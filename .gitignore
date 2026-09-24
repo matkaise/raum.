@@ -1,0 +1,22 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+build.nosync/
+.gradle.nosync/
+keystore.properties
+*.jks
+*.keystore
+# iCloud-Duplikate ("Foo 2.der")
+* 2.*
+# Zertifikate/Schlüssel aus tools/make-attestation.sh
+attestation-*/
+raum-bridge-*.zip
+*.csr
