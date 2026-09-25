@@ -50,6 +50,9 @@ interface MatterBridge {
     suspend fun closePairingWindow()
     suspend fun removeAdmin(fabricIndex: Int): CommandResult
 
-    /** Werksreset der Bridge-Identität: alle Kopplungen weg. */
+    /**
+     * Werksreset der Bridge-Identität: alle Kopplungen weg, Bridge danach aus – auch wenn sie gerade nicht läuft.
+     * Wirft, wenn sich das nicht bestätigen lässt; der Reset gilt dann nicht als abgeschlossen.
+     */
     suspend fun reset()
 }

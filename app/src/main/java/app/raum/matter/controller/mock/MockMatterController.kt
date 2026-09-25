@@ -244,9 +244,23 @@ class MockMatterController(
         delay(latency())
         if (fabricIndex == 1) return CommandResult.Failure(CommandFailure.UNSUPPORTED, "own fabric")
         if (_devices.value[nodeId]?.onlineState != OnlineState.ONLINE) return CommandResult.Failure(CommandFailure.OFFLINE)
+        // Echte Geräte melden eine Ablehnung teils nur in der Antwort (NOCResponse) – der Befehl selbst „gelingt“
+        if (nodeId in stuckAdmins) return CommandResult.Success
         otherAdmins.update { m -> m + (nodeId to m[nodeId].orEmpty().filterNot { it.fabricIndex == fabricIndex }) }
         return CommandResult.Success
     }
+
+    override suspend fun readAdmins(nodeId: ULong): List<AdminFabric>? {
+        delay(latency())
+        if (_devices.value[nodeId]?.onlineState != OnlineState.ONLINE) return null
+        // Direkt der aktuelle Stand (adminFabrics folgt asynchron) – wie ein frischer Lesezugriff beim Gerät
+        return listOf(AdminFabric(1, TEST_VENDOR, "raum.", own = true)) + otherAdmins.value[nodeId].orEmpty()
+    }
+
+    private val stuckAdmins: MutableSet<ULong> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Test: Gerät bestätigt RemoveFabric, behält die fremde Fabric aber. */
+    fun simulateStuckAdmins(nodeId: ULong) { stuckAdmins += nodeId }
 
     /** Test/Vorführung: eine andere App koppelt über das offene Fenster. */
     fun simulateExternalAdmin(nodeId: ULong, vendorId: Int, label: String): Boolean {

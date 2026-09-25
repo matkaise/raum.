@@ -718,6 +718,31 @@ class ChipMatterController(
             ?: CommandResult.Failure(CommandFailure.OFFLINE)
     }
 
+    override suspend fun readAdmins(nodeId: ULong): List<AdminFabric>? {
+        val c = controller()
+        val attrs = listOf(Attr.FABRICS, Attr.CURRENT_FABRIC_INDEX).map {
+            ChipAttributePath.newInstance(ChipPathId.forId(0), ChipPathId.forId(Cluster.OPERATIONAL_CREDENTIALS), ChipPathId.forId(it))
+        }
+        val state = withDevice(nodeId) { ptr ->
+            // Result als Hülle: null innen = gelesen, aber ohne Antwort; null außen = nicht erreichbar
+            Result.success(withTimeoutOrNull(COMMAND_TIMEOUT.toMillis()) {
+                suspendCancellableCoroutine<NodeState?> { cont ->
+                    c.readPath(object : ReportCallback {
+                        override fun onError(attributePath: ChipAttributePath?, eventPath: ChipEventPath?, e: Exception) {
+                            Log.w(TAG, "Admins 0x%X lesen: %s".format(nodeId.toLong(), attributePath), e)
+                            if (cont.isActive) cont.resume(null)
+                        }
+                        override fun onReport(nodeState: NodeState) { if (cont.isActive) cont.resume(nodeState) }
+                    }, ptr, attrs, emptyList(), false /* alle Fabrics, nicht nur die eigene */, 0)
+                }
+            })
+        }?.getOrNull() ?: return null
+        val read = state.endpointStates[0]?.clusterStates?.get(Cluster.OPERATIONAL_CREDENTIALS)?.attributeStates
+        if (read?.containsKey(Attr.FABRICS) != true || !read.containsKey(Attr.CURRENT_FABRIC_INDEX)) return null
+        apply(nodeId, state) // aktualisiert auch adminFabrics für die Oberfläche
+        return nodeData[nodeId]?.let(ClusterMapper::admins)
+    }
+
     // --- Zwischenspeicher der letzten Werte ----------------------------------------------------
 
     private fun saveCache(nodeId: ULong) {

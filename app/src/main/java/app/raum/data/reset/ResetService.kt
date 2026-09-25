@@ -19,9 +19,16 @@ enum class ResetMode {
     FULL,
 }
 
+/** Die Übergabe wurde nicht abgeschlossen: Nicht alle fremden Zugriffe sind bestätigt entzogen. */
+class HandoverIncompleteException(val report: HandoverReport) : IllegalStateException("handover incomplete")
+
 /**
  * Werksreset und Wohnungsübergabe (Spez. 7.11). Aufrufer müssen vorher die Administrator-PIN
  * geprüft haben (RST-003). Nach dem Reset ist ein Neustart des Prozesses nötig.
+ *
+ * Übergabe in zwei Schritten: [revokeForeignAdmins] entzieht anderen Apps den Zugriff und meldet das Ergebnis je
+ * Gerät; erst danach löscht [reset] die eigenen Schlüssel. Ohne sie ließe sich ein verbliebener fremder Zugriff
+ * später nicht mehr entziehen – deshalb nur bei vollständigem Ergebnis oder ausdrücklich unvollständig.
  */
 class ResetService(
     private val context: Context,
@@ -34,18 +41,27 @@ class ResetService(
     private val bridge: MatterBridge,
     private val credentials: NetworkCredentialStore,
 ) {
-    suspend fun reset(mode: ResetMode) {
+    /**
+     * Übergabe, Schritt 1: allen anderen Apps (Apple Home, Google Home …) den Zugriff auf alle Geräte entziehen –
+     * sonst könnten Vormieter die Geräte weiter steuern. Geht nur, solange raum. noch Admin ist. Ändert sonst nichts.
+     */
+    suspend fun revokeForeignAdmins(): HandoverReport = AdminRevocation(controller).run(controller.devices.value.keys)
+
+    /**
+     * @param handover Ergebnis von [revokeForeignAdmins] (Pflicht bei [ResetMode.HANDOVER]).
+     * @param acceptIncomplete Nutzer hat ausdrücklich bestätigt, trotz verbliebener/ungeprüfter Zugriffe abzuschließen.
+     * @throws HandoverIncompleteException Übergabe ohne vollständiges Ergebnis und ohne Bestätigung – nichts gelöscht.
+     */
+    suspend fun reset(mode: ResetMode, handover: HandoverReport? = null, acceptIncomplete: Boolean = false) {
         // Bewusst kein Protokolleintrag: er würde asynchron nach dem Löschen geschrieben.
-        // 0. Übergabe: andere Apps (Apple Home, Google Home …) verlieren den Zugriff – sonst könnten
-        //    Vormieter die Geräte weiter steuern. Geht nur, solange raum. noch Admin ist.
         if (mode == ResetMode.HANDOVER) {
-            controller.adminFabrics.value.forEach { (node, admins) ->
-                admins.filterNot { it.own }.forEach { runCatching { controller.removeAdmin(node, it.fabricIndex) } }
-            }
+            val report = handover ?: throw HandoverIncompleteException(HandoverReport(emptyList()))
+            if (!report.complete && !acceptIncomplete) throw HandoverIncompleteException(report)
         }
-        // Bridge: alle Kopplungen anderer Apps lösen, Bridge aus (neue Bewohner entscheiden selbst)
-        runCatching { bridge.reset(); bridge.stop() }
+        // Bridge: alle Kopplungen anderer Apps lösen, Bridge aus (neue Bewohner entscheiden selbst). Zuerst die
+        // Einstellung, damit sie nicht wieder startet. Schlägt der Reset fehl, bricht alles ab – noch ist nichts gelöscht.
         settings.setBridgeEnabled(false)
+        bridge.reset()
         settings.setBridgeExcluded(emptySet())
         // 1. Eigene Matter-Fabric auflösen (RST-002) – vor dem Löschen der Daten.
         controller.resetFabric()

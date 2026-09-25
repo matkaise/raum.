@@ -47,6 +47,12 @@ class KeystoreCipher(private val alias: String) {
         }.also { cached = it }
     }
 
+    /** Schlüssel endgültig löschen – verschlüsselte Reste sind danach unlesbar (Werksreset). */
+    fun deleteKey() = synchronized(this) {
+        cached = null
+        KeyStore.getInstance(PROVIDER).apply { load(null) }.deleteEntry(alias)
+    }
+
     fun encrypt(plain: ByteArray, aad: ByteArray): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, key()) // IV erzeugt der Keystore
