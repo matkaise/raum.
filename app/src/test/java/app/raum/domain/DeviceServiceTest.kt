@@ -17,6 +17,7 @@ import app.raum.matter.controller.mock.MockHomeSeed
 import app.raum.matter.controller.mock.MockMatterController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -28,9 +29,9 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeviceServiceTest {
 
-    private class Fixture(scope: CoroutineScope, failureRate: Double = 0.0) {
+    private class Fixture(scope: CoroutineScope, failureRate: Double = 0.0, latencyMs: LongRange = 0L..0L) {
         val controller = MockMatterController(
-            scope = scope, latencyMs = 0L..0L, failureRate = failureRate, simulationTickMs = null,
+            scope = scope, latencyMs = latencyMs, failureRate = failureRate, simulationTickMs = null,
         )
         val repository = InMemoryHomeRepository("Test", MockHomeSeed.rooms, MockHomeSeed.deviceMetadata, MockHomeSeed.scenes, MockHomeSeed.automations)
         val messages = UiMessageBus()
@@ -67,6 +68,28 @@ class DeviceServiceTest {
         runCurrent()
         assertTrue(result is CommandResult.Failure)
         assertFalse(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+    }
+
+    @Test
+    fun `cancelled command removes optimistic state`() = runTest {
+        val f = Fixture(backgroundScope, latencyMs = 1_000L..1_000L).also { runCurrent() }
+        val lamp = f.device("Stehlampe")
+        assertFalse(lamp.capabilities.find<LightCapability>()!!.isOn)
+
+        val job = launch { f.service.send(lamp, DeviceCommand.SetOn(true)) }
+        runCurrent()
+        assertTrue(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+
+        job.cancel()
+        runCurrent()
+        assertFalse(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+
+        // Spätere echte Zustandsmeldungen dürfen nicht verdeckt bleiben
+        f.controller.simulateExternalChange(lamp.matterNodeId) { caps ->
+            caps.map { if (it is LightCapability) it.copy(isOn = true) else it }
+        }
+        runCurrent()
+        assertTrue(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
     }
 
     @Test

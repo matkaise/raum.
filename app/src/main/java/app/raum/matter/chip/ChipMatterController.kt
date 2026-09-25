@@ -129,7 +129,7 @@ class ChipMatterController(
     // --- SDK ---------------------------------------------------------------------------------
 
     private val initLock = Mutex()
-    private var chip: ChipDeviceController? = null
+    @Volatile private var chip: ChipDeviceController? = null
     private var kvs: EncryptedKeyValueStore? = null
 
     private val _credentialStorage = MutableStateFlow<CredentialStorage?>(null)
@@ -534,19 +534,24 @@ class ChipMatterController(
 
     // --- Verbindung, Abo, Befehle ------------------------------------------------------------
 
-    private suspend fun devicePointer(nodeId: ULong): Long? {
+    /** Verbindung zum Gerät; der native Zeiger gilt nur innerhalb von [block] und wird danach freigegeben. null = nicht erreichbar. */
+    private suspend fun <T : Any> withDevice(nodeId: ULong, block: suspend (Long) -> T): T? {
         val c = controller()
-        return withTimeoutOrNull(CONNECT_TIMEOUT.toMillis()) {
-            suspendCancellableCoroutine { cont ->
+        return withDevicePointer(
+            CONNECT_TIMEOUT.toMillis(),
+            connect = { onConnected, onFailure ->
                 c.getConnectedDevicePointer(nodeId.toLong(), object : GetConnectedDeviceCallback {
-                    override fun onDeviceConnected(devicePointer: Long) { if (cont.isActive) cont.resume(devicePointer) }
+                    override fun onDeviceConnected(devicePointer: Long) = onConnected(devicePointer)
                     override fun onConnectionFailure(nodeId: Long, error: Exception) {
                         Log.w(TAG, "Verbindung zu 0x%X fehlgeschlagen".format(nodeId), error)
-                        if (cont.isActive) cont.resume(null)
+                        onFailure()
                     }
                 })
-            }
-        }
+            },
+            // Nach einem Fabric-Reset ist dieser Controller geschlossen – seine Objekte nicht mehr anfassen
+            release = { p -> if (chip === c) c.releaseConnectedDevicePointer(p) },
+            block = block,
+        )
     }
 
     private fun paths(nodeId: ULong): List<ChipAttributePath> =
@@ -560,17 +565,20 @@ class ChipMatterController(
 
     private suspend fun subscribe(nodeId: ULong, onFirstReport: () -> Unit = {}) {
         Log.i(TAG, "Abo: verbinde Node 0x%X".format(nodeId.toLong()))
-        val ptr = devicePointer(nodeId)
-        Log.i(TAG, "Abo: Verbindung Node 0x%X = %s".format(nodeId.toLong(), ptr?.let { "ok" } ?: "fehlgeschlagen"))
-        if (ptr == null) {
+        val c = controller()
+        var first = true
+        // Das Abo übernimmt die Sitzung beim Aufruf; der Zeiger wird danach nicht mehr gebraucht und freigegeben.
+        val connected = withDevice(nodeId) { ptr -> startSubscription(c, nodeId, ptr) { if (first) { first = false; onFirstReport() } }; true }
+        Log.i(TAG, "Abo: Verbindung Node 0x%X = %s".format(nodeId.toLong(), connected?.let { "ok" } ?: "fehlgeschlagen"))
+        if (connected == null) {
             if (!recentlySeen(nodeId)) online[nodeId] = OnlineState.OFFLINE
             publish()
             // später erneut versuchen – z. B. Gerät war stromlos oder Border Router neu gestartet
             scope.launch { kotlinx.coroutines.delay(RETRY_CONNECT_MS); if (nodeId in storedNodes()) subscribe(nodeId, onFirstReport) }
-            return
         }
-        val c = controller()
-        var first = true
+    }
+
+    private suspend fun startSubscription(c: ChipDeviceController, nodeId: ULong, ptr: Long, onReport: () -> Unit) {
         withContext(Dispatchers.Main) {
             c.subscribeToPath(
                 SubscriptionEstablishedCallback { id ->
@@ -594,7 +602,7 @@ class ChipMatterController(
                     }
                     override fun onReport(nodeState: NodeState) {
                         apply(nodeId, nodeState)
-                        if (first) { first = false; onFirstReport() }
+                        onReport()
                     }
                 },
                 ptr,
@@ -635,15 +643,16 @@ class ChipMatterController(
         val data = nodeData[node] ?: return CommandResult.Failure(CommandFailure.OFFLINE, "no data yet")
         val actions = ClusterMapper.actions(command.command, data)
             ?: return CommandResult.Failure(CommandFailure.UNSUPPORTED, "command not supported")
-        val ptr = devicePointer(node) ?: return CommandResult.Failure(CommandFailure.OFFLINE, "unreachable")
-        for (a in actions) {
-            val r = when (a) {
-                is MatterAction.Invoke -> invoke(ptr, a.endpoint, a.cluster, a.command, a.fields, timed = false)
-                is MatterAction.Write -> write(ptr, a)
+        return withDevice(node) { ptr ->
+            for (a in actions) {
+                val r = when (a) {
+                    is MatterAction.Invoke -> invoke(ptr, a.endpoint, a.cluster, a.command, a.fields, timed = false)
+                    is MatterAction.Write -> write(ptr, a)
+                }
+                if (r !is CommandResult.Success) return@withDevice r
             }
-            if (r !is CommandResult.Success) return r
-        }
-        return CommandResult.Success
+            CommandResult.Success
+        } ?: CommandResult.Failure(CommandFailure.OFFLINE, "unreachable")
     }
 
     private suspend fun invoke(ptr: Long, ep: Int, cluster: Long, cmd: Long, fields: ByteArray, timed: Boolean): CommandResult {
@@ -667,7 +676,7 @@ class ChipMatterController(
                         if (cont.isActive) cont.resume(CommandResult.Failure(CommandFailure.DEVICE_ERROR, e.message))
                     }
                     override fun onResponse(attributePath: ChipAttributePath, status: Status) {
-                        if (cont.isActive) cont.resume(CommandResult.Success)
+                        if (cont.isActive) cont.resume(writeResult(status))
                     }
                 }, ptr, listOf(AttributeWriteRequest.newInstance(a.endpoint, a.cluster, a.attribute, a.value)), 0, 0)
             }
@@ -677,36 +686,36 @@ class ChipMatterController(
     // --- Multi-Admin -------------------------------------------------------------------------
 
     override suspend fun openPairingWindow(nodeId: ULong, timeout: Duration): PairingWindowResult {
-        val ptr = devicePointer(nodeId) ?: return PairingWindowResult.Failure(CommandFailure.OFFLINE)
         val c = controller()
         val discriminator = random.nextInt(0x1000)
-        val result = withTimeoutOrNull(COMMAND_TIMEOUT.toMillis()) {
-            suspendCancellableCoroutine { cont ->
-                val ok = c.openPairingWindowWithPINCallback(ptr, timeout.seconds.toInt(), PBKDF_ITERATIONS, discriminator, null,
-                    object : OpenCommissioningCallback {
-                        override fun onError(status: Int, deviceId: Long) { if (cont.isActive) cont.resume(null) }
-                        override fun onSuccess(deviceId: Long, manualPairingCode: String, qrCode: String) {
-                            if (cont.isActive) cont.resume(PairingWindow(nodeId, manualPairingCode, qrCode, clock.instant().plus(timeout)))
-                        }
-                    })
-                if (!ok && cont.isActive) cont.resume(null)
+        return withDevice(nodeId) { ptr ->
+            val result = withTimeoutOrNull(COMMAND_TIMEOUT.toMillis()) {
+                suspendCancellableCoroutine { cont ->
+                    val ok = c.openPairingWindowWithPINCallback(ptr, timeout.seconds.toInt(), PBKDF_ITERATIONS, discriminator, null,
+                        object : OpenCommissioningCallback {
+                            override fun onError(status: Int, deviceId: Long) { if (cont.isActive) cont.resume(null) }
+                            override fun onSuccess(deviceId: Long, manualPairingCode: String, qrCode: String) {
+                                if (cont.isActive) cont.resume(PairingWindow(nodeId, manualPairingCode, qrCode, clock.instant().plus(timeout)))
+                            }
+                        })
+                    if (!ok && cont.isActive) cont.resume(null)
+                }
             }
-        }
-        return result?.let { PairingWindowResult.Open(it) } ?: PairingWindowResult.Failure(CommandFailure.DEVICE_ERROR)
+            result?.let { PairingWindowResult.Open(it) } ?: PairingWindowResult.Failure(CommandFailure.DEVICE_ERROR)
+        } ?: PairingWindowResult.Failure(CommandFailure.OFFLINE)
     }
 
     override suspend fun closePairingWindow(nodeId: ULong) {
-        val ptr = devicePointer(nodeId) ?: return
         // AdministratorCommissioning.RevokeCommissioning verlangt eine zeitgebundene Anfrage
-        invoke(ptr, 0, Cluster.ADMIN_COMMISSIONING, Cmd.REVOKE_COMMISSIONING, TlvWriter.empty(), timed = true)
+        withDevice(nodeId) { ptr -> invoke(ptr, 0, Cluster.ADMIN_COMMISSIONING, Cmd.REVOKE_COMMISSIONING, TlvWriter.empty(), timed = true) }
     }
 
     override suspend fun removeAdmin(nodeId: ULong, fabricIndex: Int): CommandResult {
         val own = nodeData[nodeId]?.let(ClusterMapper::admins)?.firstOrNull { it.own }?.fabricIndex
         if (fabricIndex == own) return CommandResult.Failure(CommandFailure.UNSUPPORTED, "own fabric")
-        val ptr = devicePointer(nodeId) ?: return CommandResult.Failure(CommandFailure.OFFLINE)
         val fields = TlvWriter().startStructure().uint(0, fabricIndex.toLong()).endContainer().bytes()
-        return invoke(ptr, 0, Cluster.OPERATIONAL_CREDENTIALS, Cmd.REMOVE_FABRIC, fields, timed = false)
+        return withDevice(nodeId) { ptr -> invoke(ptr, 0, Cluster.OPERATIONAL_CREDENTIALS, Cmd.REMOVE_FABRIC, fields, timed = false) }
+            ?: CommandResult.Failure(CommandFailure.OFFLINE)
     }
 
     // --- Zwischenspeicher der letzten Werte ----------------------------------------------------
