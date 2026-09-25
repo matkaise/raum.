@@ -300,4 +300,15 @@ class ClusterMapperTest {
         assertTrue(ClusterMapper.channels(n).isEmpty())
         assertTrue(ClusterMapper.channels(node(*onOff(1, DeviceType.ON_OFF_PLUG, true))).isEmpty())
     }
+
+    @Test fun `Kleinste Helligkeitsstufe wird nicht als 0 Prozent angezeigt`() {
+        fun level(raw: Long) = ClusterMapper.capabilities(node(
+            at(1, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) to types(DeviceType.DIMMABLE_LIGHT),
+            at(1, Cluster.ON_OFF, Attr.VALUE) to true,
+            at(1, Cluster.LEVEL_CONTROL, Attr.VALUE) to raw,
+        )).find<LightCapability>()!!.brightnessPercent
+        assertEquals(1, level(1))
+        assertEquals(0, level(0))
+        assertEquals(100, level(254))
+    }
 }
