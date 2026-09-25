@@ -35,7 +35,7 @@ data class RoomEntity(
             onDelete = ForeignKey.SET_NULL,
         ),
     ],
-    indices = [Index("roomId"), Index(value = ["matterNodeId"], unique = true)],
+    indices = [Index("roomId"), Index(value = ["matterNodeId", "endpointId"], unique = true)],
 )
 data class DeviceEntity(
     @PrimaryKey val id: String,
@@ -45,6 +45,8 @@ data class DeviceEntity(
     val vendorName: String?,
     val productName: String?,
     val favorite: Boolean,
+    /** Weiterer Kanal des Nodes (Endpunkt); null = Hauptkanal. */
+    val endpointId: Int? = null,
 )
 
 @Entity(tableName = "scenes")

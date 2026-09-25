@@ -89,7 +89,7 @@ class RoomHomeRepositoryTest {
         repo.removeDevice(lamp.nodeId)
         val actions = dao.observeScenes().first().flatMap { it.actions }
         assertTrue(actions.none { it.deviceId == lamp.id.toString() })
-        assertNull(dao.deviceByNode(lamp.nodeId.toLong()))
+        assertNull(dao.deviceByChannel(lamp.nodeId.toLong(), null))
     }
 
     @Test
@@ -107,7 +107,7 @@ class RoomHomeRepositoryTest {
     fun upsertByNodeKeepsExistingDeviceId() = runBlocking {
         val lamp = MockHomeSeed.deviceMetadata.first()
         repo.upsertDevice(lamp.copy(id = UUID.randomUUID(), displayName = "Umbenannt"))
-        val stored = dao.deviceByNode(lamp.matterNodeId.toLong())!!
+        val stored = dao.deviceByChannel(lamp.matterNodeId.toLong(), null)!!
         assertEquals(lamp.id.toString(), stored.id)
         assertEquals("Umbenannt", stored.displayName)
     }

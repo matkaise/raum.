@@ -9,6 +9,7 @@ import app.raum.data.backup.BackupMapper
 import app.raum.data.backup.IncompatibleBackupException
 import app.raum.data.backup.SettingsDto
 import app.raum.domain.models.Home
+import app.raum.domain.models.deviceIdForChannel
 import app.raum.matter.controller.mock.MockHomeSeed
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -42,6 +43,20 @@ class BackupTest {
         assertEquals(MockHomeSeed.automations, plan.automations)
         assertEquals("DARK", plan.settings.themeMode)
         assertTrue(plan.warnings.isEmpty())
+    }
+
+    @Test
+    fun `further channels of a node survive backup and restore`() {
+        val main = MockHomeSeed.deviceMetadata.first()
+        val channel = main.copy(id = deviceIdForChannel(main.matterNodeId, 2), displayName = "Relais 2", endpointId = 2)
+        val doc = BackupMapper.toDocument(
+            home, MockHomeSeed.rooms, MockHomeSeed.deviceMetadata + channel, MockHomeSeed.scenes, MockHomeSeed.automations,
+            SettingsDto(), appVersion = "0.7.0", dbSchema = 3,
+        )
+        val plan = BackupMapper.plan(BackupCodec.decode(BackupCodec.encode(doc, pw, fastIterations), pw),
+            currentDbSchema = 3, knownNodeIds = MockHomeSeed.devices.map { it.nodeId }.toSet())
+        assertEquals(channel, plan.devices.single { it.endpointId == 2 })
+        assertEquals(main, plan.devices.single { it.matterNodeId == main.matterNodeId && it.endpointId == null })
     }
 
     @Test

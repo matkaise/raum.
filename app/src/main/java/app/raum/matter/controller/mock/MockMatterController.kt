@@ -20,6 +20,7 @@ import app.raum.domain.models.ThreadRole
 import app.raum.thread.NetworkCredentialStore
 import app.raum.domain.models.CoverCapability
 import app.raum.domain.models.CoverMovement
+import app.raum.domain.models.DeviceChannel
 import app.raum.domain.models.DeviceCommand
 import app.raum.domain.models.DeviceState
 import app.raum.domain.models.HumiditySensorCapability
@@ -259,6 +260,14 @@ class MockMatterController(
 
     private val stuckAdmins: MutableSet<ULong> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
+    /** Test/Vorführung: Node bekommt einen weiteren Kanal (z. B. zweites Relais) an [endpoint]. */
+    fun addChannel(nodeId: ULong, endpoint: Int, capabilities: List<Capability>) {
+        mutate { map ->
+            val s = map[nodeId] ?: return@mutate map
+            map + (nodeId to s.copy(channels = s.channels.filterNot { it.endpoint == endpoint } + DeviceChannel(endpoint, capabilities)))
+        }
+    }
+
     /** Test: Gerät bestätigt RemoveFabric, behält die fremde Fabric aber. */
     fun simulateStuckAdmins(nodeId: ULong) { stuckAdmins += nodeId }
 
@@ -295,11 +304,25 @@ class MockMatterController(
             delay(latency() * 3) // Timeout-ähnliches Verhalten
             return CommandResult.Failure(CommandFailure.OFFLINE, "no response")
         }
-        if (!CapabilityReducer.supports(state.capabilities, command.command)) {
+        val channel = command.endpointId?.let { ep ->
+            state.channels.firstOrNull { it.endpoint == ep }
+                ?: return CommandResult.Failure(CommandFailure.UNSUPPORTED, "no channel $ep")
+        }
+        if (!CapabilityReducer.supports(channel?.capabilities ?: state.capabilities, command.command)) {
             return CommandResult.Failure(CommandFailure.UNSUPPORTED, "command not supported")
         }
         if (failureRate > 0 && random.nextDouble() < failureRate) {
             return CommandResult.Failure(CommandFailure.TIMEOUT, "response timeout")
+        }
+        if (channel != null) {
+            mutate { map ->
+                val s = map[command.nodeId] ?: return@mutate map
+                val channels = s.channels.map { c ->
+                    if (c.endpoint == channel.endpoint) c.copy(capabilities = CapabilityReducer.apply(c.capabilities, command.command)) else c
+                }
+                map + (command.nodeId to s.copy(channels = channels, lastSeenAt = clock.instant()))
+            }
+            return CommandResult.Success
         }
         mutate { map ->
             val s = map[command.nodeId] ?: return@mutate map

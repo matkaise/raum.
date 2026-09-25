@@ -77,7 +77,8 @@ fun shareSummary(vm: ShareViewModel = koinViewModel()): String {
     val admins by vm.admins.collectAsStateWithLifecycle()
     val bridgeOn by vm.bridgeEnabled.collectAsStateWithLifecycle()
     val bridge by vm.bridgeState.collectAsStateWithLifecycle()
-    val direct = devices.count { d -> admins[d.matterNodeId].orEmpty().any { !it.own } }
+    // Direkt geteilt wird immer der ganze Node – weitere Kanäle zählen nicht extra
+    val direct = devices.count { d -> d.isPrimaryChannel && admins[d.matterNodeId].orEmpty().any { !it.own } }
     val parts = buildList {
         if (bridgeOn) add(
             if (bridge.admins.isEmpty()) stringResource(R.string.bridge_summary_on)
@@ -197,7 +198,7 @@ fun ShareSection(roomName: (Device) -> String?, vm: ShareViewModel = koinViewMod
             // Gleiche App direkt und über die Bridge → Gerät erscheint dort doppelt
             val bridgeVendors = bridge.admins.map { it.vendorId }.toSet()
             val doubled = devices.count { d ->
-                d.id !in excluded && admins[d.matterNodeId].orEmpty().any { !it.own && it.vendorId in bridgeVendors }
+                d.isPrimaryChannel && d.id !in excluded && admins[d.matterNodeId].orEmpty().any { !it.own && it.vendorId in bridgeVendors }
             }
             if (doubled > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -213,11 +214,13 @@ fun ShareSection(roomName: (Device) -> String?, vm: ShareViewModel = koinViewMod
     Group(stringResource(R.string.share_direct_title)) {
         Text(stringResource(R.string.share_direct_explain), style = MaterialTheme.typography.bodyLarge)
         Text(stringResource(R.string.share_hubs), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val online = devices.filter { it.isOnline }.sortedBy { it.displayName }
+        // Multi-Admin gilt für den ganzen Node (alle Kanäle) – daher nur Hauptkanäle
+        val nodes = devices.filter { it.isPrimaryChannel }
+        val online = nodes.filter { it.isOnline }.sortedBy { it.displayName }
         TextButton(onClick = { guarded { vm.start(online) } }, enabled = online.isNotEmpty()) {
             Icon(Icons.Outlined.Share, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.share_all, online.size))
         }
-        devices.sortedBy { it.displayName }.forEach { d ->
+        nodes.sortedBy { it.displayName }.forEach { d ->
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

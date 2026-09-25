@@ -92,7 +92,8 @@ sealed interface PairingWindowResult {
 data class MatterCommand(
     val nodeId: ULong,
     val command: DeviceCommand,
-    val endpointId: Int = 1,
+    /** Weiterer Kanal ([app.raum.domain.models.DeviceChannel.endpoint]); null = Hauptkanal. */
+    val endpointId: Int? = null,
 )
 
 sealed interface CommandResult {

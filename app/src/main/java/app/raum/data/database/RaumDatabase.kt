@@ -31,7 +31,7 @@ abstract class RaumDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "raum.db"
-        const val VERSION = 2
+        const val VERSION = 3
 
         fun create(context: Context): RaumDatabase {
             DatabaseSafety.snapshotBeforeMigration(context)

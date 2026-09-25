@@ -202,7 +202,7 @@ class DataMaintenanceViewModel(
     fun cancelHandover() { _handover.value = null }
 
     private fun describe(d: DeviceRevocation): Pair<String, String> {
-        val name = devices.devices.value.firstOrNull { it.matterNodeId == d.nodeId }?.displayName
+        val name = devices.devices.value.firstOrNull { it.matterNodeId == d.nodeId && it.isPrimaryChannel }?.displayName
             ?: strings.get(R.string.device_unnamed, "%X".format(d.nodeId.toLong()))
         fun apps(list: List<AdminFabric>) =
             list.map { Ecosystems.name(it) ?: strings.get(R.string.handover_other_app) }.distinct().joinToString(", ")

@@ -77,8 +77,8 @@ object Reports {
         appendLine("Rooms $roomsCount · devices ${devices.size} (offline ${devices.count { !it.isOnline }}) · scenes $scenesCount · automations $automationsCount")
         appendLine()
         appendLine(strings.get(R.string.report_devices_header))
-        devices.sortedBy { it.matterNodeId }.forEach { d ->
-            appendLine(" 0x%X %-8s %-10s %s %s".format(d.matterNodeId.toLong(), d.onlineState, d.category.name, d.vendorName ?: "-", d.productName ?: "-"))
+        devices.sortedWith(compareBy({ it.matterNodeId }, { it.endpointId ?: -1 })).forEach { d ->
+            appendLine(" 0x%X%s %-8s %-10s %s %s".format(d.matterNodeId.toLong(), d.endpointId?.let { "/$it" }.orEmpty(), d.onlineState, d.category.name, d.vendorName ?: "-", d.productName ?: "-"))
         }
         appendLine()
         appendLine(strings.get(R.string.report_log_header, log.size))

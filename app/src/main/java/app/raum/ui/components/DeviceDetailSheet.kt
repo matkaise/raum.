@@ -353,6 +353,7 @@ private fun DeviceInfo(device: Device) {
         InfoLine(stringResource(R.string.device_vendor), device.vendorName ?: "–")
         InfoLine(stringResource(R.string.device_product), device.productName ?: "–")
         InfoLine(stringResource(R.string.device_node_id), "0x%016X".format(device.matterNodeId.toLong()), mono = true)
+        device.endpointId?.let { InfoLine(stringResource(R.string.device_channel), stringResource(R.string.device_channel_value, it)) }
         device.network?.let { n -> InfoLine(stringResource(R.string.device_connection), connectionText(n)) }
         device.capabilities.find<BatteryCapability>()?.let { InfoLine(stringResource(R.string.battery), "${it.percent} %") }
         InfoLine(stringResource(R.string.last_seen), formatAgo(device.lastSeenAt))

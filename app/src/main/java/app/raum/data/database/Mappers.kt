@@ -43,6 +43,7 @@ internal fun DeviceEntity.toDomain() = DeviceMetadata(
     vendorName = vendorName,
     productName = productName,
     favorite = favorite,
+    endpointId = endpointId,
 )
 
 internal fun DeviceMetadata.toEntity() = DeviceEntity(
@@ -53,6 +54,7 @@ internal fun DeviceMetadata.toEntity() = DeviceEntity(
     vendorName = vendorName,
     productName = productName,
     favorite = favorite,
+    endpointId = endpointId,
 )
 
 internal fun SceneWithActions.toDomain() = Scene(

@@ -6,6 +6,7 @@ import app.raum.domain.models.CoverCapability
 import app.raum.domain.models.CoverMovement
 import app.raum.domain.models.DeviceCommand
 import app.raum.domain.models.LightCapability
+import app.raum.domain.models.SwitchCapability
 import app.raum.domain.models.find
 import app.raum.domain.usecases.DeviceService
 import app.raum.domain.usecases.SceneRunner
@@ -90,6 +91,59 @@ class DeviceServiceTest {
         }
         runCurrent()
         assertTrue(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+    }
+
+    // --- Mehrkanalgeräte ----------------------------------------------------------------------
+
+    /** Online-Zwischenstecker, der einen zweiten Kanal (Endpunkt 2) bekommt; liefert den Hauptkanal. */
+    private fun Fixture.plugWithSecondChannel(): app.raum.domain.models.Device {
+        val plug = service.devices.value.first { it.isOnline && it.capabilities.find<SwitchCapability>() != null }
+        controller.addChannel(plug.matterNodeId, 2, listOf(SwitchCapability(isOn = false)))
+        return plug
+    }
+
+    @Test
+    fun `second channel appears as its own device and is switched independently`() = runTest {
+        val f = fixture()
+        val plug = f.plugWithSecondChannel()
+        runCurrent()
+        val channel = f.service.devices.value.single { it.matterNodeId == plug.matterNodeId && it.endpointId == 2 }
+        assertEquals("${plug.displayName} · Kanal 2", channel.displayName)
+        assertEquals(plug.roomId, channel.roomId)
+        assertFalse(channel.isPrimaryChannel)
+        val mainOn = plug.capabilities.find<SwitchCapability>()!!.isOn
+
+        assertEquals(CommandResult.Success, f.service.send(channel, DeviceCommand.SetOn(true)))
+        runCurrent()
+
+        assertTrue(f.service.device(channel.id)!!.capabilities.find<SwitchCapability>()!!.isOn)
+        assertEquals(mainOn, f.service.device(plug.id)!!.capabilities.find<SwitchCapability>()!!.isOn)
+    }
+
+    @Test
+    fun `renaming a channel stores its own metadata and keeps the main device`() = runTest {
+        val f = fixture()
+        val plug = f.plugWithSecondChannel()
+        runCurrent()
+        val channel = f.service.devices.value.single { it.matterNodeId == plug.matterNodeId && it.endpointId == 2 }
+
+        f.service.rename(channel, "Kaffeemühle")
+        runCurrent()
+
+        val stored = f.repository.deviceMetadata.value.filter { it.matterNodeId == plug.matterNodeId }
+        assertEquals(setOf(null, 2), stored.map { it.endpointId }.toSet())
+        assertEquals("Kaffeemühle", f.service.device(channel.id)!!.displayName)
+        assertEquals(plug.displayName, f.service.device(plug.id)!!.displayName)
+    }
+
+    @Test
+    fun `removing the node removes all its channels`() = runTest {
+        val f = fixture()
+        val plug = f.plugWithSecondChannel()
+        runCurrent()
+        f.service.remove(plug)
+        runCurrent()
+        assertTrue(f.service.devices.value.none { it.matterNodeId == plug.matterNodeId })
     }
 
     @Test

@@ -6,8 +6,11 @@ import androidx.annotation.StringRes
 import java.time.Instant
 import java.util.UUID
 
-/** Stabile lokale Geräte-ID je Matter-Node (auch für Nodes ohne gespeicherte Metadaten). */
+/** Stabile lokale Geräte-ID je Matter-Node (auch für Nodes ohne gespeicherte Metadaten) – zugleich der Hauptkanal. */
 fun deviceIdForNode(nodeId: ULong): UUID = UUID.nameUUIDFromBytes("raum-device-$nodeId".toByteArray())
+
+/** Stabile lokale Geräte-ID für einen weiteren Kanal eines Nodes (z. B. zweites Relais, zweite Leuchte). */
+fun deviceIdForChannel(nodeId: ULong, endpoint: Int): UUID = UUID.nameUUIDFromBytes("raum-device-$nodeId-ep$endpoint".toByteArray())
 
 enum class OnlineState { ONLINE, OFFLINE, UNKNOWN }
 
@@ -33,7 +36,15 @@ data class DeviceState(
     val label: String? = null,
     /** Wie das Gerät im Netz hängt (Thread-Diagnose, Spez. 8.3) */
     val network: DeviceNetwork? = null,
+    /** Weitere unabhängig steuerbare Kanäle; der Hauptkanal steckt in [capabilities]. */
+    val channels: List<DeviceChannel> = emptyList(),
 )
+
+/**
+ * Ein weiterer Kanal eines Nodes mit eigenem Endpunkt (Mehrkanal-Relais, Leuchte + Steckdose, Bridge mit mehreren
+ * Leuchten). raum. zeigt ihn als eigenes Gerät; Befehle gehen an [endpoint].
+ */
+data class DeviceChannel(val endpoint: Int, val capabilities: List<Capability>)
 
 enum class NetworkTransport { THREAD, WIFI, ETHERNET }
 
@@ -56,7 +67,7 @@ data class DeviceNetwork(
     val threadChannel: Int? = null,
 )
 
-/** Lokal gespeicherte Metadaten zu einem Node (Name, Raum, Favorit). */
+/** Lokal gespeicherte Metadaten zu einem Gerät (Name, Raum, Favorit). */
 data class DeviceMetadata(
     val id: UUID,
     val matterNodeId: ULong,
@@ -65,6 +76,8 @@ data class DeviceMetadata(
     val vendorName: String?,
     val productName: String?,
     val favorite: Boolean,
+    /** Weiterer Kanal des Nodes ([DeviceChannel.endpoint]); null = Hauptkanal. */
+    val endpointId: Int? = null,
 )
 
 /** Kombiniertes Modell für UI und Domain (Spez. 10.2). */
@@ -80,8 +93,13 @@ data class Device(
     val lastSeenAt: Instant?,
     val capabilities: List<Capability>,
     val network: DeviceNetwork? = null,
+    /** Weiterer Kanal eines Nodes (Befehle gehen an diesen Endpunkt); null = Hauptkanal. */
+    val endpointId: Int? = null,
 ) {
     val isOnline: Boolean get() = onlineState == OnlineState.ONLINE
+
+    /** Hauptkanal des Nodes – nur er steht für den ganzen Node (Teilen, Entfernen, Node-Infos). */
+    val isPrimaryChannel: Boolean get() = endpointId == null
 
     val category: DeviceCategory
         get() = when {

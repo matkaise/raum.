@@ -36,7 +36,7 @@ class InMemoryHomeRepository(
 
     override suspend fun upsertDevice(metadata: DeviceMetadata) {
         _devices.update { list ->
-            val idx = list.indexOfFirst { it.matterNodeId == metadata.matterNodeId }
+            val idx = list.indexOfFirst { it.matterNodeId == metadata.matterNodeId && it.endpointId == metadata.endpointId }
             if (idx >= 0) list.toMutableList().also { it[idx] = metadata } else list + metadata
         }
     }

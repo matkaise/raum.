@@ -46,6 +46,14 @@ raum. das Gerät trotzdem: Es sucht per mDNS (`_matter._tcp`) nach Knoten der ei
 und nimmt sie auf (Name aus BasicInformation). Erneutes Koppeln meldet dann „Gerät ist schon in raum.“ statt eines
 Echtheitsfehlers.
 
+**Mehrkanalgeräte:** Hat ein Gerät mehrere schaltbare Endpunkte mit Licht- oder Steckdosen-/Schaltaktor-Gerätetyp
+(z. B. Zweifach-Relais, Leuchte mit Steckdose, Matter-Bridge mit mehreren Leuchten), zeigt raum. jeden weiteren Kanal
+als eigenes Gerät „<Name> · Kanal n“ im Raum des Hauptgeräts. Kanäle lassen sich einzeln umbenennen, einem Raum
+zuordnen, in Szenen, Automationen und die Bridge aufnehmen. Der erste Kanal bleibt das bisherige Gerät (bestehende
+Szenen bleiben gültig). Teilen mit anderen Apps und „Aus raum. entfernen“ gelten immer für das ganze Gerät mit allen
+Kanälen. Nicht als eigene Kanäle erscheinen mehrere Thermostate, Storen oder Sensoren an einem Node – dort nutzt raum.
+weiterhin den ersten Endpunkt.
+
 **Hinweise:** Batteriebetriebene Thread-Sensoren schlafen und melden sich teils nur alle paar Minuten; raum. zeigt bis
 dahin die zuletzt bekannten Werte (auch nach Neustart) und meldet ein Gerät erst nach 10 Minuten Funkstille als offline.
 Nicht erreichbare Geräte werden jede Minute erneut verbunden. „Funkstille“ heißt: kein Bericht **und** kein bestehendes

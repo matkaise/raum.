@@ -34,4 +34,16 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2)
+/**
+ * v2 → v3 (Mehrkanalgeräte): weitere Kanäle eines Nodes sind eigene Geräte mit `endpointId`; bestehende Geräte
+ * bleiben Hauptkanal (NULL). Eindeutig ist jetzt (Node, Kanal) statt nur der Node.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `devices` ADD COLUMN `endpointId` INTEGER")
+        db.execSQL("DROP INDEX IF EXISTS `index_devices_matterNodeId`")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_devices_matterNodeId_endpointId` ON `devices` (`matterNodeId`, `endpointId`)")
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)

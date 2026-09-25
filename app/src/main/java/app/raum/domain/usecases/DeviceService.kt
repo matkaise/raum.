@@ -11,6 +11,7 @@ import app.raum.domain.models.Device
 import app.raum.domain.models.DeviceCommand
 import app.raum.domain.models.DeviceMetadata
 import app.raum.domain.models.OnlineState
+import app.raum.domain.models.deviceIdForChannel
 import app.raum.domain.models.deviceIdForNode
 import app.raum.domain.repositories.HomeRepository
 import app.raum.matter.controller.CommandFailure
@@ -47,7 +48,8 @@ class DeviceService(
 ) {
     private data class Pending(val version: Long, val capabilities: List<Capability>)
 
-    private val pending = MutableStateFlow<Map<ULong, Pending>>(emptyMap())
+    /** Laufende Befehle je Gerät (Kanal) – nicht je Node, sonst überlagern sich Kanäle eines Nodes. */
+    private val pending = MutableStateFlow<Map<UUID, Pending>>(emptyMap())
     private val versions = AtomicLong()
 
     val devices: StateFlow<List<Device>> = combine(
@@ -70,17 +72,33 @@ class DeviceService(
     private fun merge(
         states: Map<ULong, app.raum.domain.models.DeviceState>,
         metadata: List<DeviceMetadata>,
-        overlay: Map<ULong, Pending>,
+        overlay: Map<UUID, Pending>,
     ): List<Device> {
-        val known = metadata.associateBy { it.matterNodeId }
+        val (primaryMeta, channelMeta) = metadata.partition { it.endpointId == null }
+        val primaryNodes = primaryMeta.map { it.matterNodeId }.toSet()
         // Nodes ohne lokale Metadaten (z. B. extern hinzugefügt) trotzdem anzeigen.
-        val orphans = states.filterKeys { it !in known }.map { (nodeId, st) ->
+        val orphans = states.filterKeys { it !in primaryNodes }.map { (nodeId, st) ->
             // Name aus dem Gerät (anderswo vergebener Name, sonst Produkt), sonst „Gerät …“
             val name = st.label ?: st.productName ?: strings.get(R.string.device_unnamed, "%X".format(nodeId.toLong()))
             DeviceMetadata(deviceIdForNode(nodeId), nodeId, name, null, st.vendorName, st.productName, false)
         }
-        return (metadata + orphans).map { meta ->
+        // Weitere Kanäle ohne gespeicherte Metadaten: „<Hauptgerät> · Kanal n“ im Raum des Hauptgeräts
+        val primaries = (primaryMeta + orphans).associateBy { it.matterNodeId }
+        val storedChannels = channelMeta.map { it.id }.toSet()
+        val newChannels = states.values.flatMap { st ->
+            st.channels.mapIndexedNotNull { i, ch ->
+                val id = deviceIdForChannel(st.nodeId, ch.endpoint)
+                if (id in storedChannels) return@mapIndexedNotNull null
+                val p = primaries[st.nodeId]
+                DeviceMetadata(id, st.nodeId, strings.get(R.string.device_channel_name, p?.displayName.orEmpty(), i + 2),
+                    p?.roomId, p?.vendorName ?: st.vendorName, p?.productName ?: st.productName, false, ch.endpoint)
+            }
+        }
+        val all = primaryMeta + orphans + channelMeta + newChannels
+        return all.map { meta ->
             val state = states[meta.matterNodeId]
+            val live = if (meta.endpointId == null) state?.capabilities
+                else state?.channels?.firstOrNull { it.endpoint == meta.endpointId }?.capabilities
             Device(
                 id = meta.id,
                 matterNodeId = meta.matterNodeId,
@@ -91,8 +109,9 @@ class DeviceService(
                 onlineState = state?.onlineState ?: OnlineState.UNKNOWN,
                 favorite = meta.favorite,
                 lastSeenAt = state?.lastSeenAt,
-                capabilities = overlay[meta.matterNodeId]?.capabilities ?: state?.capabilities.orEmpty(),
+                capabilities = overlay[meta.id]?.capabilities ?: live.orEmpty(),
                 network = state?.network,
+                endpointId = meta.endpointId,
             )
         }
     }
@@ -117,15 +136,15 @@ class DeviceService(
 
         val version = versions.incrementAndGet()
         pending.update { map ->
-            val base = map[nodeId]?.capabilities ?: device.capabilities
-            map + (nodeId to Pending(version, CapabilityReducer.apply(base, command)))
+            val base = map[device.id]?.capabilities ?: device.capabilities
+            map + (device.id to Pending(version, CapabilityReducer.apply(base, command)))
         }
 
         val result = try {
-            controller.execute(MatterCommand(nodeId, command))
+            controller.execute(MatterCommand(nodeId, command, device.endpointId))
         } finally {
             // Auch bei Abbruch/Exception: nur die eigene Überlagerung entfernen – ein neuerer Befehl hat Vorrang.
-            pending.update { map -> if (map[nodeId]?.version == version) map - nodeId else map }
+            pending.update { map -> if (map[device.id]?.version == version) map - device.id else map }
         }
 
         if (result is CommandResult.Failure) {
@@ -158,7 +177,7 @@ class DeviceService(
     suspend fun assignRoom(device: Device, roomId: UUID?) = updateMetadata(device) { it.copy(roomId = roomId) }
     suspend fun setFavorite(device: Device, favorite: Boolean) = repository.setFavorite(device.id, favorite)
 
-    /** DEV-007: entfernt das Gerät aus der eigenen Fabric und aus der lokalen Konfiguration. */
+    /** DEV-007: entfernt das Gerät aus der eigenen Fabric und aus der lokalen Konfiguration – mit allen Kanälen des Nodes. */
     suspend fun remove(device: Device) {
         controller.removeDevice(device.matterNodeId)
         repository.removeDevice(device.matterNodeId)
@@ -169,7 +188,7 @@ class DeviceService(
     private suspend fun updateMetadata(device: Device, transform: (DeviceMetadata) -> DeviceMetadata) {
         val current = repository.deviceMetadata.value.firstOrNull { it.id == device.id }
             ?: DeviceMetadata(device.id, device.matterNodeId, device.displayName, device.roomId,
-                device.vendorName, device.productName, device.favorite)
+                device.vendorName, device.productName, device.favorite, device.endpointId)
         repository.upsertDevice(transform(current))
     }
 }

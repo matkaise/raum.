@@ -45,6 +45,8 @@ data class DeviceDto(
     val vendorName: String?,
     val productName: String?,
     val favorite: Boolean,
+    /** Weiterer Kanal des Nodes; null = Hauptkanal (ältere Sicherungen kennen das Feld nicht). */
+    val endpointId: Int? = null,
 )
 
 @Serializable data class SceneActionDto(val deviceId: String, val command: DeviceCommand)

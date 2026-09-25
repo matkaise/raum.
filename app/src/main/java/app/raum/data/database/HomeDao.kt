@@ -54,10 +54,10 @@ abstract class HomeDao {
     @Query("SELECT * FROM devices ORDER BY displayName")
     abstract fun observeDevices(): Flow<List<DeviceEntity>>
 
-    @Query("SELECT * FROM devices WHERE matterNodeId = :nodeId")
-    abstract suspend fun deviceByNode(nodeId: Long): DeviceEntity?
+    @Query("SELECT * FROM devices WHERE matterNodeId = :nodeId AND endpointId IS :endpointId")
+    abstract suspend fun deviceByChannel(nodeId: Long, endpointId: Int?): DeviceEntity?
 
-    @Query("SELECT matterNodeId FROM devices")
+    @Query("SELECT DISTINCT matterNodeId FROM devices")
     abstract suspend fun nodeIds(): List<Long>
 
     @Query("SELECT id FROM devices")
@@ -75,7 +75,7 @@ abstract class HomeDao {
     @Query("DELETE FROM devices WHERE matterNodeId = :nodeId")
     protected abstract suspend fun deleteDeviceRow(nodeId: Long)
 
-    /** Entfernt das Gerät samt aller Szenenaktionen, die es betreffen. */
+    /** Entfernt das Gerät (alle Kanäle des Nodes) samt aller Szenenaktionen, die es betreffen. */
     @Transaction
     open suspend fun deleteDeviceByNode(nodeId: Long) {
         deleteActionsForNode(nodeId)
@@ -83,12 +83,12 @@ abstract class HomeDao {
     }
 
     /**
-     * Upsert per Node-ID: Existiert der Node bereits unter anderer Geräte-ID, wird die vorhandene ID
+     * Upsert per Node-ID und Kanal: Existiert der Kanal bereits unter anderer Geräte-ID, wird die vorhandene ID
      * beibehalten, damit Szenenaktionen gültig bleiben.
      */
     @Transaction
-    open suspend fun upsertDeviceByNode(device: DeviceEntity) {
-        val existing = deviceByNode(device.matterNodeId)
+    open suspend fun upsertDeviceByChannel(device: DeviceEntity) {
+        val existing = deviceByChannel(device.matterNodeId, device.endpointId)
         upsertDevices(listOf(if (existing != null) device.copy(id = existing.id) else device))
     }
 
