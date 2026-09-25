@@ -66,6 +66,9 @@ interface MatterController {
     /** Einer anderen App den Zugriff entziehen (RemoveFabric). Die eigene Fabric ist ausgenommen. */
     suspend fun removeAdmin(nodeId: ULong, fabricIndex: Int): CommandResult
 
+    /** Administratoren frisch vom Gerät lesen (nicht aus dem Zwischenspeicher); null = nicht erreichbar/lesbar. */
+    suspend fun readAdmins(nodeId: ULong): List<AdminFabric>?
+
     /** Wie die Fabric-Schlüssel gespeichert sind (Spez. 11.2); null = Simulation ohne echte Schlüssel. */
     val credentialStorage: StateFlow<CredentialStorage?> get() = kotlinx.coroutines.flow.MutableStateFlow(null)
 }

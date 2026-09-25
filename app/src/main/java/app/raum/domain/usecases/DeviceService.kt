@@ -121,10 +121,12 @@ class DeviceService(
             map + (nodeId to Pending(version, CapabilityReducer.apply(base, command)))
         }
 
-        val result = controller.execute(MatterCommand(nodeId, command))
-
-        // Nur die eigene Überlagerung entfernen – ein neuerer Befehl hat Vorrang.
-        pending.update { map -> if (map[nodeId]?.version == version) map - nodeId else map }
+        val result = try {
+            controller.execute(MatterCommand(nodeId, command))
+        } finally {
+            // Auch bei Abbruch/Exception: nur die eigene Überlagerung entfernen – ein neuerer Befehl hat Vorrang.
+            pending.update { map -> if (map[nodeId]?.version == version) map - nodeId else map }
+        }
 
         if (result is CommandResult.Failure) {
             val reason = strings.get(ErrorTexts.command(result.reason))

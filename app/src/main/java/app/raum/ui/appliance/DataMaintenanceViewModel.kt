@@ -16,12 +16,17 @@ import app.raum.data.backup.RestorePlan
 import app.raum.data.database.DatabaseSafety
 import app.raum.data.database.LogFilter
 import app.raum.data.database.PersistentEventLog
+import app.raum.data.reset.DeviceRevocation
+import app.raum.data.reset.HandoverReport
 import app.raum.data.reset.ResetMode
+import app.raum.data.reset.RevocationOutcome
 import app.raum.data.reset.ResetService
 import app.raum.diagnostics.Reports
 import app.raum.domain.repositories.HomeRepository
 import app.raum.domain.usecases.DeviceService
 import app.raum.domain.usecases.UiMessageBus
+import app.raum.matter.controller.AdminFabric
+import app.raum.matter.controller.Ecosystems
 import app.raum.matter.controller.MatterController
 import app.raum.matter.controller.mock.MockMatterController
 import app.raum.platform.kiosk.KioskManager
@@ -152,10 +157,62 @@ class DataMaintenanceViewModel(
     fun verifyPin(pin: String): VerifyResult = pins.verify(pin)
     val pinSet: Boolean get() = pins.isSet
 
+    /** Offene Punkte der Übergabe (Gerät → Grund); null = kein Dialog. */
+    data class HandoverProblems(val report: HandoverReport, val checked: Int, val items: List<Pair<String, String>>)
+
+    private val _handover = MutableStateFlow<HandoverProblems?>(null)
+    val handover: StateFlow<HandoverProblems?> = _handover.asStateFlow()
+
     /** Nach bestätigter PIN (RST-003). */
-    fun reset(activity: Activity, mode: ResetMode) = run(R.string.busy_reset) {
-        reset.reset(mode)
-        restart(activity)
+    fun reset(activity: Activity, mode: ResetMode) {
+        if (mode == ResetMode.HANDOVER) return startHandover(activity)
+        run(R.string.busy_reset) {
+            reset.reset(mode)
+            restart(activity)
+        }
+    }
+
+    /** Übergabe: erst fremde Zugriffe entziehen; nur wenn alles bestätigt ist, direkt zurücksetzen. */
+    private fun startHandover(activity: Activity) = run(R.string.busy_handover_revoke) {
+        val report = reset.revokeForeignAdmins()
+        if (report.complete) {
+            reset.reset(ResetMode.HANDOVER, report)
+            restart(activity)
+        } else {
+            _handover.value = HandoverProblems(report, report.devices.size, report.problems.map { describe(it) })
+        }
+    }
+
+    fun retryHandover(activity: Activity) {
+        _handover.value = null
+        startHandover(activity)
+    }
+
+    /** Ausdrücklich unvollständig abschließen – die aufgeführten Geräte müssen vor Ort zurückgesetzt werden. */
+    fun finishHandoverIncomplete(activity: Activity) {
+        val report = _handover.value?.report ?: return
+        _handover.value = null
+        run(R.string.busy_reset) {
+            reset.reset(ResetMode.HANDOVER, report, acceptIncomplete = true)
+            restart(activity)
+        }
+    }
+
+    /** Abbrechen: raum. behält Geräte und Zugangsdaten; bereits entzogene Zugriffe bleiben entzogen. */
+    fun cancelHandover() { _handover.value = null }
+
+    private fun describe(d: DeviceRevocation): Pair<String, String> {
+        val name = devices.devices.value.firstOrNull { it.matterNodeId == d.nodeId }?.displayName
+            ?: strings.get(R.string.device_unnamed, "%X".format(d.nodeId.toLong()))
+        fun apps(list: List<AdminFabric>) =
+            list.map { Ecosystems.name(it) ?: strings.get(R.string.handover_other_app) }.distinct().joinToString(", ")
+        val reason = when (val o = d.outcome) {
+            RevocationOutcome.Unreachable -> strings.get(R.string.handover_problem_unreachable)
+            is RevocationOutcome.Failed ->
+                strings.get(if (o.unconfirmed) R.string.handover_problem_unconfirmed else R.string.handover_problem_failed, apps(o.remaining))
+            is RevocationOutcome.Revoked -> ""
+        }
+        return name to reason
     }
 
 

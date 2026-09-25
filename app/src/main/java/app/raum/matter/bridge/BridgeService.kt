@@ -116,13 +116,6 @@ class BridgeService : Service() {
             BridgeMessages.OPEN_WINDOW -> openWindow(msg.arg1)
             BridgeMessages.CLOSE_WINDOW -> { if (started) NativeBridge.closeWindow(); sendState() }
             BridgeMessages.REMOVE_FABRIC -> { if (started) NativeBridge.removeFabric(msg.arg1); sendState() }
-            BridgeMessages.RESET -> {
-                if (started) {
-                    NativeBridge.closeWindow()
-                    fabrics().forEach { NativeBridge.removeFabric(it.index) }
-                }
-                sendState()
-            }
         }
     }
 
@@ -193,10 +186,12 @@ class BridgeService : Service() {
         runCatching { client?.send(msg) }.onFailure { client = null }
     }
 
-    private companion object {
-        const val TAG = "raum.bridge"
-        const val STORE = "raum_bridge_kvs"
-        const val ALIAS = "raum_bridge_kvs_v1"
-        const val LEVEL_DEBOUNCE_MS = 400L
+    companion object {
+        private const val TAG = "raum.bridge"
+        /** Bridge-Identität (Fabrics anderer Apps, Betriebsschlüssel) – löscht [ChipMatterBridge.reset] */
+        internal const val STORE = "raum_bridge_kvs"
+        internal const val ALIAS = "raum_bridge_kvs_v1"
+        internal const val PROCESS_SUFFIX = ":bridge"
+        private const val LEVEL_DEBOUNCE_MS = 400L
     }
 }

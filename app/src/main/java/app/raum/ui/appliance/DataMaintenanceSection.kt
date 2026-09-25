@@ -79,6 +79,7 @@ fun DataMaintenanceSection(vm: DataMaintenanceViewModel) {
     val busy by vm.busy.collectAsStateWithLifecycle()
     val plan by vm.restorePlan.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
+    val handover by vm.handover.collectAsStateWithLifecycle()
     var pending by remember { mutableStateOf<Pending?>(null) }
     var password by remember { mutableStateOf("") }
     val today = LocalDate.now().toString()
@@ -182,6 +183,44 @@ fun DataMaintenanceSection(vm: DataMaintenanceViewModel) {
     }
     plan?.let { RestorePreviewDialog(it, onDismiss = vm::dismissRestore, onConfirm = vm::restore) }
     update?.let { UpdateDialog(it, onDismiss = vm::dismissUpdate, onConfirm = vm::installUpdate) }
+    handover?.let {
+        HandoverIncompleteDialog(it, onCancel = vm::cancelHandover, onRetry = { vm.retryHandover(activity) },
+            onFinish = { vm.finishHandoverIncomplete(activity) })
+    }
+}
+
+/** Übergabe mit offenen Punkten: nichts ist gelöscht; erneut versuchen oder ausdrücklich unvollständig abschließen. */
+@Composable
+private fun HandoverIncompleteDialog(
+    problems: DataMaintenanceViewModel.HandoverProblems,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+    onFinish: () -> Unit,
+) {
+    RaumDialog(
+        title = stringResource(R.string.handover_incomplete_title),
+        onDismiss = onCancel,
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onFinish) { Text(stringResource(R.string.handover_finish_incomplete), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.handover_retry)) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) } },
+    ) {
+        Text(stringResource(R.string.handover_incomplete_text, problems.items.size, problems.checked), style = MaterialTheme.typography.bodyLarge)
+        problems.items.forEach { (device, reason) ->
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(Icons.Outlined.WarningAmber, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text(device, style = MaterialTheme.typography.titleSmall)
+                    Text(reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        Text(stringResource(R.string.handover_incomplete_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 /** Zeitpunkt der Sicherung (gespeichert als UTC-ISO) in Ortszeit und Gebietsschema anzeigen. */

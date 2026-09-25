@@ -26,7 +26,7 @@ import java.util.UUID
  */
 @SuppressLint("UseKtx")
 class BridgeConfigurationManager(context: Context) : ConfigurationManager {
-    private val prefs = context.getSharedPreferences("raum_bridge_config", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private fun key(namespace: String?, name: String?): String = when {
         namespace != null && name != null -> "$namespace:$name"
@@ -92,5 +92,7 @@ class BridgeConfigurationManager(context: Context) : ConfigurationManager {
         val VENDOR_ID: Int = BuildConfig.MATTER_VENDOR_ID
         val PRODUCT_ID: Long = BuildConfig.BRIDGE_PRODUCT_ID.toLong()
         private const val SERIAL = "raum:serial"
+        /** Konfiguration des Bridge-Stacks inkl. Seriennummer – ein Werksreset gibt der Bridge eine neue Identität */
+        internal const val PREFS = "raum_bridge_config"
     }
 }

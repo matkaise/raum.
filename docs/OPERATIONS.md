@@ -255,8 +255,19 @@ stattdessen eine zweite, ausdrückliche Bestätigung. Danach startet die Einrich
 | Wiederherstellungspunkte | bleiben | gelöscht |
 | Kiosk/Device Owner | bleibt | bleibt |
 | Einrichtung | läuft erneut (Name vorgeschlagen) | läuft erneut |
-| Zugriff anderer Apps (Apple Home …) | **entfernt** (erreichbare Geräte) | bleibt |
-| Bridge | aus, alle Kopplungen gelöscht | aus, alle Kopplungen gelöscht |
+| Zugriff anderer Apps (Apple Home …) | **entfernt**, je Gerät bestätigt (siehe unten) | bleibt |
+| Bridge | aus, alle Kopplungen gelöscht, neue Identität – auch wenn sie gerade aus ist | aus, alle Kopplungen gelöscht, neue Identität – auch wenn sie gerade aus ist |
+
+**Übergabe: Entzug anderer Apps.** raum. liest bei jedem Gerät frisch aus, welche Apps Zugriff haben, entzieht alle
+fremden und bestätigt das durch erneutes Lesen. Erst wenn das für alle Geräte gelungen ist, werden die eigenen
+Schlüssel und Daten gelöscht. Sonst zeigt raum. die betroffenen Geräte (nicht erreichbar, Entzug abgelehnt oder nicht
+bestätigt) und löscht noch nichts: **Erneut versuchen** (Geräte einschalten/in Reichweite bringen), **Abbrechen**
+oder ausdrücklich **Unvollständig abschließen** – dann müssen diese Geräte vor Ort auf Werkseinstellungen
+zurückgesetzt werden, denn ohne die raum.-Schlüssel lässt sich der Zugriff nachträglich nicht mehr entziehen.
+
+**Bridge beim Zurücksetzen:** Der Bridge-Prozess wird beendet und ihr Speicher (`raum_bridge_kvs`,
+`raum_bridge_config`, Keystore-Schlüssel) direkt gelöscht – unabhängig davon, ob die Bridge läuft. Lässt sich das
+nicht bestätigen, bricht der Reset ab, bevor etwas anderes gelöscht wird. Der Echtheitsnachweis (DAC) bleibt erhalten.
 
 Gelöschte Datenbankinhalte werden überschrieben (`secure_delete`, WAL-Checkpoint, `VACUUM`).
 

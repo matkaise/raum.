@@ -984,7 +984,7 @@
     <string name="log_share_removed">%2$s no longer has access to “%1$s”</string>
 
     <!-- Übergabe entzieht fremden Apps den Zugriff -->
-    <string name="reset_fabric_text_handover">First, all other apps (e.g. Apple Home, Google Home, Alexa) lose access to the devices – reachable devices are removed there. Then all devices are removed from the raum. fabric and the fabric keys are deleted. Please factory-reset unreachable devices on site.</string>
+    <string name="reset_fabric_text_handover">First, all other apps (e.g. Apple Home, Google Home, Alexa) lose access to the devices – reachable devices are removed there. If this cannot be confirmed for every device, raum. lists them before anything is deleted. Then all devices are removed from the raum. fabric and the fabric keys are deleted. Please factory-reset unreachable devices on site.</string>
 
     <!-- Bridge -->
     <string name="select_all">All</string>
@@ -1181,4 +1181,14 @@
     <string name="bridge_attestation_pending">Request from %1$s is waiting for its certificate</string>
     <string name="bridge_attestation_no_request">There is no open request on this panel for this certificate (and no key in the bundle).</string>
     <string name="log_bridge_attestation_request">Certificate request for the bridge created (key in Keystore)</string>
+    <string name="busy_handover_revoke">Revoking access of other apps …</string>
+    <string name="handover_incomplete_title">Handover not complete yet</string>
+    <string name="handover_incomplete_text">For %1$d of %2$d devices it could not be confirmed that other apps no longer have access. Nothing has been deleted yet – raum. keeps its credentials so you can try again.</string>
+    <string name="handover_incomplete_hint">Switch the devices on or bring them in range and try again. If you finish anyway, these devices must be factory-reset on site – otherwise the previous apps keep access, and raum. can no longer revoke it afterwards.</string>
+    <string name="handover_problem_unreachable">Not reachable – unknown whether other apps have access</string>
+    <string name="handover_problem_failed">Still has access: %1$s</string>
+    <string name="handover_problem_unconfirmed">Revocation not confirmed: %1$s</string>
+    <string name="handover_other_app">other app</string>
+    <string name="handover_retry">Try again</string>
+    <string name="handover_finish_incomplete">Finish incomplete</string>
 </resources>

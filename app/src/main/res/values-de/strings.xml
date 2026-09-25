@@ -983,7 +983,7 @@
     <string name="log_share_removed">%2$s hat keinen Zugriff mehr auf „%1$s“</string>
 
     <!-- Übergabe entzieht fremden Apps den Zugriff -->
-    <string name="reset_fabric_text_handover">Zuerst verlieren alle anderen Apps (z. B. Apple Home, Google Home, Alexa) den Zugriff auf die Geräte – erreichbare Geräte werden dort entfernt. Danach werden alle Geräte aus der raum.-Fabric entfernt und die Fabric-Schlüssel gelöscht. Nicht erreichbare Geräte bitte vor Ort auf Werkseinstellungen zurücksetzen.</string>
+    <string name="reset_fabric_text_handover">Zuerst verlieren alle anderen Apps (z. B. Apple Home, Google Home, Alexa) den Zugriff auf die Geräte – erreichbare Geräte werden dort entfernt. Lässt sich das nicht für alle Geräte bestätigen, zeigt raum. sie an, bevor etwas gelöscht wird. Danach werden alle Geräte aus der raum.-Fabric entfernt und die Fabric-Schlüssel gelöscht. Nicht erreichbare Geräte bitte vor Ort auf Werkseinstellungen zurücksetzen.</string>
 
     <!-- Bridge -->
     <string name="select_all">Alle</string>
@@ -1180,4 +1180,14 @@
     <string name="bridge_attestation_pending">Anforderung vom %1$s wartet auf ihr Zertifikat</string>
     <string name="bridge_attestation_no_request">Zu diesem Zertifikat gibt es auf diesem Panel keine offene Anforderung (und keinen Schlüssel im Paket).</string>
     <string name="log_bridge_attestation_request">Zertifikatsanforderung für die Bridge erstellt (Schlüssel im Keystore)</string>
+    <string name="busy_handover_revoke">Zugriffe anderer Apps werden entzogen …</string>
+    <string name="handover_incomplete_title">Übergabe noch nicht vollständig</string>
+    <string name="handover_incomplete_text">Bei %1$d von %2$d Geräten ließ sich nicht bestätigen, dass andere Apps keinen Zugriff mehr haben. Es wurde noch nichts gelöscht – raum. behält seine Zugangsdaten, damit du es erneut versuchen kannst.</string>
+    <string name="handover_incomplete_hint">Geräte einschalten bzw. in Reichweite bringen und erneut versuchen. Wer trotzdem abschließt, muss diese Geräte vor Ort auf Werkseinstellungen zurücksetzen – sonst behalten die bisherigen Apps den Zugriff, und raum. kann ihn danach nicht mehr entziehen.</string>
+    <string name="handover_problem_unreachable">Nicht erreichbar – ob andere Apps Zugriff haben, ist unbekannt</string>
+    <string name="handover_problem_failed">Hat weiterhin Zugriff: %1$s</string>
+    <string name="handover_problem_unconfirmed">Entzug nicht bestätigt: %1$s</string>
+    <string name="handover_other_app">andere App</string>
+    <string name="handover_retry">Erneut versuchen</string>
+    <string name="handover_finish_incomplete">Unvollständig abschließen</string>
 </resources>

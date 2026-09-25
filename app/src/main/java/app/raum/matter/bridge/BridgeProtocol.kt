@@ -208,7 +208,7 @@ internal object BridgeMessages {
     const val OPEN_WINDOW = 3   // arg1 = Sekunden
     const val CLOSE_WINDOW = 4
     const val REMOVE_FABRIC = 5 // arg1 = Fabric-Index
-    const val RESET = 6
+    // 6 = früher RESET – der Werksreset löscht den Speicher jetzt direkt (ChipMatterBridge.reset)
     // Bridge → raum.
     const val STATE = 10        // data: running, fabrics (json), windowOpen
     const val WINDOW = 11       // data: passcode, discriminator, seconds; arg1 = 1 ok / 0 Fehler

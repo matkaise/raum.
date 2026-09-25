@@ -72,7 +72,7 @@ class MockMatterBridge(
     }
 
     override suspend fun reset() {
-        _state.update { it.copy(admins = emptyList(), window = null) }
+        _state.update { it.copy(running = false, admins = emptyList(), window = null) }
         saveAdmins()
     }
 

@@ -1,5 +1,6 @@
 package app.raum.matter.bridge
 
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -10,6 +11,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.Process
 import android.util.Log
 import app.raum.domain.models.Device
 import app.raum.domain.models.DeviceCommand
@@ -20,7 +22,10 @@ import app.raum.matter.controller.CommandResult
 import app.raum.matter.controller.PairingWindow
 import app.raum.matter.controller.PairingWindowResult
 import app.raum.security.KeyValueStore
+import app.raum.security.KeystoreCipher
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.time.Clock
@@ -83,7 +89,7 @@ class ChipMatterBridge(
     }
 
     override suspend fun stop() {
-        main.post {
+        withContext(Dispatchers.Main) {
             if (bound) runCatching { context.unbindService(connection) }
             bound = false
             service = null
@@ -157,9 +163,32 @@ class ChipMatterBridge(
         return CommandResult.Success
     }
 
+    /**
+     * Werksreset der Bridge-Identität – unabhängig davon, ob die Bridge gerade läuft: Dienst trennen, Bridge-Prozess
+     * beenden und seinen Speicher direkt löschen. Wirft, wenn sich das nicht bestätigen lässt; der Aufrufer darf den
+     * Reset dann nicht als abgeschlossen behandeln – sonst könnten frühere Kopplungen den Reset überleben.
+     */
     override suspend fun reset() {
-        send(Message.obtain(null, BridgeMessages.RESET))
-        _state.update { it.copy(admins = emptyList(), window = null) }
+        stop()
+        withContext(Dispatchers.IO) {
+            endBridgeProcess()
+            // Nur der Bridge-Prozess nutzt diese Dateien – nach seinem Ende gefahrlos löschbar
+            val wiped = listOf(BridgeService.STORE, BridgeConfigurationManager.PREFS).all { context.deleteSharedPreferences(it) }
+            check(wiped) { "bridge storage not deleted" }
+            // Schlüssel weg: selbst übersehene Reste des verschlüsselten Speichers sind unlesbar
+            KeystoreCipher(BridgeService.ALIAS).deleteKey()
+        }
+        _state.update { it.copy(running = false, admins = emptyList(), window = null) }
+    }
+
+    /** Beendet den Prozess „:bridge“ (läuft er nicht, ist nichts zu tun) und wartet, bis er wirklich weg ist. */
+    private suspend fun endBridgeProcess() {
+        val am = context.getSystemService(ActivityManager::class.java)
+        val name = context.packageName + BridgeService.PROCESS_SUFFIX
+        fun pid() = am.runningAppProcesses.orEmpty().firstOrNull { it.processName == name }?.pid
+        pid()?.let(Process::killProcess)
+        withTimeoutOrNull(PROCESS_END_TIMEOUT_MS) { while (pid() != null) delay(50) }
+            ?: error("bridge process still running")
     }
 
     /**
@@ -265,5 +294,6 @@ class ChipMatterBridge(
         const val TAG = "raum.bridge"
         const val FIRST_ENDPOINT = 2
         const val KEY_NEXT_ENDPOINT = "bridge_next_endpoint"
+        const val PROCESS_END_TIMEOUT_MS = 5_000L
     }
 }
