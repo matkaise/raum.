@@ -313,6 +313,7 @@ class ChipMatterController(
                 productName = info?.productName,
                 label = info?.nodeLabel,
                 network = data?.let(ClusterMapper::network),
+                channels = data?.let(ClusterMapper::channels).orEmpty(),
             )
         }
         _admins.value = nodes.associateWith { node -> nodeData[node]?.let(ClusterMapper::admins).orEmpty() }
@@ -641,7 +642,7 @@ class ChipMatterController(
     override suspend fun execute(command: MatterCommand): CommandResult {
         val node = command.nodeId
         val data = nodeData[node] ?: return CommandResult.Failure(CommandFailure.OFFLINE, "no data yet")
-        val actions = ClusterMapper.actions(command.command, data)
+        val actions = ClusterMapper.actions(command.command, data, command.endpointId)
             ?: return CommandResult.Failure(CommandFailure.UNSUPPORTED, "command not supported")
         return withDevice(node) { ptr ->
             for (a in actions) {

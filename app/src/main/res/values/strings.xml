@@ -127,7 +127,7 @@
     <string name="favorite_remove">Remove from favorites</string>
     <string name="device_remove">Remove from raum.</string>
     <string name="device_remove_title">Remove %1$s?</string>
-    <string name="device_remove_text">The device is removed from the raum. fabric and deleted from all scenes. Other Matter controllers it is shared with are not affected. To add it again, you need its setup code.</string>
+    <string name="device_remove_text">The device is removed from the raum. fabric and deleted from all scenes – for devices with several channels, all channels. Other Matter controllers it is shared with are not affected. To add it again, you need its setup code.</string>
     <string name="device_light">Light</string>
     <string name="brightness">Brightness</string>
     <string name="color_temperature">Color temperature</string>
@@ -1191,4 +1191,7 @@
     <string name="handover_other_app">other app</string>
     <string name="handover_retry">Try again</string>
     <string name="handover_finish_incomplete">Finish incomplete</string>
+    <string name="device_channel_name">%1$s · Channel %2$d</string>
+    <string name="device_channel">Channel</string>
+    <string name="device_channel_value">Endpoint %1$d (additional channel)</string>
 </resources>

@@ -56,7 +56,7 @@ class BridgeTest {
 
         val lamp = f.device("Stehlampe")
         f.prefs.bridgeExcluded.value = setOf(lamp.id); runCurrent()
-        assertFalse(lamp.matterNodeId in f.bridge.state.value.exposed)
+        assertFalse(lamp.id in f.bridge.state.value.exposed)
         assertEquals(MockHomeSeed.devices.size - 1, f.bridge.published.size)
 
         f.prefs.bridgeEnabled.value = false; runCurrent()
@@ -84,14 +84,14 @@ class BridgeTest {
 
         val lamp = f.device("Stehlampe")
         val wasOn = lamp.capabilities.find<LightCapability>()!!.isOn
-        assertTrue(f.bridge.simulateCommand(lamp.matterNodeId, DeviceCommand.SetOn(!wasOn), Ecosystems.APPLE))
+        assertTrue(f.bridge.simulateCommand(lamp.id, DeviceCommand.SetOn(!wasOn), Ecosystems.APPLE))
         runCurrent()
         assertEquals(!wasOn, f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
         assertTrue(f.log.recent.value.any { it.message.contains("Apple Home") && it.deviceName == "Stehlampe" })
 
         // nicht gekoppelte App und abgewählte Geräte werden abgewiesen
-        assertFalse(f.bridge.simulateCommand(lamp.matterNodeId, DeviceCommand.SetOn(wasOn), Ecosystems.GOOGLE))
+        assertFalse(f.bridge.simulateCommand(lamp.id, DeviceCommand.SetOn(wasOn), Ecosystems.GOOGLE))
         f.prefs.bridgeExcluded.value = setOf(lamp.id); runCurrent()
-        assertFalse(f.bridge.simulateCommand(lamp.matterNodeId, DeviceCommand.SetOn(wasOn), Ecosystems.APPLE))
+        assertFalse(f.bridge.simulateCommand(lamp.id, DeviceCommand.SetOn(wasOn), Ecosystems.APPLE))
     }
 }

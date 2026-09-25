@@ -58,7 +58,7 @@ object BackupMapper {
         home = HomeDto(home.id.toString(), home.name, home.createdAt.toEpochMilli()),
         rooms = rooms.map { RoomDto(it.id.toString(), it.name, it.icon, it.sortOrder) },
         devices = devices.map {
-            DeviceDto(it.id.toString(), it.matterNodeId.toString(), it.displayName, it.roomId?.toString(), it.vendorName, it.productName, it.favorite)
+            DeviceDto(it.id.toString(), it.matterNodeId.toString(), it.displayName, it.roomId?.toString(), it.vendorName, it.productName, it.favorite, it.endpointId)
         },
         scenes = scenes.map { s -> SceneDto(s.id.toString(), s.name, s.icon, s.actions.map { SceneActionDto(it.deviceId.toString(), it.command) }) },
         automations = automations.map { AutomationDto(it.id.toString(), it.name, it.enabled, it.triggers, it.conditions, it.actions) },
@@ -98,8 +98,8 @@ object BackupMapper {
             if (id == null || node == null) { badDevices++; return@mapNotNull null }
             val room = d.roomId?.let(::uuid)?.takeIf { it in roomIds }
             if (d.roomId != null && room == null) lostRooms++
-            DeviceMetadata(id, node, d.displayName, room, d.vendorName, d.productName, d.favorite)
-        }.distinctBy { it.matterNodeId }
+            DeviceMetadata(id, node, d.displayName, room, d.vendorName, d.productName, d.favorite, d.endpointId)
+        }.distinctBy { it.matterNodeId to it.endpointId }
         if (badDevices > 0) warnings += RestoreWarning.InvalidDevices(badDevices)
         if (lostRooms > 0) warnings += RestoreWarning.LostRooms(lostRooms)
         val deviceIds = devices.map { it.id }.toSet()

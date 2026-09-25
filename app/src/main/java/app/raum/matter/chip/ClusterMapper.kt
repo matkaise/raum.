@@ -5,6 +5,7 @@ import app.raum.domain.models.Capability
 import app.raum.domain.models.ContactSensorCapability
 import app.raum.domain.models.CoverCapability
 import app.raum.domain.models.CoverMovement
+import app.raum.domain.models.DeviceChannel
 import app.raum.domain.models.DeviceCommand
 import app.raum.domain.models.DeviceNetwork
 import app.raum.domain.models.NetworkTransport
@@ -172,6 +173,23 @@ object ClusterMapper {
         return caps
     }
 
+    /**
+     * Weitere unabhängig schaltbare Kanäle neben dem Hauptkanal: jeder weitere On/Off-Endpunkt mit Licht- oder
+     * Steckdosen-/Schaltaktor-Gerätetyp (Mehrkanal-Relais, Leuchte + Steckdose, Bridge mit mehreren Leuchten).
+     * Endpunkte anderer Gerätetypen (z. B. Klimagerät mit On/Off) bleiben Teil des Hauptgeräts.
+     */
+    fun channels(n: NodeData): List<DeviceChannel> {
+        val primary = primaryOnOffEndpoint(n) ?: return emptyList()
+        return n.endpointsWith(Cluster.ON_OFF).filter { it != primary && isChannel(n, it) }.map { ep ->
+            val cap: Capability = if (isLight(n, ep)) light(n, ep) else switch(n, ep, anyMeter = false)
+            DeviceChannel(ep, listOf(cap))
+        }
+    }
+
+    private fun isLight(n: NodeData, ep: Int) = n.deviceTypes(ep).any { it in DeviceType.LIGHTS }
+    private fun isChannel(n: NodeData, ep: Int) = n.deviceTypes(ep).any { it in DeviceType.LIGHTS || it in DeviceType.PLUGS }
+    private fun primaryOnOffEndpoint(n: NodeData): Int? = lightEndpoint(n) ?: switchEndpoint(n)
+
     private fun lightEndpoint(n: NodeData): Int? = n.endpointsWith(Cluster.ON_OFF).firstOrNull { ep ->
         n.deviceTypes(ep).any { it in DeviceType.LIGHTS }
     }
@@ -180,8 +198,9 @@ object ClusterMapper {
         n.deviceTypes(ep).none { it in DeviceType.LIGHTS }
     }
 
-    private fun light(n: NodeData): LightCapability? {
-        val ep = lightEndpoint(n) ?: return null
+    private fun light(n: NodeData): LightCapability? = lightEndpoint(n)?.let { light(n, it) }
+
+    private fun light(n: NodeData, ep: Int): LightCapability {
         val on = n[ep, Cluster.ON_OFF, Attr.VALUE] as? Boolean ?: false
         val level = if (n.has(ep, Cluster.LEVEL_CONTROL, Attr.VALUE)) {
             ((n[ep, Cluster.LEVEL_CONTROL, Attr.VALUE] as? Long ?: 0L) * 100.0 / 254).roundToInt().coerceIn(0, 100)
@@ -214,10 +233,16 @@ object ClusterMapper {
     private fun switch(n: NodeData): SwitchCapability? {
         if (lightEndpoint(n) != null) return null
         val ep = switchEndpoint(n) ?: return null
-        val power = n.endpointsWith(Cluster.ELECTRICAL_POWER_MEASUREMENT).firstNotNullOfOrNull {
+        return switch(n, ep, anyMeter = n.endpointsWith(Cluster.ON_OFF).none { it != ep && isChannel(n, it) })
+    }
+
+    /** @param anyMeter Messwerte auch von anderen Endpunkten übernehmen (nur wenn der Node keinen weiteren Kanal hat). */
+    private fun switch(n: NodeData, ep: Int, anyMeter: Boolean): SwitchCapability {
+        fun meters(cluster: Long) = if (n.endpointsWith(cluster).contains(ep)) listOf(ep) else if (anyMeter) n.endpointsWith(cluster) else emptyList()
+        val power = meters(Cluster.ELECTRICAL_POWER_MEASUREMENT).firstNotNullOfOrNull {
             n[it, Cluster.ELECTRICAL_POWER_MEASUREMENT, Attr.ACTIVE_POWER] as? Long
         }
-        val energy = n.endpointsWith(Cluster.ELECTRICAL_ENERGY_MEASUREMENT).firstNotNullOfOrNull {
+        val energy = meters(Cluster.ELECTRICAL_ENERGY_MEASUREMENT).firstNotNullOfOrNull {
             (n[it, Cluster.ELECTRICAL_ENERGY_MEASUREMENT, Attr.CUMULATIVE_ENERGY_IMPORTED] as? TlvStruct)?.long(0)
         }
         return SwitchCapability(
@@ -277,9 +302,17 @@ object ClusterMapper {
 
     // --- Schreiben --------------------------------------------------------------------------
 
-    /** null = vom Gerät nicht unterstützt. */
-    fun actions(cmd: DeviceCommand, n: NodeData): List<MatterAction>? {
-        val onOffEp = lightEndpoint(n) ?: switchEndpoint(n)
+    /**
+     * null = vom Gerät nicht unterstützt.
+     * @param channel Endpunkt eines weiteren Kanals ([channels]); null = Hauptkanal. Ein Kanal kann nur schalten,
+     *   dimmen und – bei Leuchten – Farbe/Farbtemperatur.
+     */
+    fun actions(cmd: DeviceCommand, n: NodeData, channel: Int? = null): List<MatterAction>? {
+        if (channel != null && channel !in channels(n).map { it.endpoint }) return null
+        val onOffEp = channel ?: primaryOnOffEndpoint(n)
+        val lightEp = if (channel == null) lightEndpoint(n) else channel.takeIf { isLight(n, it) }
+        if (channel != null && cmd !is DeviceCommand.SetOn && cmd !is DeviceCommand.SetBrightness &&
+            cmd !is DeviceCommand.SetColorTemperature && cmd !is DeviceCommand.SetColor) return null
         return when (cmd) {
             is DeviceCommand.SetOn -> onOffEp?.let { listOf(MatterAction.Invoke(it, Cluster.ON_OFF, if (cmd.on) Cmd.ON else Cmd.OFF, TlvWriter.empty())) }
             is DeviceCommand.SetBrightness -> {
@@ -290,7 +323,7 @@ object ClusterMapper {
                     TlvWriter().startStructure().uint(0, level).uint(1, TRANSITION).uint(2, 0).uint(3, 0).endContainer().bytes()))
             }
             is DeviceCommand.SetColorTemperature -> {
-                val ep = lightEndpoint(n)?.takeIf { n.has(it, Cluster.COLOR_CONTROL, Attr.COLOR_TEMPERATURE_MIREDS) } ?: return null
+                val ep = lightEp?.takeIf { n.has(it, Cluster.COLOR_CONTROL, Attr.COLOR_TEMPERATURE_MIREDS) } ?: return null
                 val minM = n[ep, Cluster.COLOR_CONTROL, Attr.COLOR_TEMP_MIN_MIREDS] as? Long ?: 153
                 val maxM = n[ep, Cluster.COLOR_CONTROL, Attr.COLOR_TEMP_MAX_MIREDS] as? Long ?: 500
                 val mireds = (1_000_000.0 / cmd.kelvin).roundToLong().coerceIn(minM, maxM)
@@ -298,7 +331,7 @@ object ClusterMapper {
                     TlvWriter().startStructure().uint(0, mireds).uint(1, TRANSITION).uint(2, 0).uint(3, 0).endContainer().bytes()))
             }
             is DeviceCommand.SetColor -> {
-                val ep = lightEndpoint(n)?.takeIf { ((n[it, Cluster.COLOR_CONTROL, Attr.COLOR_CAPABILITIES] as? Long ?: 0L) and 1L) != 0L } ?: return null
+                val ep = lightEp?.takeIf { ((n[it, Cluster.COLOR_CONTROL, Attr.COLOR_CAPABILITIES] as? Long ?: 0L) and 1L) != 0L } ?: return null
                 val (h, s) = rgbToHueSat(cmd.color)
                 listOf(MatterAction.Invoke(ep, Cluster.COLOR_CONTROL, Cmd.MOVE_TO_HUE_AND_SATURATION,
                     TlvWriter().startStructure().uint(0, h).uint(1, s).uint(2, TRANSITION).uint(3, 0).uint(4, 0).endContainer().bytes()))

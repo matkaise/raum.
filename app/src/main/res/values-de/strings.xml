@@ -126,7 +126,7 @@
     <string name="favorite_remove">Aus Favoriten entfernen</string>
     <string name="device_remove">Aus raum. entfernen</string>
     <string name="device_remove_title">%1$s entfernen?</string>
-    <string name="device_remove_text">Das Gerät wird aus der raum.-Fabric entfernt und aus allen Szenen gelöscht. Andere Matter-Controller, mit denen es geteilt ist, bleiben unberührt. Um es erneut hinzuzufügen, wird der Setup-Code benötigt.</string>
+    <string name="device_remove_text">Das Gerät wird aus der raum.-Fabric entfernt und aus allen Szenen gelöscht – bei Geräten mit mehreren Kanälen alle Kanäle. Andere Matter-Controller, mit denen es geteilt ist, bleiben unberührt. Um es erneut hinzuzufügen, wird der Setup-Code benötigt.</string>
     <string name="device_light">Licht</string>
     <string name="brightness">Helligkeit</string>
     <string name="color_temperature">Farbtemperatur</string>
@@ -1190,4 +1190,7 @@
     <string name="handover_other_app">andere App</string>
     <string name="handover_retry">Erneut versuchen</string>
     <string name="handover_finish_incomplete">Unvollständig abschließen</string>
+    <string name="device_channel_name">%1$s · Kanal %2$d</string>
+    <string name="device_channel">Kanal</string>
+    <string name="device_channel_value">Endpunkt %1$d (weiterer Kanal)</string>
 </resources>

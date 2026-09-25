@@ -9,21 +9,22 @@ import app.raum.matter.controller.PairingWindowResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.Duration
+import java.util.UUID
 
 /** Zustand der Bridge (raum. selbst als Matter-Gerät). */
 data class BridgeState(
     val running: Boolean = false,
     /** Apps, die raum. als Bridge gekoppelt haben (Apple Home, Google Home …) */
     val admins: List<AdminFabric> = emptyList(),
-    /** Nodes, die als „Bridged Node“-Endpunkte sichtbar sind */
-    val exposed: Set<ULong> = emptySet(),
+    /** Geräte (auch einzelne Kanäle), die als „Bridged Node“-Endpunkte sichtbar sind */
+    val exposed: Set<UUID> = emptySet(),
     val window: PairingWindow? = null,
     /** Echtheitsnachweis der Bridge; null = unbekannt (Simulation) */
     val attestation: AttestationStatus? = null,
 )
 
 /** Befehl einer anderen App an ein überbrücktes Gerät. */
-data class BridgedCommand(val nodeId: ULong, val command: DeviceCommand, val fromVendorId: Int)
+data class BridgedCommand(val deviceId: UUID, val command: DeviceCommand, val fromVendorId: Int)
 
 /**
  * raum. als Matter-Bridge (Gerätetyp Aggregator mit „Bridged Node“-Endpunkten, Matter-Spez. 9.12):

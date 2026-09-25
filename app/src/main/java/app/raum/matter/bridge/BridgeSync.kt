@@ -46,7 +46,7 @@ class BridgeSync(
         }
         scope.launch {
             bridge.incomingCommands.collect { cmd ->
-                val device = devices.devices.value.firstOrNull { it.matterNodeId == cmd.nodeId } ?: return@collect
+                val device = devices.devices.value.firstOrNull { it.id == cmd.deviceId } ?: return@collect
                 // Abgewählte Geräte sind für andere Apps tabu, auch wenn ein Befehl noch ankommt
                 if (!prefs.bridgeEnabled.value || device.id in prefs.bridgeExcluded.value) return@collect
                 val via = bridge.state.value.admins.firstOrNull { it.vendorId == cmd.fromVendorId }?.let(Ecosystems::name) ?: "?"

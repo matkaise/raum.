@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
+import java.util.UUID
 import kotlin.random.Random
 
 /**
@@ -44,7 +45,7 @@ class MockMatterBridge(
 
     override suspend fun stop() = _state.update { it.copy(running = false, window = null) }
 
-    override fun expose(devices: List<Device>) = _state.update { it.copy(exposed = devices.map { d -> d.matterNodeId }.toSet()) }
+    override fun expose(devices: List<Device>) = _state.update { it.copy(exposed = devices.map { d -> d.id }.toSet()) }
 
     override fun publish(devices: List<Device>) { published = devices }
 
@@ -88,10 +89,10 @@ class MockMatterBridge(
     }
 
     /** Vorführung/Test: eine gekoppelte App schickt einen Befehl. Nur freigegebene Geräte reagieren. */
-    fun simulateCommand(nodeId: ULong, command: DeviceCommand, vendorId: Int): Boolean {
+    fun simulateCommand(deviceId: UUID, command: DeviceCommand, vendorId: Int): Boolean {
         val s = _state.value
-        if (!s.running || nodeId !in s.exposed || s.admins.none { it.vendorId == vendorId }) return false
-        return commands.tryEmit(BridgedCommand(nodeId, command, vendorId))
+        if (!s.running || deviceId !in s.exposed || s.admins.none { it.vendorId == vendorId }) return false
+        return commands.tryEmit(BridgedCommand(deviceId, command, vendorId))
     }
 
     private fun loadAdmins(): List<AdminFabric> = store?.getString(KEY)?.split(";")?.filter { it.isNotBlank() }?.mapNotNull { e ->

@@ -38,6 +38,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import java.time.Clock
 import java.time.Duration
+import java.util.UUID
 
 /**
  * Echte Bridge: raum. als Matter-Aggregator im Prozess „:bridge“ ([BridgeService]).
@@ -64,7 +65,7 @@ class ChipMatterBridge(
     private var bound = false
     /** Zuletzt übertragene Geräte (für Neuverbindung) und Endpunkt → Node */
     @Volatile private var lastEntries: List<BridgeEntry> = emptyList()
-    @Volatile private var nodeByEndpoint: Map<Int, ULong> = emptyMap()
+    @Volatile private var deviceByEndpoint: Map<Int, UUID> = emptyMap()
     private var pendingWindow: CompletableDeferred<Message>? = null
 
     private val connection = object : ServiceConnection {
@@ -100,15 +101,15 @@ class ChipMatterBridge(
     // --- Geräte ----------------------------------------------------------------------------------------------------
 
     override fun expose(devices: List<Device>) {
-        _state.update { it.copy(exposed = devices.filter { d -> BridgeMapping.kind(d) != null }.map { d -> d.matterNodeId }.toSet()) }
+        _state.update { it.copy(exposed = devices.filter { d -> BridgeMapping.kind(d) != null }.map { d -> d.id }.toSet()) }
     }
 
     override fun publish(devices: List<Device>) {
         val entries = devices.mapNotNull { d ->
             val kind = BridgeMapping.kind(d) ?: return@mapNotNull null
-            d.matterNodeId to BridgeMapping.entry(d, endpointFor(d.id.toString()), kind)
+            d.id to BridgeMapping.entry(d, endpointFor(d.id.toString()), kind)
         }
-        nodeByEndpoint = entries.associate { (node, e) -> e.endpoint to node }
+        deviceByEndpoint = entries.associate { (id, e) -> e.endpoint to id }
         val list = entries.map { it.second }.sortedBy { it.endpoint }
         if (list == lastEntries) return
         lastEntries = list
@@ -234,7 +235,7 @@ class ChipMatterBridge(
             }
             BridgeMessages.WINDOW -> pendingWindow?.complete(Message.obtain(msg))
             BridgeMessages.COMMAND -> {
-                val node = nodeByEndpoint[msg.arg1] ?: return
+                val device = deviceByEndpoint[msg.arg1] ?: return
                 val value = msg.data.getInt(BridgeMessages.KEY_VALUE)
                 val current = lastEntries.firstOrNull { it.endpoint == msg.arg1 }
                 val command = when (msg.data.getString(BridgeMessages.KEY_TYPE)) {
@@ -252,7 +253,7 @@ class ChipMatterBridge(
                 }
                 // Welche App den Befehl schickte, verrät der Server nicht; bei genau einer ist es eindeutig
                 val vendor = _state.value.admins.singleOrNull()?.vendorId ?: 0
-                commands.tryEmit(BridgedCommand(node, command, vendor))
+                commands.tryEmit(BridgedCommand(device, command, vendor))
             }
         }
     }

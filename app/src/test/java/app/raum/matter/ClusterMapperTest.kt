@@ -238,4 +238,66 @@ class ClusterMapperTest {
         assertTrue(paths.any { it.cluster == Cluster.NETWORK_COMMISSIONING && it.attribute == Attr.FEATURE_MAP && it.endpoint == 0 })
         assertTrue(paths.size < full.size / 2)
     }
+
+    // --- Mehrkanalgeräte -----------------------------------------------------------------------
+
+    private fun onOff(ep: Int, type: Long, on: Boolean) = arrayOf(
+        at(ep, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) to types(type),
+        at(ep, Cluster.ON_OFF, Attr.VALUE) to on,
+    )
+
+    @Test fun `Zwei Relais - zweiter Kanal eigenständig, Befehle an den richtigen Endpunkt`() {
+        val n = node(
+            *onOff(1, DeviceType.ON_OFF_PLUG, true), *onOff(2, DeviceType.ON_OFF_PLUG, false),
+            at(1, Cluster.ELECTRICAL_POWER_MEASUREMENT, Attr.ACTIVE_POWER) to 10_000L,
+            at(2, Cluster.ELECTRICAL_POWER_MEASUREMENT, Attr.ACTIVE_POWER) to 60_000L,
+        )
+        val main = ClusterMapper.capabilities(n).find<SwitchCapability>()!!
+        assertTrue(main.isOn); assertEquals(10.0, main.powerWatts!!, 0.001)
+
+        val ch = ClusterMapper.channels(n).single()
+        assertEquals(2, ch.endpoint)
+        val second = ch.capabilities.find<SwitchCapability>()!!
+        assertFalse(second.isOn); assertEquals(60.0, second.powerWatts!!, 0.001)
+
+        assertEquals(1, (ClusterMapper.actions(DeviceCommand.SetOn(false), n)!!.single() as MatterAction.Invoke).endpoint)
+        val toSecond = ClusterMapper.actions(DeviceCommand.SetOn(true), n, channel = 2)!!.single() as MatterAction.Invoke
+        assertEquals(2, toSecond.endpoint); assertEquals(Cmd.ON, toSecond.command)
+        // Unbekannter Kanal oder Hauptkanal-Endpunkt als „Kanal“: nicht adressierbar
+        assertNull(ClusterMapper.actions(DeviceCommand.SetOn(true), n, channel = 3))
+        assertNull(ClusterMapper.actions(DeviceCommand.SetOn(true), n, channel = 1))
+    }
+
+    @Test fun `Leuchte und Steckdose in einem Gerät - Schaltfunktion geht nicht mehr verloren`() {
+        val n = node(
+            *onOff(1, DeviceType.DIMMABLE_LIGHT, true),
+            at(1, Cluster.LEVEL_CONTROL, Attr.VALUE) to 127L,
+            *onOff(2, DeviceType.ON_OFF_PLUG, true),
+        )
+        val caps = ClusterMapper.capabilities(n)
+        assertTrue(caps.find<LightCapability>()!!.isOn)
+        assertNull(caps.find<SwitchCapability>()) // Hauptkanal ist die Leuchte
+        val plug = ClusterMapper.channels(n).single()
+        assertEquals(2, plug.endpoint)
+        assertTrue(plug.capabilities.find<SwitchCapability>()!!.isOn)
+
+        // Dimmen am Hauptkanal, nicht am Steckdosen-Kanal
+        assertEquals(1, ClusterMapper.actions(DeviceCommand.SetBrightness(50), n)!!.single().endpoint)
+        assertNull(ClusterMapper.actions(DeviceCommand.SetBrightness(50), n, channel = 2))
+        assertEquals(2, ClusterMapper.actions(DeviceCommand.SetOn(false), n, channel = 2)!!.single().endpoint)
+    }
+
+    @Test fun `Kanal kann nur schalten und dimmen - Storen- und Thermostatbefehle nicht`() {
+        val n = node(*onOff(1, DeviceType.ON_OFF_LIGHT, true), *onOff(2, DeviceType.ON_OFF_LIGHT, false),
+            at(3, Cluster.WINDOW_COVERING, Attr.CURRENT_LIFT_PERCENT_100THS) to 0L)
+        assertNull(ClusterMapper.actions(DeviceCommand.OpenCover, n, channel = 2))
+        assertTrue(ClusterMapper.channels(n).single().capabilities.single() is LightCapability)
+    }
+
+    @Test fun `On-Off an anderem Gerätetyp ist kein eigener Kanal`() {
+        // z. B. Klimagerät mit On/Off neben einer Leuchte: bleibt wie bisher Teil des Hauptgeräts
+        val n = node(*onOff(1, DeviceType.ON_OFF_LIGHT, true), *onOff(2, DeviceType.THERMOSTAT, true))
+        assertTrue(ClusterMapper.channels(n).isEmpty())
+        assertTrue(ClusterMapper.channels(node(*onOff(1, DeviceType.ON_OFF_PLUG, true))).isEmpty())
+    }
 }

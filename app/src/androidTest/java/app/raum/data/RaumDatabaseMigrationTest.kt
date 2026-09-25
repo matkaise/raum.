@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.raum.data.database.ALL_MIGRATIONS
 import app.raum.data.database.MIGRATION_1_2
+import app.raum.data.database.MIGRATION_2_3
 import app.raum.data.database.RaumDatabase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,6 +50,26 @@ class RaumDatabaseMigrationTest {
                 assertEquals("[]", c.getString(3))
             }
             db.execSQL("INSERT INTO event_log (timestampMs, category, level, message) VALUES (1, 'SYSTEM', 'INFO', 'ok')")
+        }
+    }
+
+    @Test
+    fun migrate2To3KeepsDevicesAsMainChannelAndAllowsFurtherChannels() {
+        helper.createDatabase(TEST_DB, 2).use { db ->
+            db.execSQL("INSERT INTO devices (id, matterNodeId, displayName, roomId, vendorName, productName, favorite) VALUES ('d', 17, 'Relais', NULL, NULL, NULL, 0)")
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_2_3).use { db ->
+            db.query("SELECT displayName, endpointId FROM devices WHERE id = 'd'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("Relais", c.getString(0))
+                assertTrue(c.isNull(1)) // bestehendes Gerät = Hauptkanal
+            }
+            // Zweiter Kanal desselben Nodes ist erlaubt, derselbe Kanal zweimal nicht
+            db.execSQL("INSERT INTO devices (id, matterNodeId, displayName, favorite, endpointId) VALUES ('d2', 17, 'Relais 2', 0, 2)")
+            val duplicate = runCatching {
+                db.execSQL("INSERT INTO devices (id, matterNodeId, displayName, favorite, endpointId) VALUES ('d3', 17, 'doppelt', 0, 2)")
+            }
+            assertTrue(duplicate.isFailure)
         }
     }
 
