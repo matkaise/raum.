@@ -1193,4 +1193,6 @@
     <string name="device_channel_name">%1$s · Kanal %2$d</string>
     <string name="device_channel">Kanal</string>
     <string name="device_channel_value">Endpunkt %1$d (weiterer Kanal)</string>
+    <string name="reset_error_bridge">Die Bridge ließ sich nicht zurücksetzen – es wurde nichts gelöscht. Bitte raum. neu starten und erneut versuchen.</string>
+    <string name="share_remove_failed">Zugriff für %1$s nicht entzogen: %2$s</string>
 </resources>

@@ -23,6 +23,9 @@ data class BridgeState(
     val attestation: AttestationStatus? = null,
 )
 
+/** Werksreset der Bridge ließ sich nicht bestätigen – der Reset ist abgebrochen, nichts sonst wurde gelöscht. */
+class BridgeResetException(message: String) : IllegalStateException(message)
+
 /** Befehl einer anderen App an ein überbrücktes Gerät. */
 data class BridgedCommand(val deviceId: UUID, val command: DeviceCommand, val fromVendorId: Int)
 
@@ -53,7 +56,7 @@ interface MatterBridge {
 
     /**
      * Werksreset der Bridge-Identität: alle Kopplungen weg, Bridge danach aus – auch wenn sie gerade nicht läuft.
-     * Wirft, wenn sich das nicht bestätigen lässt; der Reset gilt dann nicht als abgeschlossen.
+     * Wirft [BridgeResetException], wenn sich das nicht bestätigen lässt; der Reset gilt dann nicht als abgeschlossen.
      */
     suspend fun reset()
 }

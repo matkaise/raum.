@@ -1,5 +1,6 @@
 package app.raum.ui.settings
 
+import app.raum.i18n.ErrorTexts
 import app.raum.data.preferences.SettingsStore
 import app.raum.matter.bridge.BridgeState
 import app.raum.matter.bridge.MockMatterBridge
@@ -159,8 +160,10 @@ class ShareViewModel(
 
     fun removeBridgeAdmin(f: AdminFabric) {
         viewModelScope.launch {
-            bridge.removeAdmin(f.fabricIndex)
-            log.warning(LogCategory.SYSTEM, strings.get(R.string.log_bridge_removed, Ecosystems.name(f) ?: "?"))
+            when (val r = bridge.removeAdmin(f.fabricIndex)) {
+                CommandResult.Success -> log.warning(LogCategory.SYSTEM, strings.get(R.string.log_bridge_removed, appName(f)))
+                is CommandResult.Failure -> messages.error(strings.get(R.string.share_remove_failed, appName(f), strings.get(ErrorTexts.command(r.reason))))
+            }
         }
     }
 
@@ -187,7 +190,7 @@ class ShareViewModel(
                 if (s.joined == null && s.window != null && st.admins.size > bridgeBaseline) {
                     val added = st.admins.last()
                     _bridgeSession.update { it?.copy(joined = added, window = null) }
-                    log.info(LogCategory.SYSTEM, strings.get(R.string.log_bridge_joined, Ecosystems.name(added) ?: "?"))
+                    log.info(LogCategory.SYSTEM, strings.get(R.string.log_bridge_joined, appName(added)))
                 }
             }
         }
@@ -200,7 +203,7 @@ class ShareViewModel(
                 if (others.size > baseline) {
                     val added = others.last()
                     _session.update { it?.copy(joined = added, window = null) }
-                    log.info(LogCategory.DEVICE, strings.get(R.string.log_share_joined, s.device.displayName, Ecosystems.name(added) ?: "?"))
+                    log.info(LogCategory.DEVICE, strings.get(R.string.log_share_joined, s.device.displayName, appName(added)))
                 }
             }
         }
@@ -250,12 +253,18 @@ class ShareViewModel(
 
     fun removeAdmin(device: Device, fabric: AdminFabric) {
         viewModelScope.launch {
-            val r = controller.removeAdmin(device.matterNodeId, fabric.fabricIndex)
-            if (r is CommandResult.Success) {
-                log.warning(LogCategory.DEVICE, strings.get(R.string.log_share_removed, device.displayName, Ecosystems.name(fabric) ?: "?"))
+            when (val r = controller.removeAdmin(device.matterNodeId, fabric.fabricIndex)) {
+                CommandResult.Success ->
+                    log.warning(LogCategory.DEVICE, strings.get(R.string.log_share_removed, device.displayName, appName(fabric)))
+                is CommandResult.Failure ->
+                    messages.error(strings.get(R.string.share_remove_failed, appName(fabric), strings.get(ErrorTexts.command(r.reason))))
             }
         }
     }
+
+    /** Name der App wie in der Oberfläche – unbekannte als „Andere App (0x…)“ statt „?“. */
+    private fun appName(f: AdminFabric): String =
+        Ecosystems.name(f) ?: strings.get(R.string.share_other_app, "0x%04X".format(f.vendorId))
 
     /** Nur Simulation: so tun, als hätte die andere App gekoppelt. */
     fun simulateJoin(vendorId: Int, label: String) {

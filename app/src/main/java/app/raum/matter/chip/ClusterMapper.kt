@@ -203,7 +203,9 @@ object ClusterMapper {
     private fun light(n: NodeData, ep: Int): LightCapability {
         val on = n[ep, Cluster.ON_OFF, Attr.VALUE] as? Boolean ?: false
         val level = if (n.has(ep, Cluster.LEVEL_CONTROL, Attr.VALUE)) {
-            ((n[ep, Cluster.LEVEL_CONTROL, Attr.VALUE] as? Long ?: 0L) * 100.0 / 254).roundToInt().coerceIn(0, 100)
+            // Stufe 1–254; die kleinste Stufe ist noch Licht – nicht als 0 % anzeigen
+            val raw = n[ep, Cluster.LEVEL_CONTROL, Attr.VALUE] as? Long ?: 0L
+            (raw * 100.0 / 254).roundToInt().coerceIn(if (raw > 0) 1 else 0, 100)
         } else null
         val caps = n[ep, Cluster.COLOR_CONTROL, Attr.COLOR_CAPABILITIES] as? Long ?: 0L
         val hasCt = caps and 0x10L != 0L && n.has(ep, Cluster.COLOR_CONTROL, Attr.COLOR_TEMPERATURE_MIREDS)

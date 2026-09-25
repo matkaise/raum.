@@ -9,6 +9,7 @@ import app.raum.matter.commissioning.SetupCodeParser.InvalidReason
 import app.raum.platform.update.UpdateRejectedException
 import app.raum.matter.controller.CommandFailure
 import app.raum.matter.controller.CommissioningFailure
+import app.raum.matter.bridge.BridgeResetException
 
 /** Fehlergründe → übersetzte Texte (für Oberfläche, Meldungen und Protokoll). */
 object ErrorTexts {
@@ -65,6 +66,7 @@ object ErrorTexts {
             UpdateRejectedException.Reason.WRONG_SIGNATURE -> strings.get(R.string.update_error_signature)
             UpdateRejectedException.Reason.NOT_NEWER -> strings.get(R.string.update_error_not_newer, error.message ?: "")
         }
+        is BridgeResetException -> strings.get(R.string.reset_error_bridge)
         else -> null
     }
 

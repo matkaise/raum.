@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -158,10 +159,14 @@ class ChipMatterBridge(
         _state.update { it.copy(window = null) }
     }
 
+    /** Erfolg erst, wenn die Bridge eine Fabric-Liste ohne diese App meldet (sie antwortet mit ihrem Zustand). */
     override suspend fun removeAdmin(fabricIndex: Int): CommandResult {
-        if (service == null) return CommandResult.Failure(CommandFailure.OFFLINE)
+        if (service == null || !_state.value.running) return CommandResult.Failure(CommandFailure.OFFLINE)
+        if (_state.value.admins.none { it.fabricIndex == fabricIndex }) return CommandResult.Success
         send(Message.obtain(null, BridgeMessages.REMOVE_FABRIC, fabricIndex, 0))
-        return CommandResult.Success
+        return withTimeoutOrNull(REMOVE_TIMEOUT_MS) { state.first { s -> s.admins.none { it.fabricIndex == fabricIndex } } }
+            ?.let { CommandResult.Success }
+            ?: CommandResult.Failure(CommandFailure.TIMEOUT, "bridge did not confirm removal of fabric $fabricIndex")
     }
 
     /**
@@ -175,7 +180,7 @@ class ChipMatterBridge(
             endBridgeProcess()
             // Nur der Bridge-Prozess nutzt diese Dateien – nach seinem Ende gefahrlos löschbar
             val wiped = listOf(BridgeService.STORE, BridgeConfigurationManager.PREFS).all { context.deleteSharedPreferences(it) }
-            check(wiped) { "bridge storage not deleted" }
+            if (!wiped) throw BridgeResetException("bridge storage not deleted")
             // Schlüssel weg: selbst übersehene Reste des verschlüsselten Speichers sind unlesbar
             KeystoreCipher(BridgeService.ALIAS).deleteKey()
         }
@@ -189,7 +194,7 @@ class ChipMatterBridge(
         fun pid() = am.runningAppProcesses.orEmpty().firstOrNull { it.processName == name }?.pid
         pid()?.let(Process::killProcess)
         withTimeoutOrNull(PROCESS_END_TIMEOUT_MS) { while (pid() != null) delay(50) }
-            ?: error("bridge process still running")
+            ?: throw BridgeResetException("bridge process still running")
     }
 
     /**
@@ -296,5 +301,6 @@ class ChipMatterBridge(
         const val FIRST_ENDPOINT = 2
         const val KEY_NEXT_ENDPOINT = "bridge_next_endpoint"
         const val PROCESS_END_TIMEOUT_MS = 5_000L
+        const val REMOVE_TIMEOUT_MS = 5_000L
     }
 }
