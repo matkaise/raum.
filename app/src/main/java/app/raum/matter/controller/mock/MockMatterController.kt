@@ -41,6 +41,7 @@ import app.raum.matter.controller.CommissioningStep
 import app.raum.matter.controller.MatterCommand
 import app.raum.matter.controller.MatterController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -260,6 +261,11 @@ class MockMatterController(
 
     private val stuckAdmins: MutableSet<ULong> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
+    private val hungNodes: MutableSet<ULong> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Test: Befehle an diesen Node bleiben ohne Antwort hängen (bis zum Abbruch). */
+    fun simulateHang(nodeId: ULong, hung: Boolean = true) { if (hung) hungNodes += nodeId else hungNodes -= nodeId }
+
     /** Test/Vorführung: Node bekommt einen weiteren Kanal (z. B. zweites Relais) an [endpoint]. */
     fun addChannel(nodeId: ULong, endpoint: Int, capabilities: List<Capability>) {
         mutate { map ->
@@ -298,6 +304,7 @@ class MockMatterController(
 
     override suspend fun execute(command: MatterCommand): CommandResult {
         delay(latency())
+        if (command.nodeId in hungNodes) awaitCancellation()
         val state = _devices.value[command.nodeId]
             ?: return CommandResult.Failure(CommandFailure.DEVICE_ERROR, "unknown node")
         if (state.onlineState != OnlineState.ONLINE) {

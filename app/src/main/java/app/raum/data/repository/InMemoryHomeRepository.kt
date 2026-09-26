@@ -41,6 +41,13 @@ class InMemoryHomeRepository(
         }
     }
 
+    override suspend fun addDeviceIfMissing(metadata: DeviceMetadata) {
+        _devices.update { list ->
+            if (list.any { (it.matterNodeId == metadata.matterNodeId && it.endpointId == metadata.endpointId) || it.id == metadata.id }) list
+            else list + metadata
+        }
+    }
+
     override suspend fun removeDevice(nodeId: ULong) {
         val removed = _devices.value.filter { it.matterNodeId == nodeId }.map { it.id }.toSet()
         _devices.update { list -> list.filterNot { it.matterNodeId == nodeId } }

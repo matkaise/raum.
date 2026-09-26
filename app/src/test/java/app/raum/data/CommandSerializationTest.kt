@@ -28,6 +28,7 @@ class CommandSerializationTest {
             DeviceCommand.SetColorTemperature(2700),
             DeviceCommand.SetColor(RgbColor(10, 20, 30)),
             DeviceCommand.SetTargetTemperature(21.5),
+            DeviceCommand.SetTargetTemperature(24.0, ThermostatMode.COOL),
             DeviceCommand.SetThermostatMode(ThermostatMode.AUTO),
             DeviceCommand.SetCoverPosition(55),
             DeviceCommand.OpenCover,
@@ -45,5 +46,11 @@ class CommandSerializationTest {
     @Test
     fun `unknown fields are ignored`() {
         assertEquals(DeviceCommand.SetOn(true), decodeCommand("""{"type":"on","on":true,"transitionMs":400}"""))
+    }
+
+    @Test
+    fun `stored thermostat setpoints without mode still load`() {
+        assertEquals(DeviceCommand.SetTargetTemperature(21.0), decodeCommand("""{"type":"target_temperature","celsius":21.0}"""))
+        assertEquals("""{"type":"target_temperature","celsius":21.0}""", encodeCommand(DeviceCommand.SetTargetTemperature(21.0)))
     }
 }

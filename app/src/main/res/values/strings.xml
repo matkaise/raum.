@@ -1196,4 +1196,5 @@
     <string name="device_channel_value">Endpoint %1$d (additional channel)</string>
     <string name="reset_error_bridge">The bridge could not be reset – nothing was deleted. Please restart raum. and try again.</string>
     <string name="share_remove_failed">Access for %1$s not revoked: %2$s</string>
+    <string name="log_bridge_command_dropped">Command via %1$s dropped – device not responding, newer commands take precedence</string>
 </resources>

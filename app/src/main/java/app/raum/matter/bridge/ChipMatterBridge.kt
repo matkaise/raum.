@@ -68,6 +68,7 @@ class ChipMatterBridge(
     @Volatile private var lastEntries: List<BridgeEntry> = emptyList()
     @Volatile private var deviceByEndpoint: Map<Int, UUID> = emptyMap()
     private var pendingWindow: CompletableDeferred<Message>? = null
+    private val echo = BridgeEchoFilter()
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder) {
@@ -113,6 +114,8 @@ class ChipMatterBridge(
         deviceByEndpoint = entries.associate { (id, e) -> e.endpoint to id }
         val list = entries.map { it.second }.sortedBy { it.endpoint }
         if (list == lastEntries) return
+        val old = lastEntries.associateBy { it.endpoint }
+        echo.published(list.filter { old[it.endpoint] != it }.map { it.endpoint })
         lastEntries = list
         sendDevices(list)
     }
@@ -240,53 +243,55 @@ class ChipMatterBridge(
             }
             BridgeMessages.WINDOW -> pendingWindow?.complete(Message.obtain(msg))
             BridgeMessages.COMMAND -> {
-                val device = deviceByEndpoint[msg.arg1] ?: return
+                val ep = msg.arg1
+                val device = deviceByEndpoint[ep] ?: return
                 val value = msg.data.getInt(BridgeMessages.KEY_VALUE)
-                val current = lastEntries.firstOrNull { it.endpoint == msg.arg1 }
+                val current = lastEntries.firstOrNull { it.endpoint == ep }
                 val command = when (msg.data.getString(BridgeMessages.KEY_TYPE)) {
                     BridgeMessages.TYPE_ONOFF -> {
-                        if (current?.on == (value == 1)) return // Echo des aktuellen Zustands
+                        if (!echo.accept(ep, "onoff", value, current?.on?.let { if (it) 1 else 0 })) return
                         DeviceCommand.SetOn(value == 1)
                     }
-                    BridgeMessages.TYPE_OTHER -> otherCommand(msg.data.getInt(BridgeMessages.KEY_CMD), value, current) ?: return
+                    BridgeMessages.TYPE_OTHER -> otherCommand(ep, msg.data.getInt(BridgeMessages.KEY_CMD), value, current) ?: return
                     BridgeMessages.TYPE_LEVEL -> {
                         // Beim Einschalten meldet die Bridge die gespeicherte Helligkeit – kein neuer Wunsch
-                        if (current != null && BridgeMapping.levelToPercent(current.level) == BridgeMapping.levelToPercent(value)) return
-                        DeviceCommand.SetBrightness(BridgeMapping.levelToPercent(value))
+                        val percent = BridgeMapping.levelToPercent(value)
+                        if (!echo.accept(ep, "level", percent, current?.let { BridgeMapping.levelToPercent(it.level) })) return
+                        DeviceCommand.SetBrightness(percent)
                     }
                     else -> return
                 }
                 // Welche App den Befehl schickte, verrät der Server nicht; bei genau einer ist es eindeutig
                 val vendor = _state.value.admins.singleOrNull()?.vendorId ?: 0
-                commands.tryEmit(BridgedCommand(device, command, vendor))
+                // BridgeSync nimmt sofort ab (eigene Warteschlange je Node) – voll nur, wenn raum. gerade hängt
+                if (!commands.tryEmit(BridgedCommand(device, command, vendor))) Log.w(TAG, "Befehl verworfen (Eingang voll): $command")
             }
         }
     }
 
-    /** Thermostat und Storen; null = Echo des aktuellen Zustands oder unbekannt */
-    private fun otherCommand(cmd: Int, value: Int, current: BridgeEntry?): DeviceCommand? = when (cmd) {
+    /** Thermostat, Storen und Farbe; null = Echo (siehe [BridgeEchoFilter]) oder unbekannt */
+    private fun otherCommand(ep: Int, cmd: Int, value: Int, current: BridgeEntry?): DeviceCommand? = when (cmd) {
         BridgeMessages.CMD_SETPOINT ->
-            if (current?.setpointC100 == value) null else DeviceCommand.SetTargetTemperature(value / 100.0)
+            if (!echo.accept(ep, "setpoint", value, current?.setpointC100)) null else DeviceCommand.SetTargetTemperature(value / 100.0)
         BridgeMessages.CMD_SYSTEM_MODE ->
-            if (current?.systemMode == value) null else BridgeMapping.fromMatterMode(value)?.let { DeviceCommand.SetThermostatMode(it) }
+            if (!echo.accept(ep, "mode", value, current?.systemMode)) null
+            else BridgeMapping.fromMatterMode(value)?.let { DeviceCommand.SetThermostatMode(it) }
         BridgeMessages.CMD_COVER_OPEN -> DeviceCommand.OpenCover
         BridgeMessages.CMD_COVER_CLOSE -> DeviceCommand.CloseCover
         BridgeMessages.CMD_COVER_STOP -> DeviceCommand.StopCover
         BridgeMessages.CMD_COVER_GOTO -> DeviceCommand.SetCoverPosition(value.coerceIn(0, 100))
         BridgeMessages.CMD_COLOR_HS -> {
-            val hue = (value shr 8) and 0xFF
-            val sat = value and 0xFF
-            if (current?.colorMode == 0 && current.hue == hue && current.saturation == sat) null
-            else DeviceCommand.SetColor(BridgeMapping.hueSatToRgb(hue, sat))
+            val published = current?.takeIf { it.colorMode == 0 }?.let { (it.hue shl 8) or it.saturation }
+            if (!echo.accept(ep, "hs", value, published)) null
+            else DeviceCommand.SetColor(BridgeMapping.hueSatToRgb((value shr 8) and 0xFF, value and 0xFF))
         }
         BridgeMessages.CMD_COLOR_XY -> {
-            val x = value ushr 16
-            val y = value and 0xFFFF
-            if (current?.colorMode == 0 && current.colorX == x && current.colorY == y) null
-            else DeviceCommand.SetColor(ColorMath.xyToRgb(x, y))
+            val published = current?.takeIf { it.colorMode == 0 }?.let { (it.colorX shl 16) or it.colorY }
+            if (!echo.accept(ep, "xy", value, published)) null
+            else DeviceCommand.SetColor(ColorMath.xyToRgb(value ushr 16, value and 0xFFFF))
         }
         BridgeMessages.CMD_COLOR_TEMP ->
-            if (current?.colorMode == 2 && current.mireds == value) null
+            if (!echo.accept(ep, "mireds", value, current?.takeIf { it.colorMode == 2 }?.mireds)) null
             else DeviceCommand.SetColorTemperature(ColorMath.miredsToKelvin(value))
         else -> null
     }

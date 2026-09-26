@@ -118,6 +118,7 @@ class RoomHomeRepository(
     suspend fun knownNodeIds(): List<ULong> = dao.nodeIds().map { it.toULong() }
 
     override suspend fun upsertDevice(metadata: DeviceMetadata) = dao.upsertDeviceByChannel(metadata.toEntity())
+    override suspend fun addDeviceIfMissing(metadata: DeviceMetadata) = dao.insertDeviceIfMissing(metadata.toEntity())
 
     override suspend fun removeDevice(nodeId: ULong) = dao.deleteDeviceByNode(nodeId.toLong())
 

@@ -48,7 +48,8 @@ object SceneTargets {
         is DeviceTarget.Switch -> listOf(DeviceCommand.SetOn(target.on))
         is DeviceTarget.Thermostat -> buildList {
             target.mode?.let { add(DeviceCommand.SetThermostatMode(it)) }
-            add(DeviceCommand.SetTargetTemperature(target.targetCelsius))
+            // Modus mitgeben: der Moduswechsel davor ist beim Gerät evtl. noch nicht zurückgemeldet
+            add(DeviceCommand.SetTargetTemperature(target.targetCelsius, target.mode))
         }
         is DeviceTarget.Cover -> listOf(
             when (target.openPercent) {

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
@@ -69,33 +70,70 @@ class DeviceService(
     ) { states, metadata -> merge(states, metadata, emptyMap()) }
         .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
+    /**
+     * Angezeigte Geräte ohne gespeicherte Metadaten: extern hinzugefügte Nodes und weitere Kanäle. Sie werden
+     * einmalig gespeichert (siehe init), damit Szenen, Favoriten und Automationen sie dauerhaft referenzieren können –
+     * nur als Identität mit leerem Namen: Name und Raum bleiben abgeleitet, bis der Nutzer etwas ändert ([resolve]).
+     */
+    private fun discovered(states: Map<ULong, app.raum.domain.models.DeviceState>, metadata: List<DeviceMetadata>): List<DeviceMetadata> {
+        val (primaryMeta, channelMeta) = metadata.partition { it.endpointId == null }
+        val primaryNodes = primaryMeta.map { it.matterNodeId }.toSet()
+        val storedChannels = channelMeta.map { it.id }.toSet()
+        val orphans = states.filterKeys { it !in primaryNodes }.map { (nodeId, st) ->
+            DeviceMetadata(deviceIdForNode(nodeId), nodeId, "", null, st.vendorName, st.productName, false)
+        }
+        val newChannels = states.values.flatMap { st ->
+            st.channels.map { ch -> DeviceMetadata(deviceIdForChannel(st.nodeId, ch.endpoint), st.nodeId, "", null, null, null, false, ch.endpoint) }
+                .filter { it.id !in storedChannels }
+        }
+        return orphans + newChannels
+    }
+
+    init {
+        // Entdeckte Geräte speichern – nur falls noch nicht vorhanden, damit beim Start (Metadaten noch nicht
+        // geladen) nie ein vergebener Name oder Raum überschrieben wird.
+        scope.launch {
+            combine(controller.devices, repository.deviceMetadata, ::discovered).collect { found ->
+                found.forEach { runCatching { repository.addDeviceIfMissing(it) } }
+            }
+        }
+    }
+
+    /**
+     * Unveränderte Geräte (leerer gespeicherter Name) bekommen Name und Raum abgeleitet: ein Node aus den Angaben des
+     * Geräts, ein weiterer Kanal als „<Hauptgerät> · Kanal n“ im Raum des Hauptgeräts – so folgt er dem Namen, den das
+     * Hauptgerät z. B. erst am Ende der Kopplung bekommt.
+     */
+    private fun resolve(
+        meta: DeviceMetadata,
+        all: List<DeviceMetadata>,
+        states: Map<ULong, app.raum.domain.models.DeviceState>,
+    ): DeviceMetadata {
+        if (meta.displayName.isNotBlank()) return meta
+        val st = states[meta.matterNodeId]
+        if (meta.endpointId == null) {
+            val name = st?.label ?: st?.productName ?: meta.productName
+                ?: strings.get(R.string.device_unnamed, "%X".format(meta.matterNodeId.toLong()))
+            return meta.copy(displayName = name)
+        }
+        val primary = all.firstOrNull { it.matterNodeId == meta.matterNodeId && it.endpointId == null }?.let { resolve(it, all, states) }
+        val number = all.filter { it.matterNodeId == meta.matterNodeId && it.endpointId != null }
+            .mapNotNull { it.endpointId }.sorted().indexOf(meta.endpointId) + 2
+        return meta.copy(
+            displayName = strings.get(R.string.device_channel_name, primary?.displayName.orEmpty(), number),
+            roomId = primary?.roomId,
+            vendorName = meta.vendorName ?: primary?.vendorName,
+            productName = meta.productName ?: primary?.productName,
+        )
+    }
+
     private fun merge(
         states: Map<ULong, app.raum.domain.models.DeviceState>,
         metadata: List<DeviceMetadata>,
         overlay: Map<UUID, Pending>,
     ): List<Device> {
-        val (primaryMeta, channelMeta) = metadata.partition { it.endpointId == null }
-        val primaryNodes = primaryMeta.map { it.matterNodeId }.toSet()
-        // Nodes ohne lokale Metadaten (z. B. extern hinzugefügt) trotzdem anzeigen.
-        val orphans = states.filterKeys { it !in primaryNodes }.map { (nodeId, st) ->
-            // Name aus dem Gerät (anderswo vergebener Name, sonst Produkt), sonst „Gerät …“
-            val name = st.label ?: st.productName ?: strings.get(R.string.device_unnamed, "%X".format(nodeId.toLong()))
-            DeviceMetadata(deviceIdForNode(nodeId), nodeId, name, null, st.vendorName, st.productName, false)
-        }
-        // Weitere Kanäle ohne gespeicherte Metadaten: „<Hauptgerät> · Kanal n“ im Raum des Hauptgeräts
-        val primaries = (primaryMeta + orphans).associateBy { it.matterNodeId }
-        val storedChannels = channelMeta.map { it.id }.toSet()
-        val newChannels = states.values.flatMap { st ->
-            st.channels.mapIndexedNotNull { i, ch ->
-                val id = deviceIdForChannel(st.nodeId, ch.endpoint)
-                if (id in storedChannels) return@mapIndexedNotNull null
-                val p = primaries[st.nodeId]
-                DeviceMetadata(id, st.nodeId, strings.get(R.string.device_channel_name, p?.displayName.orEmpty(), i + 2),
-                    p?.roomId, p?.vendorName ?: st.vendorName, p?.productName ?: st.productName, false, ch.endpoint)
-            }
-        }
-        val all = primaryMeta + orphans + channelMeta + newChannels
-        return all.map { meta ->
+        val all = metadata + discovered(states, metadata)
+        return all.map { resolve(it, all, states) }.map { meta ->
             val state = states[meta.matterNodeId]
             val live = if (meta.endpointId == null) state?.capabilities
                 else state?.channels?.firstOrNull { it.endpoint == meta.endpointId }?.capabilities
@@ -175,7 +213,8 @@ class DeviceService(
 
     suspend fun rename(device: Device, name: String) = updateMetadata(device) { it.copy(displayName = name.trim()) }
     suspend fun assignRoom(device: Device, roomId: UUID?) = updateMetadata(device) { it.copy(roomId = roomId) }
-    suspend fun setFavorite(device: Device, favorite: Boolean) = repository.setFavorite(device.id, favorite)
+    /** Über die Metadaten, damit auch ein noch nicht gespeichertes (entdecktes) Gerät Favorit werden kann. */
+    suspend fun setFavorite(device: Device, favorite: Boolean) = updateMetadata(device) { it.copy(favorite = favorite) }
 
     /** DEV-007: entfernt das Gerät aus der eigenen Fabric und aus der lokalen Konfiguration – mit allen Kanälen des Nodes. */
     suspend fun remove(device: Device) {
@@ -186,9 +225,11 @@ class DeviceService(
     }
 
     private suspend fun updateMetadata(device: Device, transform: (DeviceMetadata) -> DeviceMetadata) {
-        val current = repository.deviceMetadata.value.firstOrNull { it.id == device.id }
+        val stored = repository.deviceMetadata.value.firstOrNull { it.id == device.id }
             ?: DeviceMetadata(device.id, device.matterNodeId, device.displayName, device.roomId,
                 device.vendorName, device.productName, device.favorite, device.endpointId)
+        // Erste Änderung eines unveränderten Geräts: abgeleiteten Namen und Raum festschreiben
+        val current = if (stored.displayName.isBlank()) stored.copy(displayName = device.displayName, roomId = device.roomId) else stored
         repository.upsertDevice(transform(current))
     }
 }

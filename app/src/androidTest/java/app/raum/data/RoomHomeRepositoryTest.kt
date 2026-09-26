@@ -15,7 +15,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -172,5 +174,40 @@ class RoomHomeRepositoryTest {
         file2.close()
         ctx.deleteDatabase("reopen-test.db")
         Unit
+    }
+
+    /** Review-Befund: ein entdeckter Kanal ohne Umbenennen muss in einer gespeicherten Szene erhalten bleiben. */
+    @Test
+    fun discoveredChannelSurvivesSceneSaveInRealDatabase() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val strings = object : app.raum.i18n.Strings {
+            override fun get(id: Int, vararg args: Any) = context.getString(id, *args)
+            override fun plural(id: Int, count: Int, vararg args: Any) = context.resources.getQuantityString(id, count, *args)
+        }
+        val controller = app.raum.matter.controller.mock.MockMatterController(scope, latencyMs = 0L..0L, simulationTickMs = null)
+        val service = app.raum.domain.usecases.DeviceService(
+            controller, repo, app.raum.domain.usecases.UiMessageBus(), app.raum.diagnostics.EventLog(), scope, strings,
+        )
+        val plug = MockHomeSeed.devices.first { it.online && it.capabilities.any { c -> c is app.raum.domain.models.SwitchCapability } }
+        controller.addChannel(plug.nodeId, 2, listOf(app.raum.domain.models.SwitchCapability(isOn = false)))
+        val channelId = app.raum.domain.models.deviceIdForChannel(plug.nodeId, 2)
+
+        // DeviceService speichert den entdeckten Kanal selbst – ohne Umbenennen
+        withTimeout(5_000) { while (dao.observeDevices().first().none { it.id == channelId.toString() }) delay(20) }
+        assertEquals(2, dao.deviceByChannel(plug.nodeId.toLong(), 2)!!.endpointId)
+        assertTrue(service.devices.value.any { it.id == channelId })
+
+        val scene = Scene(UUID.randomUUID(), "Kanal 2 an", "bolt", listOf(SceneAction(channelId, DeviceCommand.SetOn(true))))
+        repo.upsertScene(scene)
+        assertEquals(listOf(channelId), repo.scene(scene.id)!!.actions.map { it.deviceId })
+    }
+
+    @Test
+    fun addDeviceIfMissingNeverOverwrites() = runBlocking {
+        val lamp = MockHomeSeed.deviceMetadata.first()
+        repo.addDeviceIfMissing(lamp.copy(displayName = "Standardname", roomId = null))
+        val stored = dao.deviceByChannel(lamp.matterNodeId.toLong(), null)!!
+        assertEquals(lamp.displayName, stored.displayName)
+        assertEquals(lamp.roomId?.toString(), stored.roomId)
     }
 }

@@ -8,6 +8,8 @@ import app.raum.domain.usecases.DeviceService
 import app.raum.i18n.Strings
 import app.raum.matter.controller.Ecosystems
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -45,14 +47,39 @@ class BridgeSync(
             }
         }
         scope.launch {
+            // Je Node eine eigene, begrenzte Warteschlange: Befehle an denselben Node der Reihe nach, verschiedene Nodes
+            // parallel – ein nicht antwortendes Gerät hält die anderen nicht auf. Bei Überlast zählt der neueste Wunsch:
+            // der älteste wartende Befehl fällt weg und wird protokolliert.
+            val queues = HashMap<ULong, Channel<BridgedCommand>>()
             bridge.incomingCommands.collect { cmd ->
                 val device = devices.devices.value.firstOrNull { it.id == cmd.deviceId } ?: return@collect
-                // Abgewählte Geräte sind für andere Apps tabu, auch wenn ein Befehl noch ankommt
-                if (!prefs.bridgeEnabled.value || device.id in prefs.bridgeExcluded.value) return@collect
-                val via = bridge.state.value.admins.firstOrNull { it.vendorId == cmd.fromVendorId }?.let(Ecosystems::name) ?: "?"
-                log.record(LogCategory.DEVICE, LogLevel.INFO, strings.get(R.string.log_bridge_command, via), device.displayName, device.id)
-                devices.send(device, cmd.command, notify = false)
+                val queue = queues.getOrPut(device.matterNodeId) {
+                    Channel<BridgedCommand>(NODE_QUEUE, BufferOverflow.DROP_OLDEST) { dropped -> dropped(dropped) }
+                        .also { ch -> scope.launch { for (c in ch) execute(c) } }
+                }
+                queue.trySend(cmd)
             }
         }
+    }
+
+    private suspend fun execute(cmd: BridgedCommand) {
+        val device = devices.devices.value.firstOrNull { it.id == cmd.deviceId } ?: return
+        // Abgewählte Geräte sind für andere Apps tabu, auch wenn ein Befehl noch ankommt
+        if (!prefs.bridgeEnabled.value || device.id in prefs.bridgeExcluded.value) return
+        log.record(LogCategory.DEVICE, LogLevel.INFO, strings.get(R.string.log_bridge_command, via(cmd)), device.displayName, device.id)
+        devices.send(device, cmd.command, notify = false)
+    }
+
+    private fun dropped(cmd: BridgedCommand) {
+        val device = devices.devices.value.firstOrNull { it.id == cmd.deviceId }
+        log.record(LogCategory.DEVICE, LogLevel.WARNING, strings.get(R.string.log_bridge_command_dropped, via(cmd)), device?.displayName, cmd.deviceId)
+    }
+
+    private fun via(cmd: BridgedCommand) =
+        bridge.state.value.admins.firstOrNull { it.vendorId == cmd.fromVendorId }?.let(Ecosystems::name) ?: "?"
+
+    private companion object {
+        /** Wartende Befehle je Node – mehr sind bei Bedienung von Hand nicht plausibel. */
+        const val NODE_QUEUE = 16
     }
 }

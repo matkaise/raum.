@@ -311,4 +311,13 @@ class ClusterMapperTest {
         assertEquals(0, level(0))
         assertEquals(100, level(254))
     }
+
+    @Test fun `Sollwert mit Modus aus der Szene - nicht aus dem veralteten Zwischenspeicher`() {
+        // Gerät steht laut Zwischenspeicher noch auf Heizen (Moduswechsel noch nicht zurückgemeldet)
+        val n = node(at(1, Cluster.THERMOSTAT, Attr.SYSTEM_MODE) to 4L, at(1, Cluster.THERMOSTAT, Attr.LOCAL_TEMPERATURE) to 2100L)
+        val cool = ClusterMapper.actions(DeviceCommand.SetTargetTemperature(24.0, app.raum.domain.models.ThermostatMode.COOL), n)!!.single() as MatterAction.Write
+        assertEquals(Attr.OCCUPIED_COOLING_SETPOINT, cool.attribute)
+        val heat = ClusterMapper.actions(DeviceCommand.SetTargetTemperature(21.0), n)!!.single() as MatterAction.Write
+        assertEquals(Attr.OCCUPIED_HEATING_SETPOINT, heat.attribute)
+    }
 }

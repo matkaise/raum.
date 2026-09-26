@@ -21,6 +21,11 @@ interface HomeRepository {
     val automations: StateFlow<List<Automation>>
 
     suspend fun upsertDevice(metadata: DeviceMetadata)
+    /**
+     * Legt Metadaten nur an, wenn es für diesen Node und Kanal noch keine gibt – überschreibt nie Name oder Raum.
+     * Für entdeckte Geräte (weitere Kanäle, extern hinzugefügte Nodes), damit Szenen und Favoriten sie speichern können.
+     */
+    suspend fun addDeviceIfMissing(metadata: DeviceMetadata)
     suspend fun removeDevice(nodeId: ULong)
     suspend fun setFavorite(deviceId: UUID, favorite: Boolean)
 

@@ -101,7 +101,8 @@ class CommissioningViewModel(
                     )
                 }
                 is CommissioningResult.AlreadyCommissioned -> {
-                    val name = repository.deviceMetadata.value.firstOrNull { it.matterNodeId == result.nodeId && it.endpointId == null }?.displayName
+                    val name = repository.deviceMetadata.value.firstOrNull { it.matterNodeId == result.nodeId && it.endpointId == null }
+                        ?.displayName?.takeIf { it.isNotBlank() }
                     CommissioningUiState.AlreadyPresent(name ?: "Node 0x%X".format(result.nodeId.toLong()))
                 }
                 is CommissioningResult.Failure -> {

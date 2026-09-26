@@ -49,8 +49,11 @@ Echtheitsfehlers.
 **Mehrkanalgeräte:** Hat ein Gerät mehrere schaltbare Endpunkte mit Licht- oder Steckdosen-/Schaltaktor-Gerätetyp
 (z. B. Zweifach-Relais, Leuchte mit Steckdose, Matter-Bridge mit mehreren Leuchten), zeigt raum. jeden weiteren Kanal
 als eigenes Gerät „<Name> · Kanal n“ im Raum des Hauptgeräts. Kanäle lassen sich einzeln umbenennen, einem Raum
-zuordnen, in Szenen, Automationen und die Bridge aufnehmen. Der erste Kanal bleibt das bisherige Gerät (bestehende
-Szenen bleiben gültig). Teilen mit anderen Apps und „Aus raum. entfernen“ gelten immer für das ganze Gerät mit allen
+zuordnen, in Szenen, Automationen und die Bridge aufnehmen – auch ohne vorheriges Umbenennen (raum. speichert neu
+entdeckte Kanäle selbst; bis zur ersten Änderung folgt ihr Name dem Hauptgerät). Der erste Kanal bleibt das bisherige
+Gerät (bestehende Szenen bleiben gültig) und ist fest an seinen Endpunkt gebunden: Kommen später Endpunkte hinzu (z. B.
+eine neue Leuchte an einer Bridge), steuert er weiterhin denselben Verbraucher; verschwindet sein Endpunkt, verliert er
+die Schaltfunktion, statt auf einen anderen umzuspringen. Teilen mit anderen Apps und „Aus raum. entfernen“ gelten immer für das ganze Gerät mit allen
 Kanälen. Nicht als eigene Kanäle erscheinen mehrere Thermostate, Storen oder Sensoren an einem Node – dort nutzt raum.
 weiterhin den ersten Endpunkt.
 
