@@ -14,8 +14,8 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests and debug build
-        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      - name: Unit tests, lint and debug build
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: raum-debug-apk

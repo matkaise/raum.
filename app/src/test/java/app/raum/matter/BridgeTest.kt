@@ -100,4 +100,39 @@ class BridgeTest {
         assertTrue(app.raum.i18n.ErrorTexts.maintenance(e, XmlStrings("de"))!!.contains("nichts gelöscht"))
         assertTrue(app.raum.i18n.ErrorTexts.maintenance(e, XmlStrings("en"))!!.contains("nothing was deleted"))
     }
+
+    // --- Befehlspipeline -------------------------------------------------------------------------
+
+    private suspend fun TestScope.pairedBridge(): Fixture {
+        val f = Fixture(this)
+        f.prefs.bridgeEnabled.value = true; runCurrent()
+        f.bridge.openPairingWindow(); f.bridge.simulateJoin(Ecosystems.APPLE)
+        return f
+    }
+
+    @Test fun `Ein hängendes Gerät hält Befehle an andere Geräte nicht auf`() = runTest {
+        val f = pairedBridge()
+        val stuck = f.device("Stehlampe")
+        val other = f.device("Deckenleuchte")
+        val otherOn = other.capabilities.find<LightCapability>()!!.isOn
+        f.controller.simulateHang(stuck.matterNodeId)
+
+        f.bridge.simulateCommand(stuck.id, DeviceCommand.SetOn(true), Ecosystems.APPLE); runCurrent()
+        f.bridge.simulateCommand(other.id, DeviceCommand.SetOn(!otherOn), Ecosystems.APPLE); runCurrent()
+
+        assertEquals(!otherOn, f.device("Deckenleuchte").capabilities.find<LightCapability>()!!.isOn)
+    }
+
+    @Test fun `Bei Überlast fallen die ältesten wartenden Befehle weg - protokolliert, nicht still`() = runTest {
+        val f = pairedBridge()
+        val stuck = f.device("Stehlampe")
+        f.controller.simulateHang(stuck.matterNodeId)
+
+        // 1 Befehl hängt beim Gerät, 16 warten, 4 weitere verdrängen die ältesten wartenden
+        repeat(21) { i ->
+            assertTrue(f.bridge.simulateCommand(stuck.id, DeviceCommand.SetOn(i % 2 == 0), Ecosystems.APPLE))
+            runCurrent()
+        }
+        assertEquals(4, f.log.recent.value.count { it.level == app.raum.diagnostics.LogLevel.WARNING && it.deviceName == "Stehlampe" })
+    }
 }

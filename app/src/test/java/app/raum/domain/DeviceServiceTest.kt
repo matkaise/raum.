@@ -137,6 +137,55 @@ class DeviceServiceTest {
     }
 
     @Test
+    fun `a discovered channel is stored without renaming it first`() = runTest {
+        val f = fixture()
+        val plug = f.plugWithSecondChannel()
+        runCurrent()
+        val stored = f.repository.deviceMetadata.value.single { it.matterNodeId == plug.matterNodeId && it.endpointId == 2 }
+        assertEquals("${plug.displayName} · Kanal 2", f.service.device(stored.id)!!.displayName)
+
+        // Favorit auf einem frisch entdeckten Kanal bleibt erhalten
+        val channel = f.service.devices.value.single { it.id == stored.id }
+        f.service.setFavorite(channel, true)
+        runCurrent()
+        assertTrue(f.repository.deviceMetadata.value.single { it.id == stored.id }.favorite)
+    }
+
+    @Test
+    fun `an untouched channel follows the main device name until it is edited`() = runTest {
+        val f = fixture()
+        val plug = f.plugWithSecondChannel()
+        runCurrent()
+        val channelId = app.raum.domain.models.deviceIdForChannel(plug.matterNodeId, 2)
+
+        // Hauptgerät bekommt (z. B. am Ende der Kopplung) seinen Namen – der Kanal zieht mit
+        f.service.rename(plug, "Relais Küche"); runCurrent()
+        assertEquals("Relais Küche · Kanal 2", f.service.device(channelId)!!.displayName)
+
+        // Erste Änderung am Kanal schreibt den abgeleiteten Namen fest
+        f.service.setFavorite(f.service.device(channelId)!!, true); runCurrent()
+        f.service.rename(plug, "Relais Bad"); runCurrent()
+        assertEquals("Relais Küche · Kanal 2", f.service.device(channelId)!!.displayName)
+        assertTrue(f.service.device(channelId)!!.favorite)
+    }
+
+    @Test
+    fun `storing discovered devices never overwrites names or rooms`() = runTest {
+        val f = fixture()
+        val plug = f.plugWithSecondChannel()
+        runCurrent()
+        val channel = f.service.devices.value.single { it.matterNodeId == plug.matterNodeId && it.endpointId == 2 }
+        f.service.rename(channel, "Kaffeemühle")
+        runCurrent()
+        // Erneutes „Entdecken“ (z. B. beim Start, bevor Metadaten geladen sind) darf nichts überschreiben
+        f.repository.addDeviceIfMissing(channel.let {
+            app.raum.domain.models.DeviceMetadata(it.id, it.matterNodeId, "Standardname", null, null, null, false, 2)
+        })
+        runCurrent()
+        assertEquals("Kaffeemühle", f.service.device(channel.id)!!.displayName)
+    }
+
+    @Test
     fun `removing the node removes all its channels`() = runTest {
         val f = fixture()
         val plug = f.plugWithSecondChannel()

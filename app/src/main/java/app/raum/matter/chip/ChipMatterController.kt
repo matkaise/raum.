@@ -112,6 +112,8 @@ class ChipMatterController(
      * Ein Schalter, an dem sich nichts ändert, ist also erreichbar, auch wenn keine Werte kommen.
      */
     private val subscribed: MutableSet<ULong> = ConcurrentHashMap.newKeySet()
+    /** Fester Endpunkt des Hauptkanals je Node – ein Gerät darf nie still auf einen anderen Verbraucher wechseln. */
+    private val primaries = PrimaryEndpoints(store)
 
     private val _devices = MutableStateFlow<Map<ULong, DeviceState>>(emptyMap())
     override val devices: StateFlow<Map<ULong, DeviceState>> = _devices.asStateFlow()
@@ -307,13 +309,13 @@ class ChipMatterController(
             DeviceState(
                 nodeId = node,
                 onlineState = online[node] ?: OnlineState.UNKNOWN,
-                capabilities = data?.let(ClusterMapper::capabilities).orEmpty(),
+                capabilities = data?.let { ClusterMapper.capabilities(it, primaries.resolve(node, it)) }.orEmpty(),
                 lastSeenAt = lastSeen[node],
                 vendorName = info?.vendorName,
                 productName = info?.productName,
                 label = info?.nodeLabel,
                 network = data?.let(ClusterMapper::network),
-                channels = data?.let(ClusterMapper::channels).orEmpty(),
+                channels = data?.let { ClusterMapper.channels(it, primaries.resolve(node, it)) }.orEmpty(),
             )
         }
         _admins.value = nodes.associateWith { node -> nodeData[node]?.let(ClusterMapper::admins).orEmpty() }
@@ -323,7 +325,7 @@ class ChipMatterController(
         devices.map { it[nodeId] }.filterNotNull().distinctUntilChanged()
 
     override suspend fun readCapabilities(nodeId: ULong): List<Capability> =
-        nodeData[nodeId]?.let(ClusterMapper::capabilities).orEmpty()
+        nodeData[nodeId]?.let { ClusterMapper.capabilities(it, primaries.resolve(nodeId, it)) }.orEmpty()
 
     // --- Koppeln -----------------------------------------------------------------------------
 
@@ -510,6 +512,7 @@ class ChipMatterController(
     }
 
     private fun forget(nodeId: ULong) {
+        primaries.forget(nodeId)
         stopSubscription(nodeId)
         rememberNode(nodeId, keep = false)
         store.putString(KEY_REMOVED, (removedNodes() + nodeId).joinToString(",") { it.toString(16) })
@@ -523,6 +526,7 @@ class ChipMatterController(
         store.putString(KEY_FABRIC, null)
         store.putString(KEY_NODES, null)
         store.putString(KEY_REMOVED, null)
+        primaries.clear()
         _fabric.value = null
         // SDK-Schlüsselspeicher (Root-CA, Fabric) leeren – beim nächsten Start entsteht eine neue Fabric
         runCatching { withContext(Dispatchers.Main) { chip?.shutdownCommissioning(); chip?.close() } }
@@ -642,13 +646,13 @@ class ChipMatterController(
     override suspend fun execute(command: MatterCommand): CommandResult {
         val node = command.nodeId
         val data = nodeData[node] ?: return CommandResult.Failure(CommandFailure.OFFLINE, "no data yet")
-        val actions = ClusterMapper.actions(command.command, data, command.endpointId)
+        val actions = ClusterMapper.actions(command.command, data, command.endpointId, primaries.resolve(node, data))
             ?: return CommandResult.Failure(CommandFailure.UNSUPPORTED, "command not supported")
         return withDevice(node) { ptr ->
             for (a in actions) {
                 val r = when (a) {
                     is MatterAction.Invoke -> invoke(ptr, a.endpoint, a.cluster, a.command, a.fields, timed = false)
-                    is MatterAction.Write -> write(ptr, a)
+                    is MatterAction.Write -> write(ptr, a).also { if (it is CommandResult.Success) cacheWrite(node, a) }
                 }
                 if (r !is CommandResult.Success) return@withDevice r
             }
@@ -666,6 +670,19 @@ class ChipMatterController(
                 }, ptr, InvokeElement.newInstance(ep, cluster, cmd, fields, null), if (timed) TIMED_MS else 0, 0)
             }
         } ?: CommandResult.Failure(CommandFailure.TIMEOUT, "no response")
+    }
+
+    /**
+     * Bestätigten Schreibvorgang sofort in den Zwischenspeicher übernehmen – nicht erst mit dem nächsten Bericht. Sonst
+     * sähe ein direkt folgender Befehl (Szene: erst Modus, dann Sollwert) noch den alten Wert.
+     */
+    private fun cacheWrite(nodeId: ULong, a: MatterAction.Write) {
+        val path = AttrPath(a.endpoint, a.cluster, a.attribute)
+        val value = runCatching { TlvReader.read(a.value) }.getOrElse { return }
+        nodeData[nodeId] = (nodeData[nodeId] ?: NodeData(emptyMap())).merge(mapOf(path to value))
+        rawTlv.getOrPut(nodeId) { ConcurrentHashMap() }[path] = a.value
+        saveCache(nodeId)
+        publish()
     }
 
     private suspend fun write(ptr: Long, a: MatterAction.Write): CommandResult {

@@ -54,7 +54,14 @@ sealed interface DeviceCommand {
     data class SetColor(val color: RgbColor) : DeviceCommand
 
     @Serializable @SerialName("target_temperature")
-    data class SetTargetTemperature(val celsius: Double) : DeviceCommand
+    data class SetTargetTemperature(
+        val celsius: Double,
+        /**
+         * Für welchen Modus der Sollwert gilt (Kühlen → Kühl-, sonst Heiz-Sollwert). null = aktueller Modus des Geräts.
+         * Szenen setzen ihn, weil der vorangehende Moduswechsel beim Gerät noch nicht zurückgemeldet sein kann.
+         */
+        val mode: ThermostatMode? = null,
+    ) : DeviceCommand
 
     @Serializable @SerialName("thermostat_mode")
     data class SetThermostatMode(val mode: ThermostatMode) : DeviceCommand

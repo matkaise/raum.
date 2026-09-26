@@ -92,6 +92,14 @@ abstract class HomeDao {
         upsertDevices(listOf(if (existing != null) device.copy(id = existing.id) else device))
     }
 
+    /** Nur anlegen, wenn weder der Kanal noch die Geräte-ID schon existiert – vorhandene Einträge bleiben unberührt. */
+    @Transaction
+    open suspend fun insertDeviceIfMissing(device: DeviceEntity) {
+        if (deviceByChannel(device.matterNodeId, device.endpointId) != null) return
+        if (device.id in deviceIds()) return
+        upsertDevices(listOf(device))
+    }
+
     // --- Szenen ----------------------------------------------------------------
     @Transaction
     @Query("SELECT * FROM scenes ORDER BY sortOrder, name")

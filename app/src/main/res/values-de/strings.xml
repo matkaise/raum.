@@ -1195,4 +1195,5 @@
     <string name="device_channel_value">Endpunkt %1$d (weiterer Kanal)</string>
     <string name="reset_error_bridge">Die Bridge ließ sich nicht zurücksetzen – es wurde nichts gelöscht. Bitte raum. neu starten und erneut versuchen.</string>
     <string name="share_remove_failed">Zugriff für %1$s nicht entzogen: %2$s</string>
+    <string name="log_bridge_command_dropped">Befehl über %1$s verworfen – Gerät antwortet nicht, neuere Befehle haben Vorrang</string>
 </resources>

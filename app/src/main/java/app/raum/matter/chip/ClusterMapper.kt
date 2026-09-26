@@ -146,10 +146,16 @@ object ClusterMapper {
         productId = n[0, Cluster.BASIC_INFORMATION, Attr.PRODUCT_ID] as? Long,
     )
 
-    fun capabilities(n: NodeData): List<Capability> {
+    /**
+     * @param primary Endpunkt des Hauptkanals (fest gebunden, siehe [PrimaryEndpoints]); fehlt er inzwischen, hat das
+     *   Hauptgerät keine Schaltfunktion mehr – es springt nicht auf einen anderen Endpunkt.
+     */
+    fun capabilities(n: NodeData, primary: Int? = defaultPrimaryEndpoint(n)): List<Capability> {
         val caps = mutableListOf<Capability>()
-        light(n)?.let(caps::add)
-        switch(n)?.let(caps::add)
+        primary?.takeIf { it in n.endpointsWith(Cluster.ON_OFF) }?.let { ep ->
+            caps += if (isLight(n, ep)) light(n, ep)
+                else switch(n, ep, anyMeter = n.endpointsWith(Cluster.ON_OFF).none { it != ep && isChannel(n, it) })
+        }
         thermostat(n)?.let(caps::add)
         cover(n)?.let(caps::add)
         contact(n)?.let(caps::add)
@@ -178,8 +184,8 @@ object ClusterMapper {
      * Steckdosen-/Schaltaktor-Gerätetyp (Mehrkanal-Relais, Leuchte + Steckdose, Bridge mit mehreren Leuchten).
      * Endpunkte anderer Gerätetypen (z. B. Klimagerät mit On/Off) bleiben Teil des Hauptgeräts.
      */
-    fun channels(n: NodeData): List<DeviceChannel> {
-        val primary = primaryOnOffEndpoint(n) ?: return emptyList()
+    fun channels(n: NodeData, primary: Int? = defaultPrimaryEndpoint(n)): List<DeviceChannel> {
+        if (primary == null) return emptyList()
         return n.endpointsWith(Cluster.ON_OFF).filter { it != primary && isChannel(n, it) }.map { ep ->
             val cap: Capability = if (isLight(n, ep)) light(n, ep) else switch(n, ep, anyMeter = false)
             DeviceChannel(ep, listOf(cap))
@@ -188,7 +194,13 @@ object ClusterMapper {
 
     private fun isLight(n: NodeData, ep: Int) = n.deviceTypes(ep).any { it in DeviceType.LIGHTS }
     private fun isChannel(n: NodeData, ep: Int) = n.deviceTypes(ep).any { it in DeviceType.LIGHTS || it in DeviceType.PLUGS }
-    private fun primaryOnOffEndpoint(n: NodeData): Int? = lightEndpoint(n) ?: switchEndpoint(n)
+
+    /** Vorschlag für den Hauptkanal: erste Leuchte, sonst erster anderer On/Off-Endpunkt. Wird beim ersten Mal gebunden. */
+    fun defaultPrimaryEndpoint(n: NodeData): Int? = lightEndpoint(n) ?: switchEndpoint(n)
+
+    /** Gerätetypen aller On/Off-Endpunkte bekannt – erst dann ist [defaultPrimaryEndpoint] endgültig. */
+    fun onOffTypesKnown(n: NodeData): Boolean =
+        n.endpointsWith(Cluster.ON_OFF).all { n.has(it, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) }
 
     private fun lightEndpoint(n: NodeData): Int? = n.endpointsWith(Cluster.ON_OFF).firstOrNull { ep ->
         n.deviceTypes(ep).any { it in DeviceType.LIGHTS }
@@ -197,8 +209,6 @@ object ClusterMapper {
     private fun switchEndpoint(n: NodeData): Int? = n.endpointsWith(Cluster.ON_OFF).firstOrNull { ep ->
         n.deviceTypes(ep).none { it in DeviceType.LIGHTS }
     }
-
-    private fun light(n: NodeData): LightCapability? = lightEndpoint(n)?.let { light(n, it) }
 
     private fun light(n: NodeData, ep: Int): LightCapability {
         val on = n[ep, Cluster.ON_OFF, Attr.VALUE] as? Boolean ?: false
@@ -230,12 +240,6 @@ object ClusterMapper {
             rgbColor = rgb,
             colorMode = mode,
         )
-    }
-
-    private fun switch(n: NodeData): SwitchCapability? {
-        if (lightEndpoint(n) != null) return null
-        val ep = switchEndpoint(n) ?: return null
-        return switch(n, ep, anyMeter = n.endpointsWith(Cluster.ON_OFF).none { it != ep && isChannel(n, it) })
     }
 
     /** @param anyMeter Messwerte auch von anderen Endpunkten übernehmen (nur wenn der Node keinen weiteren Kanal hat). */
@@ -308,11 +312,12 @@ object ClusterMapper {
      * null = vom Gerät nicht unterstützt.
      * @param channel Endpunkt eines weiteren Kanals ([channels]); null = Hauptkanal. Ein Kanal kann nur schalten,
      *   dimmen und – bei Leuchten – Farbe/Farbtemperatur.
+     * @param primary gebundener Endpunkt des Hauptkanals (wie bei [capabilities]).
      */
-    fun actions(cmd: DeviceCommand, n: NodeData, channel: Int? = null): List<MatterAction>? {
-        if (channel != null && channel !in channels(n).map { it.endpoint }) return null
-        val onOffEp = channel ?: primaryOnOffEndpoint(n)
-        val lightEp = if (channel == null) lightEndpoint(n) else channel.takeIf { isLight(n, it) }
+    fun actions(cmd: DeviceCommand, n: NodeData, channel: Int? = null, primary: Int? = defaultPrimaryEndpoint(n)): List<MatterAction>? {
+        if (channel != null && channel !in channels(n, primary).map { it.endpoint }) return null
+        val onOffEp = channel ?: primary?.takeIf { it in n.endpointsWith(Cluster.ON_OFF) }
+        val lightEp = onOffEp?.takeIf { isLight(n, it) }
         if (channel != null && cmd !is DeviceCommand.SetOn && cmd !is DeviceCommand.SetBrightness &&
             cmd !is DeviceCommand.SetColorTemperature && cmd !is DeviceCommand.SetColor) return null
         return when (cmd) {
@@ -340,7 +345,7 @@ object ClusterMapper {
             }
             is DeviceCommand.SetTargetTemperature -> {
                 val ep = n.endpointsWith(Cluster.THERMOSTAT).firstOrNull() ?: return null
-                val cooling = (n[ep, Cluster.THERMOSTAT, Attr.SYSTEM_MODE] as? Long) == 3L
+                val cooling = cmd.mode?.let { it == ThermostatMode.COOL } ?: ((n[ep, Cluster.THERMOSTAT, Attr.SYSTEM_MODE] as? Long) == 3L)
                 listOf(MatterAction.Write(ep, Cluster.THERMOSTAT,
                     if (cooling) Attr.OCCUPIED_COOLING_SETPOINT else Attr.OCCUPIED_HEATING_SETPOINT,
                     TlvWriter().int(null, (cmd.celsius * 100).roundToLong()).bytes()))
