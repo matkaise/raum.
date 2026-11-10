@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.R
+import app.raum.platform.network.NetworkController
 import app.raum.platform.network.WifiNetwork
 import app.raum.platform.network.WifiSecurity
 import app.raum.ui.components.RaumDialog
@@ -64,8 +65,18 @@ import kotlinx.coroutines.launch
 
 /** Netzwerk: Status (LAN/WLAN) und WLAN verbinden – direkt nur als Geräteeigentümer. */
 @Composable
-fun NetworkSection(vm: SettingsViewModel) {
-    val net = vm.network
+fun NetworkSection(vm: SettingsViewModel) = NetworkPanel(vm.network, vm::connectWifi, vm::forgetWifi)
+
+/**
+ * Netzwerkstatus und WLAN-Auswahl, auch für die Systemprüfung der Einrichtung. Der Aufrufer startet und
+ * stoppt die Beobachtung ([NetworkController.start]/[NetworkController.stop]).
+ */
+@Composable
+fun NetworkPanel(
+    net: NetworkController,
+    connect: suspend (WifiNetwork, String?) -> Boolean,
+    forget: (String) -> Unit,
+) {
     val status by net.status.collectAsStateWithLifecycle()
     val networks by net.networks.collectAsStateWithLifecycle()
     val scanning by net.scanning.collectAsStateWithLifecycle()
@@ -103,11 +114,8 @@ fun NetworkSection(vm: SettingsViewModel) {
             }
             val ssid = status.ssid
             if (status.wifiConnected && ssid != null && net.canManage) {
-                OutlinedButton(onClick = { vm.forgetWifi(ssid) }, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.net_forget)) }
+                OutlinedButton(onClick = { forget(ssid) }, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.net_forget)) }
             }
-        }
-        if (status.wifiConnected && !status.ethernet) {
-            Text(stringResource(R.string.net_lan_recommended), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
@@ -178,11 +186,11 @@ fun NetworkSection(vm: SettingsViewModel) {
         }
     }
 
-    connectTo?.let { target -> ConnectDialog(vm, target, onDismiss = { connectTo = null }) }
+    connectTo?.let { target -> ConnectDialog(connect, target, onDismiss = { connectTo = null }) }
 }
 
 @Composable
-private fun ConnectDialog(vm: SettingsViewModel, target: WifiNetwork, onDismiss: () -> Unit) {
+private fun ConnectDialog(connectWifi: suspend (WifiNetwork, String?) -> Boolean, target: WifiNetwork, onDismiss: () -> Unit) {
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -195,7 +203,7 @@ private fun ConnectDialog(vm: SettingsViewModel, target: WifiNetwork, onDismiss:
         if (!ready) return
         busy = true; failed = false
         scope.launch {
-            val ok = vm.connectWifi(target, password.takeIf { target.secured })
+            val ok = connectWifi(target, password.takeIf { target.secured })
             busy = false
             if (ok) onDismiss() else failed = true
         }

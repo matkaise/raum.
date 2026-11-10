@@ -78,7 +78,17 @@ data class DeviceMetadata(
     val favorite: Boolean,
     /** Weiterer Kanal des Nodes ([DeviceChannel.endpoint]); null = Hauptkanal. */
     val endpointId: Int? = null,
+    /** Schaltaktor als Licht verwenden – siehe [asLight]. */
+    val switchAsLight: Boolean = false,
 )
+
+/**
+ * Schaltaktor als Licht: Ein Relais hinter dem Lichtschalter (Shelly) meldet sich als Zwischenstecker. Als Licht
+ * zählt es für Lichtszenen, „Alle Lichter aus“ und die Bridge; Befehle bleiben gleich (OnOff).
+ */
+fun asLight(capabilities: List<Capability>): List<Capability> =
+    if (capabilities.any { it is LightCapability }) capabilities
+    else capabilities.map { if (it is SwitchCapability) LightCapability(isOn = it.isOn) else it }
 
 /** Kombiniertes Modell für UI und Domain (Spez. 10.2). */
 data class Device(
@@ -95,6 +105,8 @@ data class Device(
     val network: DeviceNetwork? = null,
     /** Weiterer Kanal eines Nodes (Befehle gehen an diesen Endpunkt); null = Hauptkanal. */
     val endpointId: Int? = null,
+    /** Schaltaktor wird als Licht angezeigt ([asLight]). */
+    val switchAsLight: Boolean = false,
 ) {
     val isOnline: Boolean get() = onlineState == OnlineState.ONLINE
 

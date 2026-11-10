@@ -47,6 +47,9 @@ data class DeviceEntity(
     val favorite: Boolean,
     /** Weiterer Kanal des Nodes (Endpunkt); null = Hauptkanal. */
     val endpointId: Int? = null,
+    /** Schaltaktor/Zwischenstecker als Licht behandeln (Lichtschalter-Relais). */
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val switchAsLight: Boolean = false,
 )
 
 @Entity(tableName = "scenes")
@@ -116,4 +119,18 @@ data class EventLogEntity(
     val deviceId: String? = null,
     val deviceName: String? = null,
     val automationId: String? = null,
+)
+
+/**
+ * Messwert für den Sensorverlauf (Diagramme im Gerätedetail). Bewusst ohne Fremdschlüssel:
+ * Verläufe verwaister Geräte räumt [app.raum.history.SensorHistory] beim Aufräumen weg.
+ * Zweistellige Zustände (offen, belegt, erreichbar) als 1/0 bei jedem Wechsel.
+ */
+@Entity(tableName = "sensor_samples", indices = [Index(value = ["deviceId", "metric", "timestampMs"])])
+data class SensorSampleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val deviceId: String,
+    val metric: String,
+    val timestampMs: Long,
+    val value: Double,
 )

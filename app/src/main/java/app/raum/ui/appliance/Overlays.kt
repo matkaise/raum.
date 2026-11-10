@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -39,19 +40,26 @@ import java.util.Locale
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
- * Ruhebildschirm: schwarz mit gedimmter Uhr. Berührung oder Annäherung weckt
- * (die weckende Berührung wird in der Activity verschluckt).
+ * Ruhebildschirm: gedimmte Uhr über dem abgedunkelten Himmel (sonst schwarz). Berührung oder
+ * Annäherung weckt (die weckende Berührung wird in der Activity verschluckt).
  */
 @Composable
-fun ScreensaverOverlay(visible: Boolean, statusLine: String) {
+fun ScreensaverOverlay(visible: Boolean, status: List<String>, sky: (@Composable () -> Unit)? = null) {
+    val overSky = sky != null
     AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
-        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        // Der Himmel allein, ohne den Inhalt der App darüber
+        sky?.invoke()
+        Box(
+            Modifier.fillMaxSize().background(if (overSky) Color(0xFF03050E).copy(alpha = 0.72f) else Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
             val now by rememberNow()
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(now.format(TIME), color = Color(0xFF8A8579), fontSize = 160.sp, fontWeight = FontWeight.Thin)
-                Text(now.format(rememberLongDateFormatter()), color = Color(0xFF5E5A52), fontSize = 28.sp)
-                Spacer(Modifier.height(24.dp))
-                Text(statusLine, color = Color(0xFF4A473F), fontSize = 20.sp)
+                Text(now.format(TIME), color = Color.White.copy(alpha = 0.72f), fontSize = 210.sp, fontWeight = FontWeight.Light, lineHeight = 214.sp, letterSpacing = (-8).sp)
+                Text(now.format(rememberLongDateFormatter()), color = Color.White.copy(alpha = 0.5f), fontSize = 26.sp, modifier = Modifier.padding(top = 16.dp))
+                Row(Modifier.padding(top = 28.dp), horizontalArrangement = Arrangement.spacedBy(26.dp)) {
+                    status.forEach { Text(it, color = Color.White.copy(alpha = 0.42f), fontSize = 19.sp) }
+                }
             }
         }
     }

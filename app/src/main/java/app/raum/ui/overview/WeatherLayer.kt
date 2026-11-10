@@ -1,5 +1,14 @@
 package app.raum.ui.overview
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.PointMode
+import kotlin.math.roundToInt
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,21 +47,35 @@ data class WeatherVisual(
 )
 
 /**
- * Sekunden seit Start, ~30 Bilder/s. Läuft nur, solange [running] – im Ruhezustand, außerhalb der
- * Übersicht oder bei abgeschalteten Systemanimationen steht das Bild.
+ * Sekunden seit Start, ~30 Bilder/s. Läuft nur, solange [running] – im Ruhezustand oder bei
+ * abgeschalteten Systemanimationen steht das Bild.
  */
 @Composable
-fun rememberAnimationClock(running: Boolean): State<Float> {
+/**
+ * Uhr für Himmelsanimationen. [fast] = Regen/Schnee (schnelle Teilchen); sonst bewegt sich nur langsam Wolke und Funkeln,
+ * dafür reichen ~12 Bilder/s – spart auf dem Panel spürbar Rechenzeit.
+ */
+fun rememberAnimationClock(running: Boolean, fast: Boolean = true): State<Float> {
     val t = remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(running) {
+    LaunchedEffect(running, fast) {
         if (!running) return@LaunchedEffect
         var last = withFrameNanos { it }
         while (true) {
+            // Während der Nutzer scrollt, steht der Himmel – jedes Bild gehört dann der Bedienung
+            if (SkyMotion.paused) {
+                snapshotFlow { SkyMotion.paused }.first { !it }
+                last = withFrameNanos { it }
+            }
             withFrameNanos { now -> t.floatValue += (now - last) / 1_000_000_000f; last = now }
-            delay(30)
+            delay(if (fast) 30 else 70)
         }
     }
     return t
+}
+
+/** Pausiert die Himmelsanimation, solange eine Seite scrollt (z. B. die Übersicht). */
+object SkyMotion {
+    var paused by mutableStateOf(false)
 }
 
 private class Particle(val x: Float, val y: Float, val speed: Float, val size: Float, val phase: Float)
@@ -76,39 +99,42 @@ fun WeatherLayer(visual: WeatherVisual, night: Boolean, time: State<Float>, modi
     val flakes = remember { particles(41, 160) }
     val fogBlobs = remember { particles(53, 6) }
 
-    Canvas(modifier) {
-        val t = time.value
+    Spacer(modifier.drawWithCache {
         val cover = visual.cloudCover.coerceIn(0f, 1f)
         val cloudTint = when {
             visual.precip != PrecipType.NONE || visual.thunder -> if (night) Color(0xFF5A6273) else Color(0xFFB9C1CB)
             night -> Color(0xFF8E97AD)
             else -> Color.White
         }
+        val farTint = cloudTint.copy(alpha = 0.28f + cover * 0.2f)
+        val nearTint = cloudTint.copy(alpha = 0.40f + cover * 0.3f)
         val drift = (6f + visual.wind * 2.5f).dp.toPx() * visual.windDirection
+        onDrawBehind {
+            val t = time.value
+            // Wolken: hintere Ebene kleiner, langsamer, blasser
+            clouds(far.take((cover * far.size + 0.3f).toInt()), t, drift * 0.5f, farTint, scale = 0.55f, band = 0.05f..0.45f)
+            clouds(near.take((cover * near.size + 0.2f).toInt()), t, drift, nearTint, scale = 0.85f, band = 0.00f..0.55f)
 
-        // Wolken: hintere Ebene kleiner, langsamer, blasser
-        clouds(far.take((cover * far.size + 0.3f).toInt()), t, drift * 0.5f, cloudTint.copy(alpha = 0.28f + cover * 0.2f), scale = 0.55f, band = 0.05f..0.45f)
-        clouds(near.take((cover * near.size + 0.2f).toInt()), t, drift, cloudTint.copy(alpha = 0.40f + cover * 0.3f), scale = 0.85f, band = 0.00f..0.55f)
+            if (visual.fog) fog(fogBlobs, t)
 
-        if (visual.fog) fog(fogBlobs, t)
-
-        when (visual.precip) {
-            PrecipType.RAIN -> rain(drops, count(visual.rate, 45f, 30, 180), t, visual)
-            PrecipType.SNOW -> snow(flakes, count(visual.rate, 60f, 40, 160), t, visual)
-            PrecipType.SLEET -> {
-                rain(drops, count(visual.rate, 25f, 20, 90), t, visual)
-                snow(flakes, count(visual.rate, 30f, 20, 80), t, visual)
+            when (visual.precip) {
+                PrecipType.RAIN -> rain(drops, count(visual.rate, 45f, 30, 180), t, visual)
+                PrecipType.SNOW -> snow(flakes, count(visual.rate, 60f, 40, 160), t, visual)
+                PrecipType.SLEET -> {
+                    rain(drops, count(visual.rate, 25f, 20, 90), t, visual)
+                    snow(flakes, count(visual.rate, 30f, 20, 80), t, visual)
+                }
+                PrecipType.NONE -> Unit
             }
-            PrecipType.NONE -> Unit
-        }
 
-        if (visual.thunder) {
-            // Doppelblitz etwa alle 7 s
-            val p = t % 7.3f
-            val a = when { p < 0.07f -> 0.38f; p in 0.15f..0.22f -> 0.26f; else -> 0f }
-            if (a > 0f) drawRect(Color.White.copy(alpha = a))
+            if (visual.thunder) {
+                // Doppelblitz etwa alle 7 s
+                val p = t % 7.3f
+                val a = when { p < 0.07f -> 0.38f; p in 0.15f..0.22f -> 0.26f; else -> 0f }
+                if (a > 0f) drawRect(Color.White.copy(alpha = a))
+            }
         }
-    }
+    })
 }
 
 private fun count(rate: Float, perMm: Float, min: Int, max: Int) = (rate * perMm).toInt().coerceIn(min, max)
@@ -130,34 +156,48 @@ private fun DrawScope.clouds(list: List<Particle>, t: Float, drift: Float, color
     }
 }
 
+// Regen, Schnee und Sterne in wenigen gebündelten Zeichenbefehlen (drawPoints) statt je Teilchen einem: Auf dem Panel
+// kostete jeder Einzelbefehl im Render-Thread spürbar Zeit (bis zu 180 Striche pro Bild).
+private const val ALPHA_LEVELS = 3
+
 private fun DrawScope.rain(list: List<Particle>, n: Int, t: Float, v: WeatherVisual) {
     val h = size.height
     val slant = (v.wind * 0.045f).coerceAtMost(0.55f) * v.windDirection
     val stroke = 1.4.dp.toPx()
+    val groups = Array(ALPHA_LEVELS) { ArrayList<Offset>(2 * n / ALPHA_LEVELS + 2) }
     for (i in 0 until n) {
         val p = list[i]
         val len = (12f + p.size * 12f).dp.toPx()
         val speed = (650f + p.speed * 350f).dp.toPx()
         val y = wrap(p.y * (h + len) + t * speed, h + len) - len
         val x = wrap(p.x * size.width + y * slant, size.width)
-        drawLine(
-            Color.White.copy(alpha = 0.22f + p.size * 0.25f),
-            Offset(x, y), Offset(x + len * slant, y + len), stroke, StrokeCap.Round,
-        )
+        val g = groups[(p.size * ALPHA_LEVELS).toInt().coerceAtMost(ALPHA_LEVELS - 1)]
+        g.add(Offset(x, y)); g.add(Offset(x + len * slant, y + len))
+    }
+    groups.forEachIndexed { level, pts ->
+        val size = (level + 0.5f) / ALPHA_LEVELS
+        if (pts.isNotEmpty()) drawPoints(pts, PointMode.Lines, Color.White.copy(alpha = 0.22f + size * 0.25f), stroke, StrokeCap.Round)
     }
 }
 
 private fun DrawScope.snow(list: List<Particle>, n: Int, t: Float, v: WeatherVisual) {
     val h = size.height
     val side = v.wind * 3f * v.windDirection
+    val groups = Array(ALPHA_LEVELS) { ArrayList<Offset>(n / ALPHA_LEVELS + 1) }
     for (i in 0 until n) {
         val p = list[i]
-        val r = (1.4f + p.size * 2.4f).dp.toPx()
+        val level = (p.size * ALPHA_LEVELS).toInt().coerceAtMost(ALPHA_LEVELS - 1)
+        val r = (1.4f + (level + 0.5f) / ALPHA_LEVELS * 2.4f).dp.toPx()
         val speed = (26f + p.speed * 40f).dp.toPx()
         val y = wrap(p.y * (h + r * 2) + t * speed, h + r * 2) - r
         val sway = sin(t * (0.6f + p.speed) + p.phase) * 10.dp.toPx()
         val x = wrap(p.x * size.width + sway + t * side.dp.toPx(), size.width)
-        drawCircle(Color.White.copy(alpha = 0.55f + p.size * 0.35f), r, Offset(x, y))
+        groups[level].add(Offset(x, y))
+    }
+    groups.forEachIndexed { level, pts ->
+        val sz = (level + 0.5f) / ALPHA_LEVELS
+        val r = (1.4f + sz * 2.4f).dp.toPx()
+        if (pts.isNotEmpty()) drawPoints(pts, PointMode.Points, Color.White.copy(alpha = 0.55f + sz * 0.35f), r * 2, StrokeCap.Round)
     }
 }
 
@@ -184,10 +224,19 @@ fun TwinklingStars(cloudCover: Float, time: State<Float>, modifier: Modifier = M
         val t = time.value
         val visible = (1f - cloudCover * 1.1f).coerceIn(0f, 1f)
         if (visible <= 0f) return@Canvas
+        // Gebündelt nach Größe und Helligkeitsstufe des Funkelns – wenige Befehle statt einem je Stern
+        val groups = HashMap<Int, ArrayList<Offset>>()
         stars.forEach { s ->
             val twinkle = 0.7f + 0.3f * abs(sin(t * (0.4f + s.speed) + s.phase))
-            val r = (0.6f + s.size * 1.4f).dp.toPx()
-            drawCircle(Color.White.copy(alpha = (0.3f + s.size * 0.5f) * twinkle * visible), r, Offset(s.x * size.width, s.y * 0.8f * size.height))
+            val sizeLevel = (s.size * ALPHA_LEVELS).toInt().coerceAtMost(ALPHA_LEVELS - 1)
+            val twinkleLevel = ((twinkle - 0.7f) / 0.3f * 3f).roundToInt().coerceIn(0, 3)
+            groups.getOrPut(sizeLevel * 10 + twinkleLevel) { ArrayList() }.add(Offset(s.x * size.width, s.y * 0.8f * size.height))
+        }
+        groups.forEach { (key, pts) ->
+            val sz = (key / 10 + 0.5f) / ALPHA_LEVELS
+            val twinkle = 0.7f + 0.3f * (key % 10) / 3f
+            val r = (0.6f + sz * 1.4f).dp.toPx()
+            drawPoints(pts, PointMode.Points, Color.White.copy(alpha = (0.3f + sz * 0.5f) * twinkle * visible), r * 2, StrokeCap.Round)
         }
     }
 }

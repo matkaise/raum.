@@ -47,6 +47,8 @@ data class DeviceDto(
     val favorite: Boolean,
     /** Weiterer Kanal des Nodes; null = Hauptkanal (ältere Sicherungen kennen das Feld nicht). */
     val endpointId: Int? = null,
+    /** Schaltaktor als Licht (ältere Sicherungen: false). */
+    val switchAsLight: Boolean = false,
 )
 
 @Serializable data class SceneActionDto(val deviceId: String, val command: DeviceCommand)

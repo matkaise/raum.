@@ -46,4 +46,25 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+/** v3 → v4: Sensorverlauf (Messwerte der letzten Tage für die Diagramme im Gerätedetail). */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `sensor_samples` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`deviceId` TEXT NOT NULL, `metric` TEXT NOT NULL, `timestampMs` INTEGER NOT NULL, `value` REAL NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_sensor_samples_deviceId_metric_timestampMs` " +
+                "ON `sensor_samples` (`deviceId`, `metric`, `timestampMs`)"
+        )
+    }
+}
+
+/** v5: Schaltaktoren lassen sich als Licht verwenden (Shelly hinter dem Lichtschalter). */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `devices` ADD COLUMN `switchAsLight` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)

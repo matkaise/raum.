@@ -63,7 +63,11 @@ enum class CoverMovement { STOPPED, OPENING, CLOSING }
 data class CoverCapability(
     val openPercent: Int,
     val movement: CoverMovement = CoverMovement.STOPPED,
-) : Capability
+    /** Lamellenwinkel als "Prozent offen" (0 = geschlossen, 100 = waagrecht offen); null = keine verstellbaren Lamellen. */
+    val tiltOpenPercent: Int? = null,
+) : Capability {
+    val hasTilt: Boolean get() = tiltOpenPercent != null
+}
 
 data class ContactSensorCapability(val isOpen: Boolean) : Capability
 

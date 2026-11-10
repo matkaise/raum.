@@ -19,6 +19,7 @@ import app.raum.matter.chip.AttrPath
 import app.raum.matter.chip.Cluster
 import app.raum.matter.chip.ClusterMapper
 import app.raum.matter.chip.Cmd
+import app.raum.matter.chip.CoverFeature
 import app.raum.matter.chip.DeviceType
 import app.raum.matter.chip.MatterAction
 import app.raum.matter.chip.NodeData
@@ -117,6 +118,30 @@ class ClusterMapperTest {
         assertEquals(Cluster.ON_OFF, off.cluster); assertEquals(Cmd.OFF, off.command)
     }
 
+    @Test fun `Farbe an ausgeschalteter Leuchte schaltet sie ein – Farbe zuerst, gilt auch im Aus`() {
+        fun light(on: Boolean) = node(
+            at(1, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) to types(DeviceType.EXTENDED_COLOR_LIGHT),
+            at(1, Cluster.ON_OFF, Attr.VALUE) to on,
+            at(1, Cluster.LEVEL_CONTROL, Attr.VALUE) to 127L,
+            at(1, Cluster.COLOR_CONTROL, Attr.COLOR_CAPABILITIES) to 0x1FL,
+            at(1, Cluster.COLOR_CONTROL, Attr.COLOR_TEMPERATURE_MIREDS) to 370L,
+            at(1, Cluster.COLOR_CONTROL, Attr.COLOR_TEMP_MIN_MIREDS) to 153L,
+            at(1, Cluster.COLOR_CONTROL, Attr.COLOR_TEMP_MAX_MIREDS) to 500L,
+        )
+        for (cmd in listOf(DeviceCommand.SetColor(RgbColor(0, 0, 255)), DeviceCommand.SetColorTemperature(4000))) {
+            val off = ClusterMapper.actions(cmd, light(on = false))!!.map { it as MatterAction.Invoke }
+            assertEquals(listOf(Cluster.COLOR_CONTROL, Cluster.ON_OFF), off.map { it.cluster })
+            assertEquals(Cmd.ON, off[1].command)
+            // OptionsMask und OptionsOverride = ExecuteIfOff
+            val fields = TlvReader.read(off[0].fields) as TlvStruct
+            val last = if (cmd is DeviceCommand.SetColor) 4 else 3
+            assertEquals(1L, fields[last - 1]); assertEquals(1L, fields[last])
+
+            val on = ClusterMapper.actions(cmd, light(on = true))!!
+            assertEquals(Cluster.COLOR_CONTROL, (on.single() as MatterAction.Invoke).cluster)
+        }
+    }
+
     @Test fun `Zwischenstecker mit Leistungsmessung`() {
         val n = node(
             at(1, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) to types(DeviceType.ON_OFF_PLUG),
@@ -139,6 +164,39 @@ class ClusterMapperTest {
         val go = ClusterMapper.actions(DeviceCommand.SetCoverPosition(30), n)!!.single() as MatterAction.Invoke
         assertEquals(7000L, (TlvReader.read(go.fields) as TlvStruct)[0])
         assertEquals(Cmd.COVER_STOP, (ClusterMapper.actions(DeviceCommand.StopCover, n)!!.single() as MatterAction.Invoke).command)
+    }
+
+    @Test fun `Storen mit Lamellen - Winkel als Prozent offen, GoToTiltPercentage`() {
+        val n = node(
+            at(1, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) to types(DeviceType.WINDOW_COVERING),
+            at(1, Cluster.WINDOW_COVERING, Attr.FEATURE_MAP) to (0x01L or CoverFeature.TILT or 0x04L or CoverFeature.POSITION_AWARE_TILT),
+            at(1, Cluster.WINDOW_COVERING, Attr.CURRENT_LIFT_PERCENT_100THS) to 10000L,
+            at(1, Cluster.WINDOW_COVERING, Attr.CURRENT_TILT_PERCENT_100THS) to 6000L,
+        )
+        assertEquals(CoverCapability(0, CoverMovement.STOPPED, tiltOpenPercent = 40), ClusterMapper.capabilities(n).find<CoverCapability>())
+        val tilt = ClusterMapper.actions(DeviceCommand.SetCoverTilt(75), n)!!.single() as MatterAction.Invoke
+        assertEquals(Cmd.COVER_GO_TO_TILT_PERCENTAGE, tilt.command)
+        assertEquals(2500L, (TlvReader.read(tilt.fields) as TlvStruct)[0])
+    }
+
+    @Test fun `Storen - Shelly mit abgeschalteten Lamellen meldet Winkel null, ohne Tilt-Feature`() {
+        val n = node(
+            at(1, Cluster.DESCRIPTOR, Attr.DEVICE_TYPE_LIST) to types(DeviceType.WINDOW_COVERING),
+            at(1, Cluster.WINDOW_COVERING, Attr.FEATURE_MAP) to 0x05L, // Lift + PA_LF
+            at(1, Cluster.WINDOW_COVERING, Attr.CURRENT_LIFT_PERCENT_100THS) to 0L,
+            at(1, Cluster.WINDOW_COVERING, Attr.CURRENT_TILT_PERCENT_100THS) to null,
+        )
+        assertEquals(CoverCapability(100), ClusterMapper.capabilities(n).find<CoverCapability>())
+        assertNull(ClusterMapper.actions(DeviceCommand.SetCoverTilt(50), n))
+        // Tilt-Feature gesetzt, aber Winkel (noch) null: ebenfalls keine Lamellen
+        val unknown = n.merge(mapOf(AttrPath(1, Cluster.WINDOW_COVERING, Attr.FEATURE_MAP) to 0x17L))
+        assertNull(ClusterMapper.capabilities(unknown).find<CoverCapability>()!!.tiltOpenPercent)
+    }
+
+    @Test fun `Storen - Bewegung aus OperationalStatus`() {
+        val n = node(at(1, Cluster.WINDOW_COVERING, Attr.OPERATIONAL_STATUS) to 0b0101L)
+        assertTrue(ClusterMapper.coverMoving(n))
+        assertFalse(ClusterMapper.coverMoving(n.merge(mapOf(AttrPath(1, Cluster.WINDOW_COVERING, Attr.OPERATIONAL_STATUS) to 0L))))
     }
 
     @Test fun `Thermostat - Werte in Hundertstel-Grad, Sollwert wird geschrieben`() {

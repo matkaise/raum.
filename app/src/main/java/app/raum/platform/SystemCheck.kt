@@ -13,8 +13,17 @@ import java.time.ZonedDateTime
 
 enum class CheckState { OK, WARNING, INFO }
 
+/** Behebung direkt aus der Systemprüfung – im Kiosk gibt es keinen Weg in die Android-Einstellungen. */
+enum class CheckAction { CHOOSE_WIFI, ENABLE_BLUETOOTH }
+
 /** Ergebnis einer Prüfung; Texte als Ressourcen (übersetzbar). */
-data class CheckItem(@StringRes val titleRes: Int, val state: CheckState, @StringRes val messageRes: Int, val arg: String? = null)
+data class CheckItem(
+    @StringRes val titleRes: Int,
+    val state: CheckState,
+    @StringRes val messageRes: Int,
+    val arg: String? = null,
+    val action: CheckAction? = null,
+)
 
 /**
  * Systemprüfung der Erstinbetriebnahme (ONB-005): Netzwerk, Bluetooth, Kiosk, Uhrzeit, Sensoren.
@@ -25,25 +34,27 @@ class SystemCheck(
     private val kiosk: KioskManager,
     private val sensors: AmbientSensors,
 ) {
-    fun run(now: ZonedDateTime = ZonedDateTime.now()): List<CheckItem> = listOf(network(), bluetooth(), kiosk(), time(now), sensors())
-
-    private fun network(): CheckItem {
+    fun run(now: ZonedDateTime = ZonedDateTime.now()): List<CheckItem> {
         val cm = context.getSystemService(ConnectivityManager::class.java)
         val caps = cm?.activeNetwork?.let(cm::getNetworkCapabilities)
-        return when {
-            caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true ->
-                CheckItem(R.string.check_network, CheckState.OK, R.string.check_network_lan)
-            caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ->
-                CheckItem(R.string.check_network, CheckState.OK, R.string.check_network_wifi)
-            else -> CheckItem(R.string.check_network, CheckState.WARNING, R.string.check_network_none)
-        }
+        return listOf(network(caps), bluetooth(), kiosk(), time(now, online = caps != null), sensors())
+    }
+
+    private fun network(caps: NetworkCapabilities?): CheckItem = when {
+        caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true ->
+            CheckItem(R.string.check_network, CheckState.OK, R.string.check_network_lan)
+        // WLAN wechseln bleibt möglich
+        caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ->
+            CheckItem(R.string.check_network, CheckState.OK, R.string.check_network_wifi, action = CheckAction.CHOOSE_WIFI)
+        else -> CheckItem(R.string.check_network, CheckState.WARNING, R.string.check_network_none, action = CheckAction.CHOOSE_WIFI)
     }
 
     private fun bluetooth(): CheckItem {
         val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
         return when {
             adapter == null -> CheckItem(R.string.check_bluetooth, CheckState.WARNING, R.string.check_bluetooth_missing)
-            !runCatching { adapter.isEnabled }.getOrDefault(false) -> CheckItem(R.string.check_bluetooth, CheckState.WARNING, R.string.check_bluetooth_off)
+            !runCatching { adapter.isEnabled }.getOrDefault(false) ->
+                CheckItem(R.string.check_bluetooth, CheckState.WARNING, R.string.check_bluetooth_off, action = CheckAction.ENABLE_BLUETOOTH)
             else -> CheckItem(R.string.check_bluetooth, CheckState.OK, R.string.check_bluetooth_on)
         }
     }
@@ -52,11 +63,13 @@ class SystemCheck(
         if (kiosk.isDeviceOwner) CheckItem(R.string.check_kiosk, CheckState.OK, R.string.check_kiosk_ok)
         else CheckItem(R.string.check_kiosk, CheckState.INFO, R.string.check_kiosk_missing)
 
-    private fun time(now: ZonedDateTime): CheckItem {
+    private fun time(now: ZonedDateTime, online: Boolean): CheckItem {
         val auto = Settings.Global.getInt(context.contentResolver, Settings.Global.AUTO_TIME, 0) == 1
         val shown = "%02d.%02d.%d %02d:%02d".format(now.dayOfMonth, now.monthValue, now.year, now.hour, now.minute)
         return when {
             now.year < 2026 -> CheckItem(R.string.check_time, CheckState.WARNING, R.string.check_time_implausible, shown)
+            // Ohne Netz ist die automatische Uhrzeit nicht abgeglichen (neue Geräte stehen oft Wochen daneben)
+            auto && !online -> CheckItem(R.string.check_time, CheckState.WARNING, R.string.check_time_unsynced, shown)
             auto -> CheckItem(R.string.check_time, CheckState.OK, R.string.check_time_auto, shown)
             else -> CheckItem(R.string.check_time, CheckState.INFO, R.string.check_time_manual, shown)
         }

@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.diagnostics.LogLevel
@@ -66,14 +67,13 @@ fun AutomationsScreen(
     val rows by viewModel.rows.collectAsStateWithLifecycle()
     var deleting by remember { mutableStateOf<Automation?>(null) }
 
-    Column(Modifier.fillMaxSize().padding(start = 24.dp, end = 40.dp, top = 40.dp)) {
+    Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 36.dp)) {
         ScreenTitle(
             stringResource(R.string.nav_automations),
             stringResource(R.string.automations_subtitle, rows.count { it.automation.enabled }, rows.size),
         ) {
-            FilledTonalButton(onClick = { onEdit(null) }) {
-                Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.automation_new))
-            }
+            val g = app.raum.ui.theme.LocalGlass.current
+            app.raum.ui.rooms.PillButton(Icons.Outlined.Add, stringResource(R.string.automation_new), g.glassStrong, g.ink, border = g.edge) { onEdit(null) }
         }
         if (rows.isEmpty()) {
             EmptyState(Icons.Outlined.AutoMode, stringResource(R.string.automations_empty), stringResource(R.string.automations_empty_text)) {
@@ -129,6 +129,7 @@ private fun AutomationCard(
                     row.sentence,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (a.isComplete) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 StatusLine(row, onResume)
             }
@@ -163,19 +164,16 @@ private fun StatusLine(row: AutomationRow, onResume: () -> Unit) {
             TextButton(onClick = onResume) { Text(stringResource(R.string.action_resume)) }
         }
         row.status.running -> Text(stringResource(R.string.running_now), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-        row.lastEntry != null -> {
+        // Nur Auffälligkeiten zeigen – erfolgreiche Läufe stehen im Protokoll
+        row.lastEntry != null && row.lastEntry.level != LogLevel.INFO -> {
             val e = row.lastEntry
             // Protokolltext ohne vorangestellten Automationsnamen (falls in der aktuellen Sprache geschrieben)
             val msg = e.message.removePrefix(stringResource(R.string.auto_log_entry, row.automation.name, ""))
             Text(
                 stringResource(R.string.automation_last_run, formatAgo(e.timestamp), msg),
-                color = when (e.level) {
-                    LogLevel.ERROR -> MaterialTheme.colorScheme.error
-                    LogLevel.WARNING -> MaterialTheme.colorScheme.tertiary
-                    LogLevel.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                color = if (e.level == LogLevel.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
     }

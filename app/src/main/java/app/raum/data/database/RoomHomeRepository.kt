@@ -99,6 +99,7 @@ class RoomHomeRepository(
             dao.deleteAllSceneActions(); dao.deleteAllScenes(); dao.deleteAllAutomations(); dao.deleteAllDevices()
             if (!keepRooms) { dao.deleteAllRooms(); dao.deleteHome() }
             db.eventLogDao().clear()
+            db.sensorSampleDao().clear()
         }
         // Freigegebene Seiten überschreiben und WAL leeren – keine Altdaten in der Datei (RST-001).
         db.openHelper.writableDatabase.apply {

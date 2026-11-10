@@ -11,17 +11,12 @@ import androidx.annotation.StringRes
 
 import app.raum.data.database.RoomHomeRepository
 import app.raum.platform.kiosk.KioskManager
-import app.raum.platform.network.ConnectResult
 import app.raum.platform.network.NetworkController
 import app.raum.platform.network.WifiNetwork
 import app.raum.diagnostics.EventLog
 import app.raum.i18n.Strings
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.raum.automation.triggers.GeoLocation
@@ -101,19 +96,8 @@ class SettingsViewModel(
         viewModelScope.launch { repository.renameHome(n) }
     }
 
-    /** Verbindet und wartet bis zu 20 s darauf, dass das Netz tatsächlich aktiv ist. */
     suspend fun connectWifi(target: WifiNetwork, password: String?): Boolean {
-        val r = withContext(Dispatchers.IO) { network.connect(target, password) }
-        if (r != ConnectResult.Ok) return false
-        val ok = withTimeoutOrNull(20_000) {
-            while (true) {
-                network.refreshStatus()
-                val st = network.status.value
-                if (st.wifiConnected && (st.ssid == null || st.ssid == target.ssid)) break
-                delay(500)
-            }
-            true
-        } ?: false
+        val ok = network.connectAndAwait(target, password)
         if (ok) log.info(LogCategory.SYSTEM, strings.get(R.string.log_wifi_connected, target.ssid))
         return ok
     }

@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Base64
 import android.util.Log
 import app.raum.domain.models.Capability
+import app.raum.domain.models.DeviceCommand
 import app.raum.domain.models.DeviceState
 import app.raum.domain.models.OnlineState
 import app.raum.matter.controller.AdminFabric
@@ -57,6 +58,7 @@ import chip.platform.PreferencesKeyValueStoreManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,6 +107,11 @@ class ChipMatterController(
     private val nodeData = ConcurrentHashMap<ULong, NodeData>()
     private val rawTlv = ConcurrentHashMap<ULong, MutableMap<AttrPath, ByteArray>>()
     private val online = ConcurrentHashMap<ULong, OnlineState>()
+    /** Zeitpunkt des letzten eigenen Höhenbefehls je Storen – siehe [awaitCoverStill]. */
+    private val coverLiftSentAt = ConcurrentHashMap<ULong, Instant>()
+
+    /** Laufende Positionsabfrage je fahrendem Storen – siehe [followCover]. */
+    private val coverFollowers = ConcurrentHashMap<ULong, kotlinx.coroutines.Job>()
     private val lastSeen = ConcurrentHashMap<ULong, Instant>()
     /**
      * Nodes mit bestehendem Abo. Das SDK prüft dort selbst die Lebenszeichen des Geräts (leere Berichte im
@@ -336,12 +343,32 @@ class ChipMatterController(
     ): CommissioningResult {
         onProgress(CommissioningStep.PARSING)
         ensureFabric()
+        // Zuerst nur im Netz suchen: Geräte, die schon im WLAN/Thread sind (Multi-Admin-Code aus Apple/Google Home),
+        // werben teils zusätzlich per Bluetooth (Shelly Gen4). Sucht das SDK beides zugleich, gewinnt in der Nähe
+        // Bluetooth – die Kopplung verlangt dann WLAN-Zugangsdaten, scheitert nach „SendNOC“ und lässt die
+        // Sicherheitsfrist des Geräts (600 s) laufen; so lange nimmt es keine neue Kopplung an.
+        // Neue Geräte (noch in keinem Netz) findet das SDK nur per Bluetooth – ohne Berechtigung/Adapter nur übers Netz
+        val ble = bluetooth.ready
+        val onNetwork = commissionOnce(setupCode, allowUncertified, onProgress, useBle = false,
+            if (ble) NETWORK_FIRST_TIMEOUT else DISCOVERY_TIMEOUT)
+        val notFound = onNetwork is CommissioningResult.Failure && onNetwork.detail == NO_DEVICE_FOUND
+        if (!ble || !notFound) return onNetwork
+        Log.i(TAG, "Nicht im Netz gefunden – suche zusätzlich per Bluetooth")
+        // Netz bleibt in der Suche (langsame Thread-Geräte), Bluetooth kommt hinzu
+        return commissionOnce(setupCode, allowUncertified, onProgress, useBle = true, DISCOVERY_TIMEOUT)
+    }
+
+    private suspend fun commissionOnce(
+        setupCode: String,
+        allowUncertified: Boolean,
+        onProgress: (CommissioningStep) -> Unit,
+        useBle: Boolean,
+        discoveryTimeout: Duration,
+    ): CommissioningResult {
         val c = controller()
         val nodeId = newNodeId()
         val done = CompletableDeferred<Long>()
         var failedStage: String? = null
-        // Neue Geräte (noch in keinem Netz) findet das SDK nur per Bluetooth – ohne Berechtigung/Adapter nur übers Netz
-        val useBle = bluetooth.ready
         // Welches Netz das Gerät braucht, erfahren wir erst nach dem Verbindungsaufbau (onReadCommissioningInfo)
         var needs: NetworkTransportNeed? = null
         // Hat sich überhaupt ein Gerät gemeldet? Die Netzwerksuche des SDK hat selbst kein Zeitlimit.
@@ -412,7 +439,7 @@ class ChipMatterController(
         }
         val err = try {
             // Phase 1: Suche. Meldet sich kein Gerät, abbrechen statt minutenlang zu warten.
-            val appeared = withTimeoutOrNull(DISCOVERY_TIMEOUT.toMillis()) {
+            val appeared = withTimeoutOrNull(discoveryTimeout.toMillis()) {
                 while (!found.get() && !done.isCompleted) kotlinx.coroutines.delay(250)
             } != null
             if (!appeared) {
@@ -420,7 +447,7 @@ class ChipMatterController(
                 withContext(Dispatchers.Main) { runCatching { c.stopDevicePairing(nodeId.toLong()) } }
                 return CommissioningResult.Failure(
                     if (useBle) CommissioningFailure.DEVICE_NOT_FOUND else CommissioningFailure.BLUETOOTH_UNAVAILABLE,
-                    detail = "no commissionable device found",
+                    detail = NO_DEVICE_FOUND,
                 )
             }
             // Phase 2: Kopplung selbst
@@ -641,6 +668,72 @@ class ChipMatterController(
         lastSeen[nodeId] = clock.instant()
         saveCache(nodeId)
         publish()
+        if (nodeData[nodeId]?.let(ClusterMapper::coverMoving) == true) followCover(nodeId)
+    }
+
+    /**
+     * Position eines fahrenden Storens selbst nachlesen: Manche Geräte (Shelly 2PM Gen4) berichten die Höhe erst nach
+     * dem Halt, obwohl sie sie während der Fahrt fortschreiben. Läuft, bis der Storen steht (plus kurzer Nachlauf für
+     * den verzögerten Bewegungsbericht nach einem eigenen Befehl), höchstens [COVER_MAX_TRAVEL].
+     */
+    private fun followCover(nodeId: ULong) {
+        if (coverFollowers[nodeId]?.isActive == true) return
+        coverFollowers[nodeId] = scope.launch {
+            val until = clock.instant().plus(COVER_MAX_TRAVEL)
+            while (clock.instant().isBefore(until)) {
+                delay(COVER_FOLLOW_MS)
+                val data = nodeData[nodeId] ?: break
+                val settleAt = coverLiftSentAt[nodeId]?.plus(COVER_MOTION_REPORT_DELAY)
+                val settling = settleAt != null && clock.instant().isBefore(settleAt)
+                if (!ClusterMapper.coverMoving(data) && !settling) break
+                val ep = data.endpointsWith(Cluster.WINDOW_COVERING).firstOrNull() ?: break
+                val state = readAttributes(nodeId, ep, Cluster.WINDOW_COVERING,
+                    listOf(Attr.OPERATIONAL_STATUS, Attr.CURRENT_LIFT_PERCENT_100THS, Attr.CURRENT_TILT_PERCENT_100THS)) ?: continue
+                val lift = state.endpointStates[ep]?.clusterStates?.get(Cluster.WINDOW_COVERING)?.attributeStates
+                    ?.get(Attr.CURRENT_LIFT_PERCENT_100THS)?.tlv?.let { runCatching { TlvReader.read(it) }.getOrNull() }
+                Log.d(TAG, "Storen 0x%X fährt: Höhe %s".format(nodeId.toLong(), lift))
+                applyQuiet(nodeId, state)
+            }
+            coverFollowers.remove(nodeId)
+        }
+    }
+
+    /** Wie [apply], ohne erneut [followCover] anzustoßen. */
+    private fun applyQuiet(nodeId: ULong, state: NodeState) {
+        val update = HashMap<AttrPath, Any?>()
+        val raw = rawTlv.getOrPut(nodeId) { ConcurrentHashMap() }
+        state.endpointStates.forEach { (ep, es) ->
+            es.clusterStates.forEach { (cluster, cs) ->
+                cs.attributeStates.forEach { (attr, a) ->
+                    val tlv = a.tlv ?: return@forEach
+                    val path = AttrPath(ep, cluster, attr)
+                    update[path] = runCatching { TlvReader.read(tlv) }.getOrNull()
+                    raw[path] = tlv
+                }
+            }
+        }
+        if (update.isEmpty()) return
+        nodeData[nodeId] = (nodeData[nodeId] ?: NodeData(emptyMap())).merge(update)
+        lastSeen[nodeId] = clock.instant()
+        publish()
+    }
+
+    /** Einzelne Attribute eines Endpunkts lesen; null = nicht erreichbar oder keine Antwort. */
+    private suspend fun readAttributes(nodeId: ULong, endpoint: Int, cluster: Long, attributes: List<Long>): NodeState? {
+        val c = controller()
+        val paths = attributes.map { ChipAttributePath.newInstance(ChipPathId.forId(endpoint.toLong()), ChipPathId.forId(cluster), ChipPathId.forId(it)) }
+        return withDevice(nodeId) { ptr ->
+            Result.success(withTimeoutOrNull(COMMAND_TIMEOUT.toMillis()) {
+                suspendCancellableCoroutine<NodeState?> { cont ->
+                    c.readPath(object : ReportCallback {
+                        override fun onError(attributePath: ChipAttributePath?, eventPath: ChipEventPath?, e: Exception) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                        override fun onReport(nodeState: NodeState) { if (cont.isActive) cont.resume(nodeState) }
+                    }, ptr, paths, emptyList(), true, 0)
+                }
+            })
+        }?.getOrNull()
     }
 
     override suspend fun execute(command: MatterCommand): CommandResult {
@@ -648,6 +741,7 @@ class ChipMatterController(
         val data = nodeData[node] ?: return CommandResult.Failure(CommandFailure.OFFLINE, "no data yet")
         val actions = ClusterMapper.actions(command.command, data, command.endpointId, primaries.resolve(node, data))
             ?: return CommandResult.Failure(CommandFailure.UNSUPPORTED, "command not supported")
+        if (command.command is DeviceCommand.SetCoverTilt) awaitCoverStill(node)
         return withDevice(node) { ptr ->
             for (a in actions) {
                 val r = when (a) {
@@ -656,8 +750,30 @@ class ChipMatterController(
                 }
                 if (r !is CommandResult.Success) return@withDevice r
             }
+            when (command.command) {
+                is DeviceCommand.SetCoverPosition, DeviceCommand.OpenCover, DeviceCommand.CloseCover -> {
+                    coverLiftSentAt[node] = clock.instant()
+                    followCover(node)
+                }
+                DeviceCommand.StopCover -> coverLiftSentAt.remove(node)
+                else -> Unit
+            }
             CommandResult.Success
         } ?: CommandResult.Failure(CommandFailure.OFFLINE, "unreachable")
+    }
+
+    /**
+     * Lamellen erst nach der Höhenfahrt verstellen: Manche Storen (Shelly 2PM) verwerfen einen Lamellenbefehl, der
+     * während der Fahrt kommt – etwa in einer Szene direkt nach der Position. Kurz nach einem eigenen Höhenbefehl
+     * wird auch ohne gemeldete Bewegung gewartet, weil der Bericht „fährt“ erst verzögert eintrifft.
+     */
+    private suspend fun awaitCoverStill(node: ULong) {
+        val settleAt = coverLiftSentAt[node]?.plus(COVER_MOTION_REPORT_DELAY)
+        repeat((COVER_MAX_TRAVEL.toMillis() / COVER_POLL_MS).toInt()) {
+            val moving = nodeData[node]?.let(ClusterMapper::coverMoving) == true
+            if (!moving && (settleAt == null || !clock.instant().isBefore(settleAt))) return
+            delay(COVER_POLL_MS)
+        }
     }
 
     private suspend fun invoke(ptr: Long, ep: Int, cluster: Long, cmd: Long, fields: ByteArray, timed: Boolean): CommandResult {
@@ -815,8 +931,18 @@ class ChipMatterController(
         private const val ERROR_PASE = 0x38L          // CHIP_ERROR_INVALID_PASE_PARAMETER
         private const val ERROR_FABRIC_EXISTS = 0x7EL // CHIP_ERROR_FABRIC_EXISTS
         private val COMMISSIONING_TIMEOUT: Duration = Duration.ofMinutes(3)
+        /** Bis ein Storen nach einem Höhenbefehl „fährt“ meldet */
+        private val COVER_MOTION_REPORT_DELAY: Duration = Duration.ofSeconds(3)
+        /** Längste Fahrt, die ein Lamellenbefehl abwartet */
+        private val COVER_MAX_TRAVEL: Duration = Duration.ofMinutes(2)
+        private const val COVER_POLL_MS = 500L
+        /** Abfragetakt während der Fahrt – flüssig genug für die Anzeige, ohne das Gerät zu fluten. */
+        private const val COVER_FOLLOW_MS = 1_000L
         /** Bis sich ein koppelbares Gerät meldet (Bluetooth oder Netzwerk) */
         private val DISCOVERY_TIMEOUT: Duration = Duration.ofSeconds(90)
+        /** Netzsuche vor Bluetooth: Geräte im Netz melden sich per DNS-SD in wenigen Sekunden. */
+        private val NETWORK_FIRST_TIMEOUT: Duration = Duration.ofSeconds(12)
+        private const val NO_DEVICE_FOUND = "no commissionable device found"
         /** Bluetooth + Netzbeitritt + erste Suche im Betriebsnetz dauern bei Thread-Geräten länger */
         private val COMMISSIONING_TIMEOUT_BLE: Duration = Duration.ofMinutes(4)
         /** kInvalidEndpointId */

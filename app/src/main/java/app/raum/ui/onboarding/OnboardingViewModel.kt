@@ -25,13 +25,18 @@ import app.raum.matter.controller.mock.MockHomeSeed
 import app.raum.matter.controller.mock.MockMatterController
 import app.raum.platform.CheckItem
 import app.raum.platform.SystemCheck
+import app.raum.platform.bluetooth.BluetoothAccess
 import app.raum.platform.kiosk.KioskManager
+import app.raum.platform.network.NetworkController
+import app.raum.platform.network.WifiNetwork
 import app.raum.security.AdminPinStore
 import app.raum.ui.UiRequests
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -67,6 +72,8 @@ class OnboardingViewModel(
     private val log: EventLog,
     private val strings: Strings,
     private val weather: WeatherService,
+    val network: NetworkController,
+    private val bluetooth: BluetoothAccess,
 ) : ViewModel() {
     val weatherEnabled: StateFlow<Boolean> = settings.weatherEnabled
     fun setWeatherEnabled(enabled: Boolean) = weather.setEnabled(enabled)
@@ -103,6 +110,12 @@ class OnboardingViewModel(
             }
         }
         if (state.value.step == OnboardingStep.CHECK) runChecks()
+        // Systemprüfung aktuell halten, während WLAN/Bluetooth direkt dort behoben werden
+        viewModelScope.launch {
+            combine(network.status, bluetooth.state) { n, b -> n to b }.drop(1).collect {
+                if (state.value.step == OnboardingStep.CHECK) runChecks()
+            }
+        }
     }
 
     private fun goTo(step: OnboardingStep) {
@@ -175,6 +188,19 @@ class OnboardingViewModel(
             _state.update { it.copy(checks = items) }
         }
     }
+
+    suspend fun connectWifi(target: WifiNetwork, password: String?): Boolean {
+        val ok = network.connectAndAwait(target, password)
+        if (ok) log.info(LogCategory.SYSTEM, strings.get(R.string.log_wifi_connected, target.ssid))
+        return ok
+    }
+
+    fun forgetWifi(ssid: String) {
+        if (network.forget(ssid)) log.info(LogCategory.SYSTEM, strings.get(R.string.log_wifi_forgotten, ssid))
+    }
+
+    /** @return false, wenn die Oberfläche Android fragen muss (ohne Geräteeigentümer). */
+    fun enableBluetooth(): Boolean = bluetooth.enable().also { bluetooth.refresh(); runChecks() }
 
     private fun createFabric() {
         if (state.value.fabric != null) return

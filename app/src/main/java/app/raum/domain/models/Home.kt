@@ -69,6 +69,9 @@ sealed interface DeviceCommand {
     @Serializable @SerialName("cover_position")
     data class SetCoverPosition(val openPercent: Int) : DeviceCommand
 
+    @Serializable @SerialName("cover_tilt")
+    data class SetCoverTilt(val openPercent: Int) : DeviceCommand
+
     @Serializable @SerialName("cover_open")
     data object OpenCover : DeviceCommand
 

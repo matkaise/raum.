@@ -44,6 +44,7 @@ internal fun DeviceEntity.toDomain() = DeviceMetadata(
     productName = productName,
     favorite = favorite,
     endpointId = endpointId,
+    switchAsLight = switchAsLight,
 )
 
 internal fun DeviceMetadata.toEntity() = DeviceEntity(
@@ -55,6 +56,7 @@ internal fun DeviceMetadata.toEntity() = DeviceEntity(
     productName = productName,
     favorite = favorite,
     endpointId = endpointId,
+    switchAsLight = switchAsLight,
 )
 
 internal fun SceneWithActions.toDomain() = Scene(

@@ -46,6 +46,15 @@ fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
 fun formatTemperature(celsius: Double, compact: Boolean = true): String =
     Units.format(celsius, LocalTemperatureUnit.current, currentLocale(), compact)
 
+/** Knapp für große Anzeigen auf dem Himmel: „24,9°“, gerundet „25°“. */
+@Composable
+@ReadOnlyComposable
+fun formatDegrees(celsius: Double, decimals: Boolean = true): String {
+    val unit = LocalTemperatureUnit.current
+    val v = Units.toDisplay(celsius, unit)
+    return String.format(currentLocale(), if (decimals && unit != TemperatureUnit.FAHRENHEIT) "%.1f°" else "%.0f°", v)
+}
+
 @Composable
 @ReadOnlyComposable
 fun formatPercent(value: Double): String = String.format(currentLocale(), "%.0f %%", value)

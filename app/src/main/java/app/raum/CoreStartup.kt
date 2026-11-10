@@ -53,6 +53,7 @@ class CoreStartup(
     private val weather: WeatherService,
     private val bridgeSync: BridgeSync,
     private val thread: ThreadService,
+    private val sensorHistory: app.raum.history.SensorHistory,
 ) {
     private val _step = MutableStateFlow(StartupStep.DATABASE)
     /** Fortschritt für den Startbildschirm (SYS-008). */
@@ -85,6 +86,7 @@ class CoreStartup(
             log.info(LogCategory.SYSTEM, strings.get(if (mock != null) R.string.log_started_mock else R.string.log_started))
             _step.value = StartupStep.AUTOMATIONS
             deviceEvents.start()
+            sensorHistory.start()
             weather.start(scope)
             bridgeSync.start(scope)
             // Border Router suchen (Statushinweise) – nach den Abos, damit Namensauflösungen nicht konkurrieren

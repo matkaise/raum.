@@ -135,6 +135,8 @@ object ClusterMapper {
     }
 
     private const val TRANSITION = 5L // Zehntelsekunden – kurz, aber nicht hart
+    /** ColorControl Options-Bit 0 (ExecuteIfOff) – als OptionsMask und OptionsOverride. */
+    private const val EXECUTE_IF_OFF = 1L
 
     // --- Lesen ------------------------------------------------------------------------------
 
@@ -287,7 +289,24 @@ object ClusterMapper {
         val movement = when ((n[ep, Cluster.WINDOW_COVERING, Attr.OPERATIONAL_STATUS] as? Long ?: 0L) and 0b11) {
             1L -> CoverMovement.OPENING; 2L -> CoverMovement.CLOSING; else -> CoverMovement.STOPPED
         }
-        return CoverCapability((100 - closed100ths / 100.0).roundToInt().coerceIn(0, 100), movement)
+        return CoverCapability((100 - closed100ths / 100.0).roundToInt().coerceIn(0, 100), movement, coverTilt(n, ep))
+    }
+
+    /** Fährt der Storen gerade (OperationalStatus, globale Bits)? */
+    fun coverMoving(n: NodeData): Boolean = n.endpointsWith(Cluster.WINDOW_COVERING).any { ep ->
+        (n[ep, Cluster.WINDOW_COVERING, Attr.OPERATIONAL_STATUS] as? Long ?: 0L) and 0b11 != 0L
+    }
+
+    /**
+     * Lamellenwinkel als "Prozent offen"; null ohne positionsgenaue Lamellen. Das Feature-Bit zählt, nicht die bloße
+     * Existenz des Attributs: Shelly meldet es bei abgeschalteter Lamellensteuerung trotzdem – mit Wert null.
+     */
+    private fun coverTilt(n: NodeData, ep: Int): Int? {
+        val features = n[ep, Cluster.WINDOW_COVERING, Attr.FEATURE_MAP] as? Long ?: return null
+        val required = CoverFeature.TILT or CoverFeature.POSITION_AWARE_TILT
+        if (features and required != required) return null
+        val closed100ths = n[ep, Cluster.WINDOW_COVERING, Attr.CURRENT_TILT_PERCENT_100THS] as? Long ?: return null
+        return (100 - closed100ths / 100.0).roundToInt().coerceIn(0, 100)
     }
 
     private fun contact(n: NodeData): ContactSensorCapability? {
@@ -314,6 +333,16 @@ object ClusterMapper {
      *   dimmen und – bei Leuchten – Farbe/Farbtemperatur.
      * @param primary gebundener Endpunkt des Hauptkanals (wie bei [capabilities]).
      */
+    /**
+     * Farbe/Weißton bei ausgeschalteter Leuchte: Der Farbbefehl gilt dank ExecuteIfOff (Options-Bit 0) schon im
+     * ausgeschalteten Zustand, danach wird eingeschaltet – so leuchtet sie gleich in der neuen Farbe statt kurz in der
+     * alten. Eingeschaltete Leuchten bekommen nur den Farbbefehl.
+     */
+    private fun withTurnOn(n: NodeData, ep: Int, color: MatterAction): List<MatterAction> {
+        val off = n[ep, Cluster.ON_OFF, Attr.VALUE] == false
+        return if (off) listOf(color, MatterAction.Invoke(ep, Cluster.ON_OFF, Cmd.ON, TlvWriter.empty())) else listOf(color)
+    }
+
     fun actions(cmd: DeviceCommand, n: NodeData, channel: Int? = null, primary: Int? = defaultPrimaryEndpoint(n)): List<MatterAction>? {
         if (channel != null && channel !in channels(n, primary).map { it.endpoint }) return null
         val onOffEp = channel ?: primary?.takeIf { it in n.endpointsWith(Cluster.ON_OFF) }
@@ -334,14 +363,14 @@ object ClusterMapper {
                 val minM = n[ep, Cluster.COLOR_CONTROL, Attr.COLOR_TEMP_MIN_MIREDS] as? Long ?: 153
                 val maxM = n[ep, Cluster.COLOR_CONTROL, Attr.COLOR_TEMP_MAX_MIREDS] as? Long ?: 500
                 val mireds = (1_000_000.0 / cmd.kelvin).roundToLong().coerceIn(minM, maxM)
-                listOf(MatterAction.Invoke(ep, Cluster.COLOR_CONTROL, Cmd.MOVE_TO_COLOR_TEMPERATURE,
-                    TlvWriter().startStructure().uint(0, mireds).uint(1, TRANSITION).uint(2, 0).uint(3, 0).endContainer().bytes()))
+                withTurnOn(n, ep, MatterAction.Invoke(ep, Cluster.COLOR_CONTROL, Cmd.MOVE_TO_COLOR_TEMPERATURE,
+                    TlvWriter().startStructure().uint(0, mireds).uint(1, TRANSITION).uint(2, EXECUTE_IF_OFF).uint(3, EXECUTE_IF_OFF).endContainer().bytes()))
             }
             is DeviceCommand.SetColor -> {
                 val ep = lightEp?.takeIf { ((n[it, Cluster.COLOR_CONTROL, Attr.COLOR_CAPABILITIES] as? Long ?: 0L) and 1L) != 0L } ?: return null
                 val (h, s) = rgbToHueSat(cmd.color)
-                listOf(MatterAction.Invoke(ep, Cluster.COLOR_CONTROL, Cmd.MOVE_TO_HUE_AND_SATURATION,
-                    TlvWriter().startStructure().uint(0, h).uint(1, s).uint(2, TRANSITION).uint(3, 0).uint(4, 0).endContainer().bytes()))
+                withTurnOn(n, ep, MatterAction.Invoke(ep, Cluster.COLOR_CONTROL, Cmd.MOVE_TO_HUE_AND_SATURATION,
+                    TlvWriter().startStructure().uint(0, h).uint(1, s).uint(2, TRANSITION).uint(3, EXECUTE_IF_OFF).uint(4, EXECUTE_IF_OFF).endContainer().bytes()))
             }
             is DeviceCommand.SetTargetTemperature -> {
                 val ep = n.endpointsWith(Cluster.THERMOSTAT).firstOrNull() ?: return null
@@ -357,6 +386,10 @@ object ClusterMapper {
             }
             is DeviceCommand.SetCoverPosition -> n.endpointsWith(Cluster.WINDOW_COVERING).firstOrNull()?.let { ep ->
                 listOf(MatterAction.Invoke(ep, Cluster.WINDOW_COVERING, Cmd.COVER_GO_TO_LIFT_PERCENTAGE,
+                    TlvWriter().startStructure().uint(0, ((100 - cmd.openPercent.coerceIn(0, 100)) * 100).toLong()).endContainer().bytes()))
+            }
+            is DeviceCommand.SetCoverTilt -> n.endpointsWith(Cluster.WINDOW_COVERING).firstOrNull()?.takeIf { coverTilt(n, it) != null }?.let { ep ->
+                listOf(MatterAction.Invoke(ep, Cluster.WINDOW_COVERING, Cmd.COVER_GO_TO_TILT_PERCENTAGE,
                     TlvWriter().startStructure().uint(0, ((100 - cmd.openPercent.coerceIn(0, 100)) * 100).toLong()).endContainer().bytes()))
             }
             DeviceCommand.OpenCover -> coverCmd(n, Cmd.COVER_UP_OR_OPEN)

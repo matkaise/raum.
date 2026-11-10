@@ -28,6 +28,7 @@ object CapabilityReducer {
                 DeviceCommand.OpenCover,
                 DeviceCommand.CloseCover,
                 DeviceCommand.StopCover -> cap is CoverCapability
+                is DeviceCommand.SetCoverTilt -> cap is CoverCapability && cap.hasTilt
             }
         }
 
@@ -73,6 +74,8 @@ object CapabilityReducer {
             DeviceCommand.OpenCover -> if (cap.openPercent < 100) cap.copy(movement = CoverMovement.OPENING) else cap
             DeviceCommand.CloseCover -> if (cap.openPercent > 0) cap.copy(movement = CoverMovement.CLOSING) else cap
             DeviceCommand.StopCover -> cap.copy(movement = CoverMovement.STOPPED)
+            // Lamellen drehen in Sekunden – direkt als Zielwert anzeigen
+            is DeviceCommand.SetCoverTilt -> if (cap.hasTilt) cap.copy(tiltOpenPercent = command.openPercent.coerceIn(0, 100)) else cap
             else -> cap
         }
         else -> cap

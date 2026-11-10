@@ -114,6 +114,8 @@
     <string name="cover_opening">Öffnet · %1$d %%</string>
     <string name="cover_closing">Schließt · %1$d %%</string>
     <string name="cover_percent_open">%1$d %% offen</string>
+    <string name="cover_tilt">Lamellen</string>
+    <string name="cover_tilt_label">LAMELLEN · %1$d %% OFFEN</string>
     <string name="contact_open">Geöffnet</string>
     <string name="contact_closed">Geschlossen</string>
     <string name="occupancy_occupied">Belegt</string>
@@ -126,7 +128,7 @@
     <string name="favorite_remove">Aus Favoriten entfernen</string>
     <string name="device_remove">Aus raum. entfernen</string>
     <string name="device_remove_title">%1$s entfernen?</string>
-    <string name="device_remove_text">Das Gerät wird aus der raum.-Fabric entfernt und aus allen Szenen gelöscht – bei Geräten mit mehreren Kanälen alle Kanäle. Andere Matter-Controller, mit denen es geteilt ist, bleiben unberührt. Um es erneut hinzuzufügen, wird der Setup-Code benötigt.</string>
+    <string name="device_remove_text">Wird aus raum. und allen Szenen entfernt (inkl. aller Kanäle). Andere Apps behalten es. Neu hinzufügen nur mit Setup-Code.</string>
     <string name="device_light">Licht</string>
     <string name="brightness">Helligkeit</string>
     <string name="color_temperature">Farbtemperatur</string>
@@ -138,8 +140,8 @@
     <string name="thermostat_target">Soll</string>
     <string name="cover_position_open">Position (offen)</string>
     <string name="sensor_values">Messwerte</string>
-    <string name="device_unsupported">Dieser Gerätetyp wird noch nicht unterstützt. raum. zeigt nur Basisinformationen an und sendet keine Befehle.</string>
-    <string name="device_unreachable_hint">Das Gerät ist nicht erreichbar. Steuerbefehle sind deaktiviert, bis es wieder online ist.</string>
+    <string name="device_unsupported">Gerätetyp noch nicht unterstützt – nur Anzeige.</string>
+    <string name="device_unreachable_hint">Nicht erreichbar – Steuerung gesperrt.</string>
     <string name="device_settings">Einstellungen</string>
     <string name="name">Name</string>
     <string name="rename">Umbenennen</string>
@@ -160,10 +162,10 @@
 
     <!-- Übersicht und Räume -->
     <string name="favorites">Favoriten</string>
-    <string name="favorites_empty">Noch keine Favoriten. Halte eine Gerätekarte gedrückt und tippe auf den Stern.</string>
+    <string name="favorites_empty">Karte gedrückt halten → Stern.</string>
     <string name="notice_all_ok">Alles in Ordnung</string>
-    <string name="notice_offline">%1$s ist offline</string>
-    <string name="notice_open">%1$s ist geöffnet</string>
+    <string name="notice_offline">%1$s offline</string>
+    <string name="notice_open">%1$s offen</string>
     <string name="notice_low_battery">Batterie schwach: %1$s</string>
     <plurals name="notices_more">
         <item quantity="one">+ %1$d weiterer Hinweis</item>
@@ -191,11 +193,11 @@
     <string name="room_add">Raum hinzufügen</string>
     <string name="room_new">Neuer Raum</string>
     <string name="room_edit">Raum bearbeiten</string>
-    <string name="room_delete_text">Die Geräte in diesem Raum bleiben erhalten und werden als „ohne Raum“ geführt.</string>
+    <string name="room_delete_text">Geräte bleiben erhalten (ohne Raum).</string>
     <string name="delete_named_title">„%1$s“ löschen?</string>
     <plurals name="devices_without_room">
-        <item quantity="one">%1$d Gerät ohne Raum – unter „Geräte“ zuordnen.</item>
-        <item quantity="other">%1$d Geräte ohne Raum – unter „Geräte“ zuordnen.</item>
+        <item quantity="one">%1$d Gerät ohne Raum</item>
+        <item quantity="other">%1$d Geräte ohne Raum</item>
     </plurals>
     <string name="room_not_found">Raum nicht gefunden</string>
     <string name="room_not_found_text">Der Raum wurde möglicherweise gelöscht.</string>
@@ -204,18 +206,18 @@
     <string name="group_covers_open">Storen öffnen</string>
     <string name="group_covers_close">Storen schließen</string>
     <string name="devices_empty">Noch keine Geräte</string>
-    <string name="room_devices_empty_text">Ordne Geräte über ihre Detailansicht diesem Raum zu.</string>
+    <string name="room_devices_empty_text">Geräte in ihrer Detailansicht zuordnen.</string>
 
     <!-- Fehler -->
     <string name="error_command_offline">Gerät antwortet nicht</string>
     <string name="error_command_timeout">Zeitüberschreitung bei der Antwort</string>
     <string name="error_command_unsupported">Befehl wird vom Gerät nicht unterstützt</string>
     <string name="error_command_device">Gerätefehler</string>
-    <string name="error_commissioning_not_found">Kein Gerät im Pairing-Modus gefunden. Ist das Gerät eingeschaltet und in der Nähe?</string>
+    <string name="error_commissioning_not_found">Kein Gerät im Pairing-Modus gefunden.</string>
     <string name="error_commissioning_pase">Keine sichere Verbindung möglich. Stimmt der Setup-Code?</string>
     <string name="error_commissioning_network">Das Gerät konnte nicht mit dem Netzwerk verbunden werden.</string>
     <string name="error_commissioning_timeout">Zeitüberschreitung beim Hinzufügen.</string>
-    <string name="setup_code_qr_unsupported">QR-Payloads werden noch nicht unterstützt. Bitte den 11- oder 21-stelligen Zahlencode eingeben.</string>
+    <string name="setup_code_qr_unsupported">QR-Code nicht unterstützt – bitte Zahlencode eingeben.</string>
     <string name="setup_code_wrong_length">Der Setup-Code muss 11 oder 21 Ziffern haben.</string>
     <string name="setup_code_check_digit">Der Setup-Code ist ungültig. Bitte Eingabe prüfen.</string>
     <string name="setup_code_inconsistent">Codelänge passt nicht zum Codeinhalt.</string>
@@ -225,27 +227,27 @@
     <!-- Geräte hinzufügen -->
     <string name="device_add">Gerät hinzufügen</string>
     <string name="filter_all">Alle</string>
-    <string name="devices_empty_text">Füge dein erstes Matter-Gerät über den Setup-Code hinzu.</string>
+    <string name="devices_empty_text">Erstes Matter-Gerät per Setup-Code hinzufügen.</string>
     <string name="device_new_default">Neues Gerät</string>
     <string name="log_device_added">Gerät hinzugefügt (Node %1$s)</string>
     <string name="log_commissioning_failed">Hinzufügen fehlgeschlagen: %1$s</string>
     <string name="msg_device_added">%1$s wurde hinzugefügt.</string>
     <string name="commissioning_title">Matter-Gerät hinzufügen</string>
-    <string name="commissioning_intro">Versetze das Gerät in den Pairing-Modus und gib den 11- oder 21-stelligen Setup-Code ein. Er steht unter dem QR-Code auf dem Gerät oder der Verpackung. Neue Geräte koppelt raum. per Bluetooth – halte sie in die Nähe des Panels. Für Geräte aus einer anderen App (Apple Home, Google Home, Alexa) öffne dort ein Kopplungsfenster und gib den angezeigten Code ein.</string>
+    <string name="commissioning_intro">Gerät in den Pairing-Modus versetzen und Setup-Code eingeben (11 oder 21 Ziffern, unter dem QR-Code).</string>
     <string name="setup_code">Setup-Code</string>
     <string name="connect">Verbinden</string>
     <string name="commissioning_running">Gerät wird hinzugefügt …</string>
     <string name="commissioning_failed">Hinzufügen fehlgeschlagen</string>
-    <string name="commissioning_tips">Tipps: Gerät neu starten bzw. zurücksetzen, näher ans Panel bringen und prüfen, ob Bluetooth aktiv ist und die Thread-/WLAN-Zugangsdaten hinterlegt sind (Einstellungen → Matter und Thread).</string>
+    <string name="commissioning_tips">Gerät neu starten, näher ans Panel bringen, Bluetooth und Zugangsdaten prüfen.</string>
     <string name="retry">Erneut versuchen</string>
     <string name="change_code">Code ändern</string>
     <string name="commissioning_duplicate">Gerät bereits vorhanden</string>
-    <string name="commissioning_duplicate_text">Dieses Gerät ist bereits als „%1$s“ in raum. eingebunden.</string>
+    <string name="commissioning_duplicate_text">Bereits als „%1$s“ eingebunden.</string>
     <string name="commissioning_done">Gerät verbunden</string>
     <string name="show_as_favorite">Als Favorit auf der Übersicht zeigen</string>
 
     <!-- Automationen: Satzbau -->
-    <string name="auto_incomplete">Unvollständig – mindestens ein Auslöser und eine Aktion fehlen.</string>
+    <string name="auto_incomplete">Unvollständig – Auslöser oder Aktion fehlt.</string>
     <string name="auto_sentence">Wenn %1$s, dann %2$s.</string>
     <string name="auto_sentence_conditions">Wenn %1$s, und %2$s, dann %3$s.</string>
     <string name="auto_or">oder</string>
@@ -283,6 +285,7 @@
     <string name="auto_target_open">öffnen</string>
     <string name="auto_target_close">schließen</string>
     <string name="auto_target_open_to">auf %1$d %% öffnen</string>
+    <string name="auto_target_tilt">Lamellen %1$d %%</string>
     <string name="auto_days_daily">täglich</string>
     <string name="auto_days_workdays">Mo–Fr</string>
     <string name="auto_days_weekend">am Wochenende</string>
@@ -362,9 +365,9 @@
     <string name="scene_new">Neue Szene</string>
     <string name="scene_edit">Szene bearbeiten</string>
     <string name="scenes_empty">Noch keine Szenen</string>
-    <string name="scenes_empty_text">Szenen schalten mehrere Geräte mit einer Berührung.</string>
+    <string name="scenes_empty_text">Mehrere Geräte mit einer Berührung.</string>
     <string name="scene_create_first">Erste Szene anlegen</string>
-    <string name="scene_delete_text">Die Szene wird endgültig entfernt. Geräte bleiben unverändert.</string>
+    <string name="scene_delete_text">Wird endgültig entfernt.</string>
     <string name="no_devices">Keine Geräte</string>
     <string name="running">Läuft …</string>
     <string name="scene_not_found">Szene nicht gefunden</string>
@@ -374,8 +377,8 @@
     <string name="scene_delete">Szene löschen</string>
     <string name="scene_devices">Geräte in dieser Szene</string>
     <string name="devices_add">Geräte hinzufügen</string>
-    <string name="scene_devices_empty_text">Füge Geräte hinzu – ihr aktueller Zustand wird als Ausgangspunkt übernommen.</string>
-    <string name="scene_unsaved_text">Die Szene wurde geändert, aber noch nicht gespeichert.</string>
+    <string name="scene_devices_empty_text">Geräte hinzufügen – aktueller Zustand wird übernommen.</string>
+    <string name="scene_unsaved_text">Änderungen nicht gespeichert.</string>
     <string name="scene_remove_device">Aus Szene entfernen</string>
     <string name="scene_all_devices_added">Alle steuerbaren Geräte sind bereits in dieser Szene.</string>
     <string name="action_add_count">Hinzufügen (%1$d)</string>
@@ -390,14 +393,14 @@
     <string name="msg_saved">„%1$s“ gespeichert</string>
 
     <!-- Automationen: Oberfläche -->
-    <string name="automations_subtitle">%1$d von %2$d aktiv · lokal ausgeführt, auch ohne Internet</string>
+    <string name="automations_subtitle">%1$d von %2$d aktiv</string>
     <string name="automation_new">Neue Automation</string>
     <string name="automation_edit">Automation bearbeiten</string>
     <string name="automations_empty">Noch keine Automationen</string>
-    <string name="automations_empty_text">Automationen reagieren auf Uhrzeit, Sonne, Sensoren und Gerätezustände.</string>
+    <string name="automations_empty_text">Nach Uhrzeit, Sonne, Sensoren oder Geräten.</string>
     <string name="automation_create_first">Erste Automation anlegen</string>
     <string name="automation_delete_text">Die Automation wird endgültig entfernt.</string>
-    <string name="automation_delete_text_log">Die Automation wird endgültig entfernt. Protokolleinträge bleiben erhalten.</string>
+    <string name="automation_delete_text_log">Wird endgültig entfernt. Protokoll bleibt.</string>
     <string name="automation_test_run">Jetzt testweise ausführen</string>
     <string name="automation_paused_until">Pausiert bis %1$s Uhr (zu häufig ausgelöst)</string>
     <string name="action_resume">Fortsetzen</string>
@@ -417,7 +420,7 @@
     <string name="section_only_if_hint">Alle Bedingungen sind erfüllt (optional)</string>
     <string name="section_then">Dann</string>
     <string name="section_then_hint">Diese Aktionen der Reihe nach ausführen</string>
-    <string name="automation_unsaved_text">Die Automation wurde geändert, aber noch nicht gespeichert.</string>
+    <string name="automation_unsaved_text">Änderungen nicht gespeichert.</string>
     <string name="error_trigger_required">Mindestens ein Auslöser (Wenn) ist nötig.</string>
     <string name="error_action_required">Mindestens eine Aktion (Dann) ist nötig.</string>
     <string name="msg_actions_running">Aktionen werden ausgeführt – Ergebnis im Protokoll</string>
@@ -454,7 +457,7 @@
     <string name="trigger_add">Auslöser hinzufügen</string>
     <string name="trigger_edit">Auslöser bearbeiten</string>
     <string name="weekdays">Wochentage</string>
-    <string name="trigger_sun_no_location">Kein Standort hinterlegt – bitte unter Einstellungen → Standort eintragen, sonst löst dieser Auslöser nie aus.</string>
+    <string name="trigger_sun_no_location">Kein Standort – dieser Auslöser löst nie aus.</string>
     <string name="sunrise">Sonnenaufgang</string>
     <string name="sunset">Sonnenuntergang</string>
     <string name="offset_exact">Versatz: genau dann</string>
@@ -462,7 +465,7 @@
     <string name="offset_before">Versatz: %1$d Min. davor</string>
     <string name="connectivity_lost">wird unerreichbar</string>
     <string name="connectivity_back">ist wieder erreichbar</string>
-    <string name="trigger_start_hint">Löst einmal aus, wenn raum. startet – z. B. nach einem Stromausfall.</string>
+    <string name="trigger_start_hint">Beim Start von raum., z. B. nach Stromausfall.</string>
     <string name="condition_type_time">Zeitfenster</string>
     <string name="condition_add">Bedingung hinzufügen</string>
     <string name="condition_edit">Bedingung bearbeiten</string>
@@ -483,7 +486,7 @@
     <string name="delay_max">Höchstens 24 Stunden.</string>
     <string name="delay_waits">Wartet %1$s</string>
     <string name="notice_text">Text des Hinweises</string>
-    <string name="notice_hint">Wird auf dem Panel angezeigt und im Protokoll vermerkt.</string>
+    <string name="notice_hint">Anzeige auf dem Panel.</string>
 
     <!-- Einstellungen -->
     <string name="date_pattern_long">EEEE, d. MMMM</string>
@@ -501,10 +504,10 @@
     <string name="settings_database_value">SQLite (Room), Schema v%1$d</string>
     <string name="settings_internet">Internet</string>
     <string name="settings_internet_value">nicht erforderlich</string>
-    <string name="location_title">Standort (Sonnenzeiten)</string>
+    <string name="location_title">Standort</string>
     <string name="latitude">Breite</string>
     <string name="longitude">Länge</string>
-    <string name="location_none">Kein Standort – Sonnen-Auslöser sind inaktiv.</string>
+    <string name="location_none">Kein Standort – Sonnen-Auslöser inaktiv.</string>
     <string name="location_sun_today">Heute: Sonnenaufgang %1$s · Sonnenuntergang %2$s</string>
     <string name="location_remove">Standort entfernen</string>
     <string name="event_log">Ereignisprotokoll</string>
@@ -527,14 +530,14 @@
     <string name="pin_repeat">Neue PIN wiederholen</string>
     <string name="pin_format">Nur Ziffern, 4 bis 8 Stellen.</string>
     <string name="pin_mismatch">Die PINs stimmen nicht überein.</string>
-    <string name="pin_hint">Die PIN schützt Wartungsmodus und Werksreset. 6 Ziffern werden empfohlen. Sie wird nur als Hash gespeichert.</string>
+    <string name="pin_hint">Schützt Wartung und Reset. 6 Ziffern empfohlen.</string>
     <string name="never">Nie</string>
     <string name="display">Display</string>
     <string name="sleep_after">Ruhezustand nach</string>
-    <string name="display_off_requires_owner">„Display aus“ ist nur im Device-Owner-Betrieb verfügbar.</string>
+    <string name="display_off_requires_owner">„Display aus“ nur im Kioskbetrieb.</string>
     <string name="proximity_wake">Bei Annäherung aufwecken</string>
     <string name="auto_brightness">Automatische Helligkeit</string>
-    <string name="min_brightness">Mindesthelligkeit (dunkler Raum): %1$d %%</string>
+    <string name="min_brightness">Mindesthelligkeit: %1$d %%</string>
     <string name="brightness_value">Helligkeit: %1$d %%</string>
     <string name="ambient_light_value">Umgebungslicht: %1$s</string>
     <string name="no_light_sensor">Kein Helligkeitssensor</string>
@@ -545,7 +548,7 @@
     <string name="sleep_now">Jetzt in den Ruhezustand</string>
     <string name="security_maintenance">Sicherheit und Wartung</string>
     <string name="pin_is_set">Administrator-PIN ist festgelegt.</string>
-    <string name="pin_missing_hint">Keine Administrator-PIN festgelegt – jede Person am Panel kann den Wartungsmodus öffnen. Empfohlen: PIN festlegen.</string>
+    <string name="pin_missing_hint">Keine PIN – jeder kann die Wartung öffnen.</string>
     <string name="pin_change">PIN ändern</string>
     <string name="pin_set">PIN festlegen</string>
     <string name="maintenance">Wartungsmodus</string>
@@ -573,11 +576,11 @@
     <string name="backup_error_unsupported">Sicherungsformat %1$d wird von dieser Version nicht unterstützt.</string>
     <string name="backup_error_password">Falsches Passwort oder beschädigte Datei.</string>
     <string name="backup_error_content">Inhalt nicht lesbar: %1$s</string>
-    <string name="backup_error_newer">Die Sicherung stammt aus einer neueren raum.-Version. Bitte raum. zuerst aktualisieren.</string>
+    <string name="backup_error_newer">Sicherung aus neuerer Version – bitte raum. aktualisieren.</string>
     <string name="update_error_unreadable">Datei konnte nicht gelesen werden.</string>
     <string name="update_error_not_apk">Die Datei ist kein gültiges Android-Paket.</string>
     <string name="update_error_package">Das Paket ist kein raum.-Update (%1$s).</string>
-    <string name="update_error_signature">Die Signatur stimmt nicht mit der installierten Version überein. Nur offiziell signierte Updates sind erlaubt.</string>
+    <string name="update_error_signature">Signatur passt nicht – nur offizielle Updates erlaubt.</string>
     <string name="update_error_not_newer">Diese Version ist nicht neuer als die installierte (%1$s).</string>
     <plurals name="restore_warning_invalid_devices">
         <item quantity="one">%1$d ungültiger Geräteeintrag wurde übersprungen.</item>
@@ -601,7 +604,7 @@
     </plurals>
 
     <!-- Wartungsmodus -->
-    <string name="maintenance_autolock">Sperrt sich nach 5 Minuten ohne Bedienung automatisch.</string>
+    <string name="maintenance_autolock">Sperrt nach 5 Min. automatisch.</string>
     <string name="lock">Sperren</string>
     <string name="appliance_status">Appliance-Status</string>
     <string name="status_device_owner">Device Owner</string>
@@ -615,17 +618,17 @@
     <string name="kiosk_resume">Kiosk wieder aktivieren</string>
     <string name="actions">Aktionen</string>
     <string name="open_android_settings">Android-Einstellungen öffnen</string>
-    <string name="android_settings_hint">Zurück zu raum. über die Home-Taste. Der Kiosk wird beim Sperren des Wartungsmodus wieder aktiv.</string>
+    <string name="android_settings_hint">Zurück mit der Home-Taste. Kiosk aktiv nach Sperren der Wartung.</string>
     <string name="restart_raum">raum. neu starten</string>
     <string name="adb_disable">ADB deaktivieren (Endkundenbetrieb)</string>
     <string name="adb_enable">ADB aktivieren (Service)</string>
     <string name="release_device_owner">Device-Owner-Status abgeben …</string>
     <string name="adb_disable_title">ADB deaktivieren?</string>
-    <string name="adb_disable_text">Entwicklerzugriff über USB/WLAN wird abgeschaltet. Für Service-Einsätze kann er hier wieder aktiviert werden.</string>
+    <string name="adb_disable_text">USB/WLAN-Entwicklerzugriff wird abgeschaltet.</string>
     <string name="adb_enable_title">ADB aktivieren?</string>
-    <string name="adb_enable_text">Ermöglicht Vollzugriff per Kabel/WLAN. Nur für Service-Einsätze, danach wieder deaktivieren.</string>
+    <string name="adb_enable_text">Vollzugriff per Kabel/WLAN. Danach wieder abschalten.</string>
     <string name="release_device_owner_title">Device-Owner-Status abgeben?</string>
-    <string name="release_device_owner_text">raum. wird zu einer normalen App: kein Kiosk, kein Standard-Startbildschirm, kein Display-Aus. Der Status lässt sich nur per ADB oder Werksreset des Geräts zurückholen.</string>
+    <string name="release_device_owner_text">raum. wird eine normale App (kein Kiosk, kein Display-Aus). Zurück nur per ADB oder Werksreset.</string>
     <string name="yes">Ja</string>
     <string name="no">Nein</string>
     <string name="error_unexpected">Unerwarteter Fehler: %1$s</string>
@@ -642,12 +645,12 @@
     <string name="msg_handover_saved">Übergabeprotokoll gespeichert</string>
     <string name="msg_diagnostics_saved">Diagnosepaket gespeichert</string>
     <string name="backup">Sicherung</string>
-    <string name="backup_description">Räume, Geräte, Szenen, Automationen und Einstellungen – verschlüsselt mit einem Sicherungspasswort. Nicht enthalten: Administrator-PIN, Protokoll und Matter-Fabric-Schlüssel.</string>
+    <string name="backup_description">Verschlüsselt mit Passwort. Ohne PIN, Protokoll und Fabric-Schlüssel.</string>
     <string name="backup_create">Sicherung erstellen</string>
     <string name="backup_restore">Sicherung wiederherstellen</string>
     <string name="recovery_points">Automatische Wiederherstellungspunkte (vor Migration/Update): %1$d</string>
     <string name="update">Update</string>
-    <string name="update_description">Signiertes raum.-Update (.apk) von USB installieren. Vorher wird automatisch ein Wiederherstellungspunkt angelegt.</string>
+    <string name="update_description">Signierte .apk von USB. Wiederherstellungspunkt wird angelegt.</string>
     <string name="update_choose_file">Update-Datei auswählen</string>
     <string name="export">Export</string>
     <string name="handover_report">Übergabeprotokoll (ohne persönliche Daten)</string>
@@ -661,7 +664,7 @@
     <string name="continue_to_file">Weiter zur Dateiauswahl</string>
     <string name="password_min">Passwort (mind. %1$d Zeichen)</string>
     <string name="password_repeat">Passwort wiederholen</string>
-    <string name="backup_password_hint">Ohne dieses Passwort lässt sich die Sicherung nicht wiederherstellen. Bitte sicher aufbewahren.</string>
+    <string name="backup_password_hint">Ohne Passwort keine Wiederherstellung.</string>
     <string name="restore_title">Sicherung wiederherstellen?</string>
     <string name="restore">Wiederherstellen</string>
     <string name="restore_source">„%1$s“ · erstellt %2$s mit raum. %3$s</string>
@@ -669,18 +672,18 @@
         <item quantity="one">%1$d Automation</item>
         <item quantity="other">%1$d Automationen</item>
     </plurals>
-    <string name="restore_replaces">Die aktuelle Konfiguration wird vollständig ersetzt. Das Protokoll bleibt erhalten.</string>
+    <string name="restore_replaces">Ersetzt die aktuelle Konfiguration. Protokoll bleibt.</string>
     <string name="update_install_title">Update installieren?</string>
     <string name="install">Installieren</string>
-    <string name="update_install_text">Signatur geprüft. raum. startet nach der Installation neu; Automationen pausieren dabei kurz.</string>
+    <string name="update_install_text">Signatur geprüft. raum. startet danach neu.</string>
     <string name="reset_handover_title">Übergabe vorbereiten</string>
     <string name="continue_with_pin">Weiter – mit PIN bestätigen</string>
     <string name="reset_fabric_heading">1. Matter-Fabric</string>
-    <string name="reset_fabric_text">Alle Geräte werden aus der raum.-Fabric entfernt und die Fabric-Schlüssel gelöscht. Geräte, die zusätzlich mit anderen Systemen (z. B. Apple Home, Google Home) geteilt sind, bleiben dort verbunden. Um sie wieder mit raum. zu nutzen, müssen sie per Setup-Code neu hinzugefügt werden.</string>
+    <string name="reset_fabric_text">Alle Geräte werden aus raum. entfernt, Fabric-Schlüssel gelöscht. In anderen Apps bleiben sie. Neu hinzufügen nur mit Setup-Code.</string>
     <string name="reset_data_heading">2. Daten</string>
-    <string name="reset_handover_data">Gelöscht: Geräte, Szenen, Automationen, Protokoll, Administrator-PIN.\nErhalten: Name des Zuhauses, Räume, Display- und Standorteinstellungen.</string>
-    <string name="reset_full_data">Gelöscht: alles – Zuhause, Räume, Geräte, Szenen, Automationen, Einstellungen, Protokoll, Administrator-PIN, Wiederherstellungspunkte. raum. startet danach wie neu.</string>
-    <string name="reset_note">Das Android-System selbst und der Kiosk-Betrieb bleiben unverändert. Tipp: vorher eine Sicherung erstellen.</string>
+    <string name="reset_handover_data">Gelöscht: Geräte, Szenen, Automationen, Protokoll, PIN.\nErhalten: Name, Räume, Display, Standort.</string>
+    <string name="reset_full_data">Alles wird gelöscht. raum. startet wie neu.</string>
+    <string name="reset_note">Tipp: vorher eine Sicherung erstellen.</string>
     <string name="report_handover_title">raum. – Übergabeprotokoll</string>
     <string name="report_created">Erstellt: %1$s</string>
     <string name="report_panel">Panel: %1$s, Android %2$s, raum. %3$s</string>
@@ -748,37 +751,37 @@
     <string name="onb_step_done">Fertig</string>
     <string name="onb_tagline">Einrichtung dieses Panels</string>
     <string name="onb_welcome_title">Willkommen bei raum.</string>
-    <string name="onb_welcome_text">Dieses Panel steuert dein Zuhause lokal – ohne Cloud und ohne Konto. Die Einrichtung dauert etwa zwei Minuten.</string>
+    <string name="onb_welcome_text">Lokal, ohne Cloud und ohne Konto. Dauert etwa zwei Minuten.</string>
     <string name="onb_new_title">Neu einrichten</string>
-    <string name="onb_new_text">Mit einem leeren Zuhause beginnen und Geräte anschließend hinzufügen.</string>
+    <string name="onb_new_text">Leer beginnen, Geräte danach hinzufügen.</string>
     <string name="onb_restore_title">Aus Sicherung wiederherstellen</string>
-    <string name="onb_restore_text">Räume, Geräte, Szenen und Automationen aus einer raum.-Sicherungsdatei übernehmen.</string>
-    <string name="onb_restore_step_text">Passwort der Sicherung eingeben und die Datei auswählen (z. B. vom USB-Stick). Vor der Übernahme siehst du, was wiederhergestellt wird.</string>
+    <string name="onb_restore_text">Aus einer raum.-Sicherung übernehmen.</string>
+    <string name="onb_restore_step_text">Passwort eingeben und Datei wählen. Du siehst vorher, was übernommen wird.</string>
     <string name="onb_choose_backup">Sicherungsdatei wählen</string>
     <string name="onb_home_title">Wie heißt dein Zuhause?</string>
-    <string name="onb_home_text">Der Name erscheint in der Übersicht und in Sicherungen.</string>
+    <string name="onb_home_text">Erscheint in der Übersicht.</string>
     <string name="onb_region_title">Region und Einheiten</string>
-    <string name="onb_region_text">Zeitzone und Temperatureinheit bestimmen Zeitpläne und Anzeigen.</string>
+    <string name="onb_region_text">Für Zeitpläne und Anzeigen.</string>
     <string name="onb_timezone">Zeitzone</string>
-    <string name="onb_timezone_system">Die Zeitzone kann nur als Geräteeigentümer (Kioskbetrieb) geändert werden – sonst gilt die Android-Einstellung.</string>
+    <string name="onb_timezone_system">Nur im Kioskbetrieb änderbar – sonst gilt Android.</string>
     <string name="onb_location">Standort (optional)</string>
-    <string name="onb_location_text">Für Automationen bei Sonnenauf- und -untergang. Wird nur lokal verwendet.</string>
+    <string name="onb_location_text">Für Sonnenzeiten. Bleibt lokal.</string>
     <string name="onb_pin_title">Administrator-PIN</string>
-    <string name="onb_pin_text">Die PIN schützt Wartungsmodus, Werksreset und Android-Einstellungen vor Mitbewohnern und Gästen.</string>
+    <string name="onb_pin_text">Schützt Wartung, Reset und Android-Einstellungen.</string>
     <string name="onb_pin_save">PIN speichern</string>
-    <string name="onb_pin_skip_hint">Ohne PIN kann jede Person am Panel den Wartungsmodus öffnen, das Panel zurücksetzen oder selbst eine PIN festlegen. Du kannst die PIN jederzeit unter Einstellungen → Sicherheit nachholen.</string>
+    <string name="onb_pin_skip_hint">Ohne PIN kann jeder die Wartung öffnen oder das Panel zurücksetzen. Später unter Einstellungen → Sicherheit.</string>
     <string name="onb_pin_skip">Ohne PIN fortfahren</string>
     <string name="onb_check_title">Systemprüfung</string>
-    <string name="onb_check_text">Hinweise sind kein Hindernis – du kannst trotzdem fortfahren.</string>
+    <string name="onb_check_text">Hinweise blockieren nicht.</string>
     <string name="onb_check_again">Erneut prüfen</string>
     <string name="onb_fabric_title">Matter-Netzwerk</string>
-    <string name="onb_fabric_text">raum. legt ein eigenes Matter-Netzwerk (Fabric) an. Die Schlüssel bleiben verschlüsselt auf diesem Panel.</string>
+    <string name="onb_fabric_text">raum. legt ein eigenes Matter-Netz an. Schlüssel bleiben verschlüsselt hier.</string>
     <string name="onb_fabric_ready">Matter-Netzwerk bereit</string>
     <string name="onb_fabric_creating">Matter-Netzwerk wird angelegt …</string>
-    <string name="onb_fabric_mock_hint">Simulationsmodus: Es wird ein virtuelles Netzwerk angelegt. Das echte Matter-Netzwerk folgt mit der Matter-Integration (M2).</string>
+    <string name="onb_fabric_mock_hint">Simulation: virtuelles Netz.</string>
     <string name="onb_done_title">Alles bereit</string>
-    <string name="onb_done_text">Dein Panel ist eingerichtet. Füge jetzt dein erstes Gerät hinzu oder erkunde raum. zuerst.</string>
-    <string name="onb_done_restored_text">Die Sicherung wurde übernommen. Geräte melden sich nach und nach wieder.</string>
+    <string name="onb_done_text">Jetzt das erste Gerät hinzufügen – oder erst umschauen.</string>
+    <string name="onb_done_restored_text">Sicherung übernommen. Geräte melden sich nach und nach.</string>
     <string name="onb_done_add_device">Erstes Gerät hinzufügen</string>
     <string name="onb_done_later">Später</string>
     <string name="onb_done_start">Los geht’s</string>
@@ -789,33 +792,45 @@
     <!-- Systemprüfung -->
     <string name="check_network">Netzwerk</string>
     <string name="check_network_lan">Über LAN verbunden</string>
-    <string name="check_network_wifi">Über WLAN verbunden – LAN (PoE) ist für den Dauerbetrieb zuverlässiger.</string>
-    <string name="check_network_none">Keine Netzwerkverbindung. Matter-Geräte über WLAN/Ethernet sind so nicht erreichbar.</string>
+    <string name="check_network_wifi">WLAN – LAN (PoE) ist zuverlässiger.</string>
+    <string name="check_network_none">Kein Netzwerk.</string>
     <string name="check_bluetooth">Bluetooth</string>
-    <string name="check_bluetooth_missing">Kein Bluetooth vorhanden – neue Geräte lassen sich nur über das Netzwerk einbinden.</string>
-    <string name="check_bluetooth_off">Bluetooth ist aus. Es wird zum Hinzufügen neuer Matter-Geräte benötigt.</string>
+    <string name="check_bluetooth_missing">Kein Bluetooth – neue Geräte nur per Code.</string>
+    <string name="check_bluetooth_off">Bluetooth aus – nötig für neue Geräte.</string>
     <string name="check_bluetooth_on">Bereit zum Hinzufügen neuer Geräte</string>
     <string name="check_kiosk">Kioskbetrieb</string>
-    <string name="check_kiosk_ok">raum. ist Geräteeigentümer – Kiosk, Autostart und Zeitzone sind verfügbar.</string>
-    <string name="check_kiosk_missing">Nicht als Geräteeigentümer eingerichtet. raum. läuft als normale App (siehe Betriebsanleitung).</string>
+    <string name="check_kiosk_ok">Kiosk, Autostart und Zeitzone verfügbar.</string>
+    <string name="check_kiosk_missing">Kein Geräteeigentümer – läuft als normale App.</string>
     <string name="check_time">Uhrzeit</string>
     <string name="check_time_implausible">Die Uhrzeit (%1$s) ist unplausibel – Zeitpläne würden falsch auslösen.</string>
     <string name="check_time_auto">%1$s, automatisch aus dem Netzwerk</string>
     <string name="check_time_manual">%1$s, manuell eingestellt</string>
+    <string name="check_time_unsynced">%1$s – noch unbestätigt, wird gestellt, sobald das Panel im Netz ist</string>
+    <string name="check_action_wifi">WLAN wählen</string>
+    <string name="check_action_bluetooth">Einschalten</string>
+    <string name="history_show">Verlauf anzeigen</string>
+    <string name="history_back_controls">Zurück zur Steuerung</string>
+    <string name="device_switch_as_light">Als Licht verwenden</string>
+    <string name="device_switch_as_light_hint">Für ein Relais hinter dem Lichtschalter: erscheint als Licht und zählt bei Lichtszenen und „Alle Lichter aus“ mit.</string>
+    <string name="light_mode_white">Weiß</string>
+    <string name="light_change">Ändern</string>
+    <string name="light_quick_white">SCHNELLWAHL</string>
+    <string name="light_quick_color">SCHNELLWAHL</string>
+    <string name="light_saturation">Sättigung</string>
     <string name="check_sensors">Sensoren</string>
     <string name="check_sensors_ok">Licht- und Näherungssensor vorhanden</string>
-    <string name="check_sensors_missing">Licht- oder Näherungssensor fehlt – Helligkeit und Aufwecken bei Annäherung sind eingeschränkt.</string>
+    <string name="check_sensors_missing">Licht- oder Näherungssensor fehlt.</string>
 
     <!-- Optionale PIN -->
-    <string name="maintenance_unprotected">Nicht geschützt: Ohne Administrator-PIN kann jede Person am Panel den Wartungsmodus öffnen.</string>
+    <string name="maintenance_unprotected">Ungeschützt: keine PIN festgelegt.</string>
     <string name="reset_confirm_title">Wirklich zurücksetzen?</string>
-    <string name="reset_confirm_no_pin">Es ist keine Administrator-PIN festgelegt, deshalb wird hier ein zweites Mal nachgefragt. Dieser Schritt lässt sich nicht rückgängig machen.</string>
+    <string name="reset_confirm_no_pin">Keine PIN – daher zweite Bestätigung. Nicht umkehrbar.</string>
     <string name="reset_confirm_action">Endgültig zurücksetzen</string>
     <string name="log_maintenance_open_no_pin">Wartungsmodus ohne PIN geöffnet</string>
     <string name="log_pin_skipped">Administrator-PIN bei der Einrichtung übersprungen</string>
 
     <!-- Einrichtung nach Übergabe -->
-    <string name="onb_new_text_handover">Name und Räume sind vorbereitet. Du legst Sprache und PIN fest und fügst danach deine Geräte hinzu.</string>
+    <string name="onb_new_text_handover">Name und Räume sind vorbereitet.</string>
 
     <!-- Einstellungen – Kategorien -->
     <string name="settings_network">Netzwerk</string>
@@ -824,7 +839,7 @@
     <string name="settings_about">Über raum.</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_licenses">Lizenzen</string>
-    <string name="settings_license_geonames">Ortsdaten der Standortsuche: GeoNames (geonames.org), Lizenz CC BY 4.0. Die Liste ist in der App enthalten – die Suche braucht kein Internet.</string>
+    <string name="settings_license_geonames">Ortsdaten: GeoNames (geonames.org), Lizenz CC BY 4.0.</string>
     <string name="sleep_after_short_s">Ruhe nach %1$d s</string>
     <string name="sleep_after_short_m">Ruhe nach %1$d min</string>
     <string name="sleep_never_short">Kein Ruhezustand</string>
@@ -836,10 +851,10 @@
     <string name="log_last_entry">Letzter Eintrag %1$s</string>
 
     <!-- Standortsuche -->
-    <string name="location_explain">Nur für Automationen bei Sonnenauf- und -untergang. raum. ortet nicht: Der Ort kommt aus einer eingebauten Ortsliste.</string>
+    <string name="location_explain">Für Sonnenzeiten. Kein Orten – eingebaute Ortsliste.</string>
     <string name="location_search_hint">Ort suchen, z. B. Zürich</string>
     <string name="location_suggestions">Vorschläge in deiner Zeitzone</string>
-    <string name="location_no_results">Kein Ort gefunden. Wähle den nächstgrößeren Ort oder gib Koordinaten ein.</string>
+    <string name="location_no_results">Kein Ort gefunden.</string>
     <string name="location_manual">Koordinaten eingeben</string>
     <string name="location_use_zone">Zeitzone übernehmen: %1$s</string>
     <string name="action_clear">Leeren</string>
@@ -854,11 +869,10 @@
     <string name="net_not_connected">Nicht verbunden</string>
     <string name="net_ip">IP-Adresse %1$s</string>
     <string name="net_forget">Vergessen</string>
-    <string name="net_lan_recommended">Für den Dauerbetrieb ist LAN (PoE) zuverlässiger als WLAN.</string>
-    <string name="net_manage_requires_owner">Direkt verbinden kann raum. nur im Kioskbetrieb (als Geräteeigentümer). Sonst über die Android-Einstellungen.</string>
+    <string name="net_manage_requires_owner">Direkt verbinden nur im Kioskbetrieb.</string>
     <string name="net_open_android">Android-WLAN-Einstellungen öffnen</string>
     <string name="net_wifi_off">WLAN ist ausgeschaltet.</string>
-    <string name="net_location_service">Android 11/12 zeigt WLANs nur bei eingeschaltetem Standortdienst an. raum. ortet dabei nichts.</string>
+    <string name="net_location_service">Android 11/12: WLAN-Liste braucht den Standortdienst.</string>
     <string name="net_location_enable">Standortdienst einschalten</string>
     <string name="net_permission_missing">Keine Berechtigung, nach WLANs zu suchen.</string>
     <string name="net_available">Verfügbare Netze</string>
@@ -871,7 +885,7 @@
     <string name="net_connect_title">Mit „%1$s“ verbinden</string>
     <string name="net_password">WLAN-Passwort</string>
     <string name="net_show_password">Passwort anzeigen</string>
-    <string name="net_open_warning">Offenes Netz: Daten werden unverschlüsselt übertragen. Für ein Wandpanel nicht empfohlen.</string>
+    <string name="net_open_warning">Offenes Netz – unverschlüsselt.</string>
     <string name="net_connect">Verbinden</string>
     <string name="net_connecting">Verbinde …</string>
     <string name="net_connect_failed">Verbindung mit „%1$s“ fehlgeschlagen. Bitte Passwort prüfen.</string>
@@ -887,26 +901,23 @@
     <string name="hero_humidity">%1$s Luftfeuchte</string>
     <string name="hero_sunrise">↑ %1$s</string>
     <string name="hero_sunset">↓ %1$s</string>
-    <string name="hero_no_location">Standort in den Einstellungen festlegen, um Sonnenzeiten zu sehen.</string>
+    <string name="hero_no_location">Standort festlegen für Sonnenzeiten.</string>
 
     <!-- Wetter -->
     <string name="settings_weather">Wetter</string>
     <string name="weather_show">Wetter anzeigen</string>
-    <string name="weather_explain">raum. ruft dafür etwa stündlich die Vorhersage beim Norwegischen Wetterdienst (MET Norway) ab. Übertragen wird nur der auf ca. 1 km gerundete Standort und die App-Version – kein Konto, keine Gerätekennung. Alles andere funktioniert weiterhin ohne Internet.</string>
-    <string name="weather_explain_short">Vorhersage von MET Norway (braucht Internet). Gesendet wird nur der auf ca. 1 km gerundete Standort. Jederzeit abschaltbar.</string>
-    <string name="weather_needs_location">Für das Wetter wird ein Standort benötigt.</string>
+    <string name="weather_explain_short">Von MET Norway, braucht Internet. Nur der gerundete Standort wird gesendet.</string>
+    <string name="weather_needs_location">Braucht einen Standort.</string>
     <string name="weather_set_location">Standort festlegen</string>
     <string name="weather_status">Aktuell</string>
     <string name="weather_fetched_at">Aktualisiert um %1$s</string>
-    <string name="weather_error">Abruf fehlgeschlagen: %1$s. Es werden die zuletzt geladenen Daten angezeigt.</string>
+    <string name="weather_error">Abruf fehlgeschlagen: %1$s</string>
     <string name="weather_refresh">Jetzt aktualisieren</string>
     <string name="weather_loading">Wird geladen …</string>
     <string name="weather_off_short">Aus</string>
-    <string name="weather_outdoor_sensor">Außensensor (optional)</string>
-    <string name="weather_outdoor_explain">Hängt ein Matter-Temperatursensor draußen, zeigt raum. dessen Wert als Außentemperatur – das funktioniert auch ohne Internet. Er zählt dann nicht mehr zur Innentemperatur.</string>
-    <string name="weather_outdoor_none">Keiner (Vorhersage)</string>
+    <string name="weather_outdoor_sensor">Außensensor</string>
+    <string name="weather_outdoor_none">Keiner</string>
     <string name="weather_outdoor_empty">Keine Temperatursensoren vorhanden.</string>
-    <string name="weather_source">Quelle</string>
     <string name="settings_license_met">Wetterdaten: MET Norway (api.met.no), Lizenz CC BY 4.0.</string>
     <string name="weather_preview">Vorschau (nur Debug-Build)</string>
     <string name="weather_preview_off">Echtes Wetter</string>
@@ -952,29 +963,28 @@
 
     <!-- Mit anderen Apps teilen (Multi-Admin) -->
     <string name="action_close">Schließen</string>
-    <string name="settings_share">Mit anderen Apps teilen</string>
+    <string name="settings_share">Teilen</string>
     <string name="share">Teilen</string>
     <string name="share_none">Nicht geteilt</string>
-    <string name="share_hubs">Hinweis: Für Fernzugriff und Automationen brauchen diese Apps meist eine eigene Steuerzentrale (z. B. Apple TV oder HomePod, Nest Hub, Echo). Thread-Geräte erreichen sie nur, wenn ihre Zentrale Thread unterstützt.</string>
     <string name="share_all">Alle nacheinander teilen (%1$d)</string>
     <string name="share_other_app">Andere App (%1$s)</string>
     <string name="share_remove">Zugriff entfernen</string>
     <string name="share_remove_title">Zugriff für %1$s entfernen?</string>
-    <string name="share_remove_text">%1$s kann „%2$s“ danach nicht mehr steuern. In raum. bleibt das Gerät unverändert.</string>
+    <string name="share_remove_text">%1$s kann „%2$s“ nicht mehr steuern.</string>
     <string name="share_pin_title">Teilen – PIN eingeben</string>
     <string name="share_dialog_title">„%1$s“ teilen</string>
     <string name="share_dialog_title_n">„%1$s“ teilen · %2$d von %3$d</string>
     <string name="share_opening">Kopplungsfenster wird geöffnet …</string>
-    <string name="share_error_offline">Das Gerät ist nicht erreichbar. Teilen geht nur, solange es online ist.</string>
-    <string name="share_error">Das Gerät hat das Teilen abgelehnt (möglicherweise sind bereits zu viele Apps verbunden).</string>
-    <string name="share_step_open">In der anderen App „Gerät hinzufügen“ wählen (bei Google Home und Alexa: „Matter-Gerät“).</string>
+    <string name="share_error_offline">Gerät nicht erreichbar.</string>
+    <string name="share_error">Teilen abgelehnt (evtl. zu viele Apps).</string>
+    <string name="share_step_open">In der App „Gerät hinzufügen“ wählen (Google/Alexa: „Matter-Gerät“).</string>
     <string name="share_step_scan">QR-Code scannen oder diesen Code eingeben:</string>
-    <string name="share_step_done">Den Anweisungen der App folgen. raum. erkennt die Kopplung automatisch.</string>
+    <string name="share_step_done">Anweisungen folgen – raum. erkennt die Kopplung.</string>
     <string name="share_valid_for">Code gültig noch %1$s</string>
     <string name="share_expired">Der Code ist abgelaufen.</string>
     <string name="share_new_code">Neuen Code erzeugen</string>
     <string name="share_joined">„%1$s“ ist jetzt auch in %2$s</string>
-    <string name="share_joined_text">Das Gerät lässt sich weiterhin in raum. steuern.</string>
+    <string name="share_joined_text">Bleibt in raum. steuerbar.</string>
     <string name="share_next">Nächstes Gerät</string>
     <string name="share_skip">Überspringen</string>
     <string name="share_simulate">Simulieren: %1$s koppelt</string>
@@ -983,31 +993,30 @@
     <string name="log_share_removed">%2$s hat keinen Zugriff mehr auf „%1$s“</string>
 
     <!-- Übergabe entzieht fremden Apps den Zugriff -->
-    <string name="reset_fabric_text_handover">Zuerst verlieren alle anderen Apps (z. B. Apple Home, Google Home, Alexa) den Zugriff auf die Geräte – erreichbare Geräte werden dort entfernt. Lässt sich das nicht für alle Geräte bestätigen, zeigt raum. sie an, bevor etwas gelöscht wird. Danach werden alle Geräte aus der raum.-Fabric entfernt und die Fabric-Schlüssel gelöscht. Nicht erreichbare Geräte bitte vor Ort auf Werkseinstellungen zurücksetzen.</string>
+    <string name="reset_fabric_text_handover">Andere Apps verlieren zuerst den Zugriff. Klappt das nicht bei allen Geräten, zeigt raum. sie vorher an. Danach werden alle Geräte entfernt und die Fabric-Schlüssel gelöscht.</string>
 
     <!-- Bridge -->
     <string name="select_all">Alle</string>
     <string name="select_none">Keine</string>
-    <string name="bridge_title">Alles auf einmal (Bridge)</string>
-    <string name="bridge_explain">raum. meldet sich als Matter-Bridge an: Du koppelst das Panel einmal in Apple Home, Google Home, Alexa oder SmartThings – alle freigegebenen Geräte erscheinen dort. Neue Geräte kommen automatisch dazu.</string>
-    <string name="bridge_tradeoff">Die Befehle laufen über dieses Panel: Ist es aus oder offline, lassen sich die Geräte in der anderen App nicht steuern. Dafür reicht ein Code, und auch Thread-Geräte sind ohne eigene Thread-Zentrale erreichbar. Namen werden übertragen, Räume nicht.</string>
+    <string name="bridge_title">Bridge</string>
+    <string name="bridge_explain">Einmal in Apple Home, Google Home, Alexa oder SmartThings koppeln – alle Geräte erscheinen dort.</string>
     <string name="bridge_connected_apps">Verbundene Apps</string>
-    <string name="bridge_no_apps">Noch keine App verbunden.</string>
+    <string name="bridge_no_apps">Keine App verbunden</string>
     <string name="bridge_connect">Mit einer App verbinden</string>
     <string name="bridge_devices">Geräte auswählen (%1$d von %2$d)</string>
-    <string name="bridge_remove_text">%1$s verliert den Zugriff auf alle Geräte, die über raum. freigegeben sind. Direkt geteilte Geräte bleiben dort.</string>
+    <string name="bridge_remove_text">%1$s verliert den Zugriff auf alle Bridge-Geräte.</string>
     <string name="bridge_select_title">Über die Bridge freigegeben</string>
-    <string name="bridge_select_text">Abgewählte Geräte verschwinden aus den verbundenen Apps. Neue Geräte sind automatisch freigegeben.</string>
+    <string name="bridge_select_text">Abgewählte Geräte verschwinden aus den Apps.</string>
     <string name="bridge_dialog_title">raum. mit einer App verbinden</string>
-    <string name="bridge_pairing_note">Den Anweisungen der App folgen – sie findet %1$d Geräte und fragt je Gerät nach dem Raum.</string>
+    <string name="bridge_pairing_note">Die App findet %1$d Geräte.</string>
     <string name="bridge_joined">raum. ist jetzt in %1$s – %2$d Geräte erscheinen dort</string>
-    <string name="bridge_joined_text">Änderungen in raum. (neue, umbenannte oder entfernte Geräte) übernimmt die App automatisch.</string>
+    <string name="bridge_joined_text">Änderungen übernimmt die App automatisch.</string>
     <string name="bridge_error">Die Bridge ist nicht bereit oder es sind bereits 5 Apps verbunden.</string>
     <string name="bridge_summary_on">Bridge aktiv</string>
     <string name="bridge_summary_apps">Bridge: %1$s</string>
     <string name="share_summary_direct">%1$d direkt geteilt</string>
-    <string name="share_direct_title">Einzelne Geräte direkt teilen</string>
-    <string name="share_direct_explain">Jedes Gerät bekommt einen eigenen Code und ist danach unabhängig von diesem Panel in der anderen App – es funktioniert also auch, wenn das Panel aus ist.</string>
+    <string name="share_direct_title">Einzelne Geräte</string>
+    <string name="share_direct_explain">Eigener Code je Gerät – läuft auch ohne Panel.</string>
     <string name="log_bridge_on">Bridge eingeschaltet</string>
     <string name="log_bridge_off">Bridge ausgeschaltet – verbundene Apps erreichen die Geräte nicht mehr</string>
     <string name="log_bridge_open">Bridge zum Koppeln freigegeben (Code 15 Minuten gültig)</string>
@@ -1022,24 +1031,24 @@
     </plurals>
 
     <!-- M2 – Kopplung echter Geräte -->
-    <string name="error_commissioning_attestation">Die Echtheit des Geräts ließ sich nicht bestätigen – das Herstellerzertifikat ist in raum. nicht hinterlegt oder ungültig. Nur hinzufügen, wenn du dem Gerät vertraust.</string>
+    <string name="error_commissioning_attestation">Echtheit nicht bestätigt. Nur hinzufügen, wenn du dem Gerät vertraust.</string>
     <string name="commissioning_add_anyway">Trotzdem hinzufügen</string>
     <string name="log_device_uncertified">Gerät 0x%1$s ohne bestätigte Echtheit hinzugefügt</string>
 
     <!-- M2 – Betriebsart -->
     <string name="matter_mode_title">Betriebsart</string>
-    <string name="matter_mode_text">Echte Geräte steuert raum. über das offizielle Matter-SDK. Die Simulation zeigt eine virtuelle Wohnung – zum Ausprobieren ohne Geräte.</string>
+    <string name="matter_mode_text">Echte Geräte oder Simulation zum Ausprobieren.</string>
     <string name="matter_mode_real">Echte Geräte (Matter)</string>
     <string name="matter_mode_simulation">Simulation</string>
     <string name="matter_mode_confirm_title">Betriebsart wechseln?</string>
-    <string name="matter_mode_confirm_text">raum. startet dafür neu. Geräte der anderen Betriebsart bleiben gespeichert, erscheinen aber als nicht erreichbar.</string>
+    <string name="matter_mode_confirm_text">raum. startet neu. Geräte der anderen Betriebsart erscheinen offline.</string>
     <string name="matter_mode_restart">Neu starten</string>
 
     <!-- M2 – bereits gekoppelt -->
-    <string name="error_commissioning_already_paired">Das Gerät ist bereits mit raum. gekoppelt. Wenn es in raum. fehlt: raum. in der anderen App (verknüpfte Apps) entfernen und neu koppeln.</string>
+    <string name="error_commissioning_already_paired">Bereits mit raum. gekoppelt. Fehlt es: raum. in der anderen App entfernen und neu koppeln.</string>
 
     <!-- M2 – Kopplung Hinweis -->
-    <string name="commissioning_slow_hint">Batteriebetriebene Geräte (z. B. Thread-Sensoren) antworten langsamer – das Hinzufügen kann bis zu einer Minute dauern. Bitte nicht abbrechen.</string>
+    <string name="commissioning_slow_hint">Batteriegeräte brauchen bis zu einer Minute.</string>
     <!-- M6: Thread und neue Geräte -->
     <string name="thread_role_sleepy">schlafendes Endgerät</string>
     <string name="thread_role_end_device">Endgerät</string>
@@ -1047,12 +1056,12 @@
     <string name="thread_role_router">Router</string>
     <string name="thread_role_leader">Leader</string>
     <string name="thread_role_detached">nicht verbunden</string>
-    <string name="error_commissioning_bluetooth">Das Gerät wurde im Netzwerk nicht gefunden. Ist es schon in einer anderen App (Apple Home, Google Home, Alexa …), öffne dort ein neues Kopplungsfenster. Neue Geräte koppelt raum. per Bluetooth – das ist gerade nicht verfügbar.</string>
-    <string name="error_commissioning_no_thread">Das ist ein Thread-Gerät, in raum. ist aber noch kein Thread-Netz hinterlegt. Hinterlege die Thread-Zugangsdaten oder koppel das Gerät zuerst in einer anderen App und teile es dann per Code mit raum.</string>
-    <string name="error_commissioning_no_wifi">Das Gerät braucht WLAN, in raum. ist aber noch kein WLAN für neue Geräte hinterlegt.</string>
-    <string name="error_commissioning_thread_join">Das Gerät konnte dem Thread-Netz nicht beitreten. Sind die hinterlegten Thread-Zugangsdaten aktuell und ist der Border Router eingeschaltet?</string>
-    <string name="error_commissioning_wifi_join">Das Gerät konnte sich nicht mit dem WLAN verbinden. Stimmt das Passwort? Viele Matter-Geräte brauchen ein 2,4-GHz-WLAN.</string>
-    <string name="error_commissioning_not_reachable">Das Gerät ist jetzt im Netz, aber das Panel erreicht es nicht. Prüfe, ob der Border Router läuft und das Heimnetz IPv6 weiterleitet.</string>
+    <string name="error_commissioning_bluetooth">Nicht gefunden, Bluetooth nicht verfügbar. Ist es in einer anderen App, dort ein Kopplungsfenster öffnen.</string>
+    <string name="error_commissioning_no_thread">Thread-Gerät, aber kein Thread-Netz hinterlegt. Zugangsdaten hinterlegen oder per Code aus einer anderen App teilen.</string>
+    <string name="error_commissioning_no_wifi">Gerät braucht WLAN – noch keins hinterlegt.</string>
+    <string name="error_commissioning_thread_join">Thread-Beitritt fehlgeschlagen. Zugangsdaten und Border Router prüfen.</string>
+    <string name="error_commissioning_wifi_join">WLAN-Verbindung fehlgeschlagen. Passwort prüfen, 2,4 GHz nötig.</string>
+    <string name="error_commissioning_not_reachable">Im Netz, aber nicht erreichbar. Border Router und IPv6 prüfen.</string>
     <string name="commissioning_open_setup">Einrichten</string>
     <string name="log_thread_imported">Thread-Netz „%1$s“ hinterlegt</string>
     <string name="log_thread_adopted">Thread-Netz „%1$s“ von %2$s übernommen</string>
@@ -1070,10 +1079,9 @@
     <string name="thread_pin_title">Zugangsdaten ändern</string>
     <string name="thread_remove_title">Thread-Netz entfernen?</string>
     <string name="thread_remove">Entfernen</string>
-    <string name="thread_remove_text">raum. vergisst die Zugangsdaten. Bereits gekoppelte Thread-Geräte bleiben erreichbar; neue Thread-Geräte lassen sich dann nur noch per Code aus einer anderen App hinzufügen.</string>
+    <string name="thread_remove_text">Gekoppelte Geräte bleiben. Neue Thread-Geräte dann nur per Code aus einer anderen App.</string>
     <string name="thread_network">Thread-Netz</string>
     <string name="thread_none_text">Noch kein Thread-Netz hinterlegt.</string>
-    <string name="thread_none_hint">Für neue Thread-Geräte braucht raum. die Zugangsdaten deines Thread-Netzes (Operational Dataset). Geräte, die schon in Apple Home, Google Home oder Alexa sind, kannst du auch ohne sie per Code hinzufügen.</string>
     <string name="thread_import">Zugangsdaten eingeben</string>
     <string name="thread_name">Netzname</string>
     <string name="thread_channel">Kanal</string>
@@ -1085,54 +1093,52 @@
     <string name="thread_replace">Ersetzen</string>
     <string name="thread_health_ok">Border Router aktiv: %1$s</string>
     <string name="thread_health_inactive">Border Router gefunden, sein Thread-Netz ist aber nicht aktiv.</string>
-    <string name="thread_health_no_router">Kein Border Router dieses Netzes im Heimnetz gefunden. Neue Geräte können dem Netz beitreten, sind vom Panel aus aber nicht erreichbar.</string>
-    <string name="thread_routers">Border Router im Heimnetz</string>
-    <string name="thread_routers_explain">Ein Border Router verbindet Thread-Geräte mit dem Heimnetz – z. B. HomePod mini, Apple TV, Nest Hub, Echo oder ein OpenThread Border Router.</string>
+    <string name="thread_health_no_router">Kein Border Router für dieses Netz gefunden.</string>
+    <string name="thread_routers">Border Router</string>
     <string name="thread_routers_searching">Suche läuft …</string>
-    <string name="thread_routers_none">Kein Border Router gefunden. Ist das Panel im selben Netz?</string>
+    <string name="thread_routers_none">Kein Border Router gefunden.</string>
     <string name="thread_router_network">Netz „%1$s“</string>
     <string name="thread_router_active">aktiv</string>
     <string name="thread_router_inactive">nicht aktiv</string>
     <string name="thread_router_unknown">Zustand unbekannt</string>
     <string name="thread_router_ours">in raum. hinterlegt</string>
     <string name="thread_adopt">Zugangsdaten übernehmen</string>
-    <string name="thread_closed_ecosystem">Apple, Google und Amazon geben die Thread-Zugangsdaten nicht heraus.</string>
-    <string name="thread_closed_ecosystem_detail">Koppel neue Thread-Geräte dort und teile sie dann per Code mit raum. – oder übernimm die Zugangsdaten aus Home Assistant bzw. einem OpenThread Border Router.</string>
+    <string name="thread_closed_ecosystem">Apple, Google und Amazon geben keine Thread-Zugangsdaten heraus.</string>
+    <string name="thread_closed_ecosystem_detail">Geräte dort koppeln und per Code mit raum. teilen.</string>
     <string name="thread_diagnosis">Diagnose</string>
     <string name="thread_diag_no_router">Kein Border Router gefunden</string>
-    <string name="thread_diag_no_router_detail">Ohne Border Router sind Thread-Geräte vom Panel aus nicht erreichbar. Ist er eingeschaltet und im selben Netz wie das Panel?</string>
+    <string name="thread_diag_no_router_detail">Eingeschaltet und im selben Netz?</string>
     <string name="thread_diag_routers">Border Router gefunden: %1$d (%2$d aktiv)</string>
     <string name="thread_diag_devices">%1$d von %2$d Thread-Geräten erreichbar</string>
-    <string name="thread_diag_devices_unreachable">Der Border Router scheint nicht erreichbar zu sein – bitte prüfen, ob er eingeschaltet ist.</string>
+    <string name="thread_diag_devices_unreachable">Border Router scheint nicht erreichbar.</string>
     <string name="thread_diag_device_networks">Thread-Geräte in raum. hängen im Netz %1$s</string>
     <string name="thread_diag_device_networks_other">Hinterlegt ist „%1$s“ – neue Geräte kommen in dieses Netz.</string>
     <string name="thread_diag_no_devices">Noch keine Thread-Geräte in raum.</string>
     <string name="thread_diag_ipv6_ok">IPv6 im Heimnetz vorhanden</string>
     <string name="thread_diag_ipv6_missing">Das Panel hat keine IPv6-Adresse im Heimnetz</string>
-    <string name="thread_diag_ipv6_detail">Thread-Geräte sind nur über IPv6 erreichbar. Prüfe, ob der Router IPv6 im Heimnetz erlaubt.</string>
+    <string name="thread_diag_ipv6_detail">Thread braucht IPv6 im Heimnetz.</string>
     <string name="thread_new_devices">Neue Geräte koppeln</string>
-    <string name="thread_new_devices_explain">Neue Matter-Geräte koppelt raum. per Bluetooth und gibt ihnen dabei die Zugangsdaten fürs Thread-Netz oder WLAN.</string>
     <string name="bt_ready">Bluetooth ist bereit</string>
     <string name="bt_off">Bluetooth ist ausgeschaltet</string>
     <string name="bt_no_permission">raum. darf Bluetooth noch nicht verwenden</string>
-    <string name="bt_no_location">Die Bluetooth-Suche braucht auf diesem Android den Standortdienst (raum. ortet nichts)</string>
-    <string name="bt_unavailable">Dieses Gerät hat kein Bluetooth – neue Geräte lassen sich nur per Code aus einer anderen App hinzufügen</string>
+    <string name="bt_no_location">Bluetooth-Suche braucht den Standortdienst</string>
+    <string name="bt_unavailable">Kein Bluetooth – neue Geräte nur per Code</string>
     <string name="bt_enable">Einschalten</string>
     <string name="bt_allow">Erlauben</string>
     <string name="commissioning_wifi">WLAN für neue Geräte</string>
     <string name="commissioning_wifi_set">„%1$s“ – Passwort verschlüsselt gespeichert</string>
-    <string name="commissioning_wifi_none">Nicht hinterlegt – nötig nur für Matter-Geräte, die per WLAN verbunden werden</string>
+    <string name="commissioning_wifi_none">Nicht hinterlegt – nur für WLAN-Geräte nötig</string>
     <string name="commissioning_wifi_define">Festlegen</string>
     <string name="commissioning_wifi_change">Ändern</string>
     <string name="commissioning_wifi_remove_title">WLAN für neue Geräte entfernen?</string>
-    <string name="commissioning_wifi_remove_text">Bereits gekoppelte Geräte bleiben verbunden. Das Panel selbst bleibt ebenfalls im WLAN.</string>
-    <string name="commissioning_wifi_explain">Diese Zugangsdaten gibt raum. nur beim Koppeln neuer WLAN-Geräte weiter. Sie werden verschlüsselt im Android-Keystore gespeichert. Viele Matter-Geräte brauchen ein 2,4-GHz-WLAN.</string>
+    <string name="commissioning_wifi_remove_text">Gekoppelte Geräte bleiben verbunden.</string>
+    <string name="commissioning_wifi_explain">Nur für das Koppeln neuer WLAN-Geräte. Verschlüsselt gespeichert. Meist 2,4 GHz nötig.</string>
     <string name="commissioning_wifi_ssid">WLAN-Name (SSID)</string>
     <string name="commissioning_wifi_short">Mindestens 8 Zeichen</string>
     <string name="thread_import_title">Thread-Zugangsdaten eingeben</string>
     <string name="thread_import_save">Übernehmen</string>
-    <string name="thread_import_text">Füge das Operational Dataset deines Thread-Netzes als Hex-Text ein.</string>
-    <string name="thread_import_where">Zu finden z. B. in Home Assistant (Einstellungen → Thread) oder auf einem OpenThread Border Router mit „ot-ctl dataset active -x“. Die Zugangsdaten werden verschlüsselt im Android-Keystore gespeichert und nie angezeigt.</string>
+    <string name="thread_import_text">Operational Dataset als Hex-Text einfügen.</string>
+    <string name="thread_import_where">z. B. Home Assistant (Einstellungen → Thread) oder „ot-ctl dataset active -x“. Wird verschlüsselt gespeichert.</string>
     <string name="thread_import_label">Operational Dataset (Hex)</string>
     <string name="thread_import_preview">Netz „%1$s“ · Kanal %2$d · PAN %3$s</string>
     <string name="thread_import_replaces">Ersetzt das bisher hinterlegte Netz „%1$s“.</string>
@@ -1147,43 +1153,43 @@
     <string name="transport_ethernet">LAN</string>
     <string name="thread_channel_short">Kanal %1$d</string>
     <string name="onb_thread_title">Thread (optional)</string>
-    <string name="onb_thread_ready">Thread-Netz „%1$s“ hinterlegt – neue Thread-Geräte lassen sich direkt koppeln.</string>
+    <string name="onb_thread_ready">Thread-Netz „%1$s“ hinterlegt.</string>
     <string name="onb_thread_none">Kein Thread Border Router gefunden.</string>
     <string name="onb_thread_found">Thread-Netz „%1$s“ gefunden (%2$s)</string>
-    <string name="onb_thread_closed">Dieser Border Router gibt seine Zugangsdaten nicht heraus. Thread-Geräte, die schon dort gekoppelt sind, fügst du später einfach per Code hinzu.</string>
-    <string name="onb_thread_later">Alles zu Thread lässt sich auch später unter Einstellungen → Matter und Thread einrichten.</string>
+    <string name="onb_thread_closed">Gibt keine Zugangsdaten heraus – Geräte später per Code hinzufügen.</string>
+    <string name="onb_thread_later">Geht auch später unter Einstellungen → Matter und Thread.</string>
     <string name="notice_border_router">Thread Border Router nicht erreichbar</string>
     <string name="settings_fabric_keys">Fabric-Schlüssel</string>
     <string name="fabric_keys_encrypted">verschlüsselt im Android-Keystore (%1$s)</string>
     <string name="fabric_keys_plain">unverschlüsselt (Keystore nicht verfügbar)</string>
-    <string name="fabric_keys_unreadable">Einzelne Fabric-Einträge ließen sich nicht entschlüsseln. Geräte sind eventuell nicht mehr erreichbar – bitte Protokoll prüfen.</string>
+    <string name="fabric_keys_unreadable">Einige Fabric-Einträge nicht lesbar – siehe Protokoll.</string>
     <string name="key_protection_strongbox">Sicherheitschip</string>
     <string name="key_protection_tee">hardwaregestützt</string>
     <string name="key_protection_software">nur Software</string>
     <string name="key_protection_unknown">Schutzniveau unbekannt</string>
     <string name="bridge_unsupported">über die Bridge noch nicht möglich</string>
-    <string name="bridge_attestation">Echtheitsnachweis der Bridge</string>
-    <string name="bridge_attestation_test">Testzertifikat des Matter-SDK – nur für Entwicklung und Tests</string>
-    <string name="bridge_attestation_custom">Eigenes Zertifikat (Hersteller 0x%1$s, Produkt 0x%2$s), Schlüssel im Android-Keystore</string>
-    <string name="bridge_attestation_missing">Fehlt – für die Hersteller-ID 0x%1$s ein passendes Zertifikat importieren, sonst lehnen andere Apps die Bridge ab</string>
+    <string name="bridge_attestation">Zertifikat</string>
+    <string name="bridge_attestation_test">Test-Zertifikat (nur Entwicklung)</string>
+    <string name="bridge_attestation_custom">Eigenes Zertifikat (0x%1$s / 0x%2$s)</string>
+    <string name="bridge_attestation_missing">Fehlt – Zertifikat für 0x%1$s importieren</string>
     <string name="bridge_attestation_import">Zertifikat importieren</string>
     <string name="bridge_attestation_imported">Echtheitszertifikat übernommen – die Bridge startet neu</string>
     <string name="bridge_attestation_incomplete">Das Paket ist unvollständig (nötig: dac.der, pai.der, cd.der).</string>
     <string name="bridge_attestation_bad">Das Paket enthält kein gültiges Zertifikat.</string>
     <string name="bridge_attestation_chain">Das Gerätezertifikat stammt nicht vom beigelegten Zwischenzertifikat.</string>
-    <string name="bridge_attestation_ids">Hersteller- oder Produkt-ID im Zertifikat passen nicht zu dieser raum.-Version.</string>
+    <string name="bridge_attestation_ids">IDs im Zertifikat passen nicht zu dieser Version.</string>
     <string name="bridge_attestation_key">Der Schlüssel passt nicht zum Gerätezertifikat.</string>
     <string name="log_bridge_attestation_imported">Echtheitszertifikat der Bridge importiert</string>
-    <string name="bridge_attestation_request">Schlüssel erzeugen und Anforderung speichern</string>
-    <string name="bridge_attestation_request_saved">Anforderung gespeichert – der Schlüssel bleibt im Keystore dieses Panels</string>
+    <string name="bridge_attestation_request">Anforderung erstellen</string>
+    <string name="bridge_attestation_request_saved">Anforderung gespeichert</string>
     <string name="bridge_attestation_request_failed">Die Anforderung konnte nicht erstellt oder gespeichert werden.</string>
     <string name="bridge_attestation_pending">Anforderung vom %1$s wartet auf ihr Zertifikat</string>
-    <string name="bridge_attestation_no_request">Zu diesem Zertifikat gibt es auf diesem Panel keine offene Anforderung (und keinen Schlüssel im Paket).</string>
+    <string name="bridge_attestation_no_request">Keine passende Anforderung auf diesem Panel.</string>
     <string name="log_bridge_attestation_request">Zertifikatsanforderung für die Bridge erstellt (Schlüssel im Keystore)</string>
     <string name="busy_handover_revoke">Zugriffe anderer Apps werden entzogen …</string>
     <string name="handover_incomplete_title">Übergabe noch nicht vollständig</string>
-    <string name="handover_incomplete_text">Bei %1$d von %2$d Geräten ließ sich nicht bestätigen, dass andere Apps keinen Zugriff mehr haben. Es wurde noch nichts gelöscht – raum. behält seine Zugangsdaten, damit du es erneut versuchen kannst.</string>
-    <string name="handover_incomplete_hint">Geräte einschalten bzw. in Reichweite bringen und erneut versuchen. Wer trotzdem abschließt, muss diese Geräte vor Ort auf Werkseinstellungen zurücksetzen – sonst behalten die bisherigen Apps den Zugriff, und raum. kann ihn danach nicht mehr entziehen.</string>
+    <string name="handover_incomplete_text">Bei %1$d von %2$d Geräten nicht bestätigt, dass andere Apps keinen Zugriff mehr haben. Noch nichts gelöscht.</string>
+    <string name="handover_incomplete_hint">Geräte einschalten und erneut versuchen. Sonst müssen sie vor Ort zurückgesetzt werden – andere Apps behalten sonst den Zugriff.</string>
     <string name="handover_problem_unreachable">Nicht erreichbar – ob andere Apps Zugriff haben, ist unbekannt</string>
     <string name="handover_problem_failed">Hat weiterhin Zugriff: %1$s</string>
     <string name="handover_problem_unconfirmed">Entzug nicht bestätigt: %1$s</string>
@@ -1193,7 +1199,44 @@
     <string name="device_channel_name">%1$s · Kanal %2$d</string>
     <string name="device_channel">Kanal</string>
     <string name="device_channel_value">Endpunkt %1$d (weiterer Kanal)</string>
-    <string name="reset_error_bridge">Die Bridge ließ sich nicht zurücksetzen – es wurde nichts gelöscht. Bitte raum. neu starten und erneut versuchen.</string>
+    <string name="reset_error_bridge">Bridge-Reset fehlgeschlagen – nichts gelöscht. raum. neu starten.</string>
     <string name="share_remove_failed">Zugriff für %1$s nicht entzogen: %2$s</string>
     <string name="log_bridge_command_dropped">Befehl über %1$s verworfen – Gerät antwortet nicht, neuere Befehle haben Vorrang</string>
+
+    <!-- Himmel-Oberfläche -->
+    <string name="nav_automations_short">Abläufe</string>
+    <string name="tile_current">Ist %1$s</string>
+    <string name="scene_done">Ausgeführt</string>
+    <string name="lights_short_of">%1$d/%2$d Lichter an</string>
+    <string name="room_occupied_chip">Belegt</string>
+    <string name="group_all_on">Alle an</string>
+    <string name="group_all_off">Alle aus</string>
+    <string name="rooms_empty">Noch keine Räume</string>
+    <string name="dial_current">Aktuell %1$s</string>
+    <string name="dial_open">Offen</string>
+    <string name="light_color_label">LICHTFARBE · %1$s</string>
+    <string name="ct_candle">Kerze</string>
+    <string name="ct_warm">Warm</string>
+    <string name="ct_neutral">Neutral</string>
+    <string name="ct_day">Tag</string>
+
+    <!-- Sensorverlauf -->
+    <string name="metric_temperature">Temperatur</string>
+    <string name="metric_humidity">Luftfeuchte</string>
+    <string name="range_24h">24 Std</string>
+    <string name="range_7d">7 Tage</string>
+    <string name="comfort_band">Wohlfühlbereich</string>
+    <string name="history_empty">Noch kein Verlauf</string>
+    <string name="history_empty_text">Wird ab jetzt alle 5 Minuten aufgezeichnet.</string>
+    <string name="ev_now">Jetzt</string>
+    <string name="ev_opened_today">Geöffnet heute</string>
+    <string name="ev_open_total">Offen gesamt</string>
+    <string name="ev_occupied_today">Belegt heute</string>
+    <string name="ev_presence">Anwesenheit</string>
+    <string name="ev_since">seit %1$s</string>
+    <string name="ev_none_today">Heute noch nichts</string>
+    <string name="duration_min">%1$d Min</string>
+    <string name="duration_h">%1$d Std</string>
+    <string name="duration_h_min">%1$d Std %2$d Min</string>
+    <string name="battery_value">Batterie %1$s</string>
 </resources>

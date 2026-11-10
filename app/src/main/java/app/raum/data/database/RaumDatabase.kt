@@ -21,6 +21,7 @@ import androidx.room.RoomDatabase
         SceneActionEntity::class,
         AutomationEntity::class,
         EventLogEntity::class,
+        SensorSampleEntity::class,
     ],
     version = RaumDatabase.VERSION,
     exportSchema = true,
@@ -28,10 +29,11 @@ import androidx.room.RoomDatabase
 abstract class RaumDatabase : RoomDatabase() {
     abstract fun homeDao(): HomeDao
     abstract fun eventLogDao(): EventLogDao
+    abstract fun sensorSampleDao(): SensorSampleDao
 
     companion object {
         const val NAME = "raum.db"
-        const val VERSION = 3
+        const val VERSION = 5
 
         fun create(context: Context): RaumDatabase {
             DatabaseSafety.snapshotBeforeMigration(context)

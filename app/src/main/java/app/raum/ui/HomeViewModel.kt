@@ -157,6 +157,7 @@ class HomeViewModel(
     }
 
     fun setFavorite(device: Device, favorite: Boolean) = viewModelScope.launch { deviceService.setFavorite(device, favorite) }
+    fun setSwitchAsLight(device: Device, asLight: Boolean) = viewModelScope.launch { deviceService.setSwitchAsLight(device, asLight) }
     fun rename(device: Device, name: String) = viewModelScope.launch { if (name.isNotBlank()) deviceService.rename(device, name) }
     fun assignRoom(device: Device, roomId: UUID?) = viewModelScope.launch { deviceService.assignRoom(device, roomId) }
     fun remove(device: Device) = viewModelScope.launch { deviceService.remove(device) }

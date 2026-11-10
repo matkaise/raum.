@@ -1,6 +1,7 @@
 package app.raum.ui.automations
 
 import app.raum.R
+import app.raum.ui.components.GlassPanel
 import androidx.compose.ui.res.stringResource
 
 import app.raum.ui.components.currentLocale
@@ -52,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.automation.AutomationDescriber
 import app.raum.domain.models.AutomationAction
@@ -102,14 +104,14 @@ fun AutomationEditorScreen(
     )
     val ctx = EditorContext(devices, { id -> rooms.firstOrNull { it.id == id }?.name }, scenes, viewModel.hasLocation)
 
-    Row(Modifier.fillMaxSize().padding(start = 24.dp, end = 40.dp, top = 32.dp)) {
+    Row(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 28.dp)) {
         Column(Modifier.width(440.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = back, modifier = Modifier.size(56.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back)) }
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(if (state.isNew) R.string.automation_new else R.string.automation_edit), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(if (state.isNew) R.string.automation_new else R.string.automation_edit), fontSize = 32.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.height(24.dp))
+            GlassPanel(Modifier.padding(top = 20.dp)) {
             OutlinedTextField(
                 value = state.name, onValueChange = viewModel::setName, label = { Text(stringResource(R.string.name)) }, singleLine = true,
                 isError = state.showErrors && state.name.isBlank(), modifier = Modifier.fillMaxWidth(),
@@ -142,6 +144,7 @@ fun AutomationEditorScreen(
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                     ) { Icon(Icons.Outlined.DeleteOutline, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.automation_delete)) }
                 }
+            }
             }
         }
 
@@ -200,10 +203,10 @@ fun AutomationEditorScreen(
 
 @Composable
 private fun Section(title: String, subtitle: String, onAdd: () -> Unit, content: @Composable () -> Unit) {
-    Row(Modifier.padding(top = 20.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(start = 20.dp, top = 20.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title.uppercase(), style = SectionLabelStyle, color = MaterialTheme.colorScheme.primary)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title.uppercase(), style = SectionLabelStyle, color = app.raum.ui.theme.SkyText)
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = app.raum.ui.theme.SkyTextSoft)
         }
         FilledTonalButton(onClick = onAdd) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.action_add)) }
     }

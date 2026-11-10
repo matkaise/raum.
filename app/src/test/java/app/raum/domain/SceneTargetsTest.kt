@@ -56,6 +56,14 @@ class SceneTargetsTest {
     }
 
     @Test
+    fun `cover tilt follows the lift and round-trips`() {
+        val target = DeviceTarget.Cover(0, tiltOpenPercent = 50)
+        assertEquals(listOf(DeviceCommand.CloseCover, DeviceCommand.SetCoverTilt(50)), SceneTargets.toCommands(target))
+        assertEquals(target, SceneTargets.fromCommands(SceneTargets.toCommands(target), null))
+        assertEquals(DeviceTarget.Cover(60, 25), SceneTargets.capture(device(CoverCapability(60, tiltOpenPercent = 25))))
+    }
+
+    @Test
     fun `thermostat keeps mode optional`() {
         assertEquals(listOf(DeviceCommand.SetTargetTemperature(19.5)), SceneTargets.toCommands(DeviceTarget.Thermostat(19.5)))
         val t = SceneTargets.fromCommands(

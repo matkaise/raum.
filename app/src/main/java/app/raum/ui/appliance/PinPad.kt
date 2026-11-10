@@ -66,6 +66,10 @@ fun PinPad(pin: String, onChange: (String) -> Unit, maxLength: Int = AdminPinSto
                         else -> FilledTonalButton(
                             onClick = { if (pin.length < maxLength) onChange(pin + key) },
                             shape = CircleShape,
+                            colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                containerColor = app.raum.ui.theme.LocalGlass.current.chip,
+                                contentColor = app.raum.ui.theme.LocalGlass.current.ink,
+                            ),
                             modifier = Modifier.size(80.dp),
                         ) { Text(key, fontSize = 28.sp) }
                     }

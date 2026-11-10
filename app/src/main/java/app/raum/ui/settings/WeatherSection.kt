@@ -93,7 +93,7 @@ fun WeatherSection(state: HomeUiState, vm: SettingsViewModel, onOpenRegion: () -
             Text(stringResource(R.string.weather_show), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Switch(checked = enabled, onCheckedChange = vm::setWeatherEnabled)
         }
-        Text(stringResource(R.string.weather_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.weather_explain_short), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (enabled && location == null) {
             Text(stringResource(R.string.weather_needs_location), color = MaterialTheme.colorScheme.error)
             FilledTonalButton(onClick = onOpenRegion, modifier = Modifier.height(48.dp)) {
@@ -127,7 +127,6 @@ fun WeatherSection(state: HomeUiState, vm: SettingsViewModel, onOpenRegion: () -
     // Außensensor – auch ohne Internet nutzbar
     val sensors = state.devices.filter { it.capabilities.find<TemperatureSensorCapability>() != null }
     Group(stringResource(R.string.weather_outdoor_sensor)) {
-        Text(stringResource(R.string.weather_outdoor_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = outdoor == null, onClick = { vm.setOutdoorSensor(null) }, label = { Text(stringResource(R.string.weather_outdoor_none)) }, modifier = Modifier.height(48.dp))
             sensors.forEach { d ->
@@ -139,10 +138,6 @@ fun WeatherSection(state: HomeUiState, vm: SettingsViewModel, onOpenRegion: () -
             }
         }
         if (sensors.isEmpty()) Text(stringResource(R.string.weather_outdoor_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-
-    Group(stringResource(R.string.weather_source)) {
-        Text(stringResource(R.string.settings_license_met), style = MaterialTheme.typography.bodyLarge)
     }
 
     if (BuildConfig.DEBUG) {

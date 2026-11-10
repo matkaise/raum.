@@ -73,7 +73,7 @@ object MockHomeSeed {
         SeedDevice(0x12u, "Stehlampe", "wohnen", "Nanoleaf", "Essentials Lightstrip",
             listOf(LightCapability(false, 45, 2700, warmWhite, RgbColor(255, 170, 90), LightColorMode.TEMPERATURE)), favorite = true),
         SeedDevice(0x13u, "Storen Wohnzimmer", "wohnen", "Eve", "Eve MotionBlinds",
-            listOf(CoverCapability(100)), favorite = true),
+            listOf(CoverCapability(100, tiltOpenPercent = 100)), favorite = true),
         SeedDevice(0x14u, "Thermostat Wohnzimmer", "wohnen", "Eve", "Eve Thermo",
             listOf(ThermostatCapability(21.2, 21.5, ThermostatMode.HEAT), BatteryCapability(82)), favorite = true),
         SeedDevice(0x15u, "Klima Wohnzimmer", "wohnen", "Eve", "Eve Weather",

@@ -194,7 +194,6 @@ private fun NetworkGroup(status: ThreadStatus, onImport: () -> Unit, onRemove: (
         val net = status.network
         if (net == null) {
             Text(stringResource(R.string.thread_none_text), style = MaterialTheme.typography.bodyLarge)
-            Text(stringResource(R.string.thread_none_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FilledTonalButton(onClick = onImport, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.thread_import)) }
             return@Group
         }
@@ -261,17 +260,18 @@ private fun RoutersGroup(
     onAdopt: (BorderRouter) -> Unit,
 ) {
     Group(stringResource(R.string.thread_routers)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.thread_routers_explain), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        val rescan: @Composable () -> Unit = {
             if (scanning && status.routers.isEmpty()) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
             else IconButton(onClick = onRescan, modifier = Modifier.size(48.dp)) { Icon(Icons.Outlined.Refresh, stringResource(R.string.net_search_again)) }
         }
         if (status.routers.isEmpty()) {
-            Text(
-                stringResource(if (scanning) R.string.thread_routers_searching else R.string.thread_routers_none),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(if (scanning) R.string.thread_routers_searching else R.string.thread_routers_none),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f),
+                )
+                rescan()
+            }
             return@Group
         }
         status.routers.forEachIndexed { i, r ->
@@ -298,6 +298,7 @@ private fun RoutersGroup(
                     )
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
+                    if (i == 0) rescan()
                     if (ours) SuggestionChip(onClick = {}, label = { Text(stringResource(R.string.thread_router_ours)) })
                     if (r.restAvailable && !ours) {
                         if (adopting == r.id) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
@@ -377,8 +378,6 @@ private fun NewDevicesGroup(vm: ThreadViewModel, guarded: (() -> Unit) -> Unit) 
     val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshBluetooth() }
 
     Group(stringResource(R.string.thread_new_devices)) {
-        Text(stringResource(R.string.thread_new_devices_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
         // Bluetooth
         Row(verticalAlignment = Alignment.CenterVertically) {
             val (icon, color, text) = when (bt) {

@@ -1,5 +1,17 @@
 package app.raum.ui.onboarding
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.DisposableEffect
+import app.raum.platform.CheckAction
+import app.raum.ui.components.RaumDialog
+import app.raum.ui.settings.NetworkPanel
 import androidx.compose.material3.Switch
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
@@ -70,6 +82,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.R
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import app.raum.ui.theme.Accent
+import app.raum.ui.theme.LocalGlass
+import app.raum.ui.theme.SkyText
+import app.raum.ui.theme.SkyTextSoft
+import app.raum.ui.theme.glass
 import app.raum.data.backup.BackupCodec
 import app.raum.data.preferences.TemperatureUnit
 import app.raum.i18n.AppLanguage
@@ -94,13 +116,15 @@ fun OnboardingScreen(vm: OnboardingViewModel = koinViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     val steps = OnboardingFlow.steps(state.path)
 
-    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Linke Spalte: Marke und Schrittliste
+    val g = LocalGlass.current
+    Row(Modifier.fillMaxSize()) {
+        // Linke Spalte: Marke und Schrittliste direkt auf dem Himmel
         Column(
-            Modifier.width(380.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(40.dp),
+            Modifier.width(380.dp).fillMaxHeight()
+                .background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.24f), Color.Transparent))).padding(40.dp),
         ) {
-            Text("raum.", fontSize = 56.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
-            Text(stringResource(R.string.onb_tagline), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("raum.", fontSize = 56.sp, fontWeight = FontWeight.SemiBold, color = SkyText)
+            Text(stringResource(R.string.onb_tagline), style = MaterialTheme.typography.bodyLarge, color = SkyTextSoft)
             Spacer(Modifier.height(48.dp))
             val current = steps.indexOf(state.step)
             steps.forEachIndexed { i, s ->
@@ -109,28 +133,32 @@ fun OnboardingScreen(vm: OnboardingViewModel = koinViewModel()) {
                     Box(
                         Modifier.size(32.dp).clip(CircleShape).background(
                             when {
-                                done -> MaterialTheme.colorScheme.secondary
-                                i == current -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                done -> Accent.Light
+                                i == current -> Color.White
+                                else -> Color.White.copy(alpha = 0.16f)
                             }
                         ),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (done) Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.onSecondary, modifier = Modifier.size(20.dp))
-                        else Text("${i + 1}", color = if (i == current) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (done) Icon(Icons.Outlined.CheckCircle, null, tint = Accent.OnLight, modifier = Modifier.size(20.dp))
+                        else Text("${i + 1}", color = if (i == current) Color(0xFF10131F) else SkyText)
                     }
                     Spacer(Modifier.width(16.dp))
                     Text(
                         stringResource(s.titleRes),
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (i <= current) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (i <= current) SkyText else SkyTextSoft,
                     )
                 }
             }
         }
 
-        // Rechte Spalte: aktueller Schritt
-        Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 64.dp, vertical = 48.dp)) {
+        // Rechte Spalte: aktueller Schritt auf einer Glasfläche
+        Column(
+            Modifier.weight(1f).fillMaxHeight().padding(top = 24.dp, end = 24.dp, bottom = 24.dp)
+                .glass(RoundedCornerShape(40.dp), g.glassStrong, g.edge).padding(horizontal = 56.dp, vertical = 44.dp),
+        ) {
+            CompositionLocalProvider(LocalContentColor provides g.ink) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).widthIn(max = 880.dp)) {
                 when (state.step) {
                     OnboardingStep.WELCOME -> WelcomeStep(vm, state)
@@ -162,6 +190,7 @@ fun OnboardingScreen(vm: OnboardingViewModel = koinViewModel()) {
                     }
                 }
             }
+            }
         }
     }
 }
@@ -188,12 +217,12 @@ private fun WelcomeStep(vm: OnboardingViewModel, state: OnboardingState) {
     val language by vm.language.collectAsStateWithLifecycle()
     StepTitle(stringResource(R.string.onb_welcome_title), stringResource(R.string.onb_welcome_text))
     Label(stringResource(R.string.settings_language))
-    SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = 560.dp)) {
+    SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
         AppLanguage.entries.forEachIndexed { i, l ->
             SegmentedButton(
                 selected = language == l, onClick = { vm.setLanguage(l) },
                 shape = SegmentedButtonDefaults.itemShape(i, AppLanguage.entries.size),
-            ) { Text(stringResource(l.labelRes)) }
+            ) { Text(stringResource(l.labelRes), maxLines = 1, softWrap = false) }
         }
     }
     Spacer(Modifier.height(40.dp))
@@ -395,6 +424,24 @@ private fun PinStep(vm: OnboardingViewModel, state: OnboardingState) {
 @Composable
 private fun CheckStep(vm: OnboardingViewModel, state: OnboardingState) {
     StepTitle(stringResource(R.string.onb_check_title), stringResource(R.string.onb_check_text))
+    // Netzstatus live beobachten, solange die Prüfung sichtbar ist
+    DisposableEffect(Unit) {
+        vm.network.start()
+        onDispose { vm.network.stop() }
+    }
+    // Die Uhr stellt sich erst kurz nach dem Verbinden – dann die Uhrzeit-Prüfung erneuern
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() { override fun onReceive(c: Context, i: Intent) = vm.runChecks() }
+        ContextCompat.registerReceiver(
+            context, receiver,
+            IntentFilter().apply { addAction(Intent.ACTION_TIME_CHANGED); addAction(Intent.ACTION_TIMEZONE_CHANGED) },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(receiver) } }
+    }
+    var wifiOpen by remember { mutableStateOf(false) }
+    val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.runChecks() }
     if (state.checks.isEmpty()) { CircularProgressIndicator(); return }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         state.checks.forEach { c ->
@@ -414,12 +461,42 @@ private fun CheckStep(vm: OnboardingViewModel, state: OnboardingState) {
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    when (c.action) {
+                        CheckAction.CHOOSE_WIFI -> CheckActionButton(stringResource(R.string.check_action_wifi), c.state) { wifiOpen = true }
+                        CheckAction.ENABLE_BLUETOOTH -> CheckActionButton(stringResource(R.string.check_action_bluetooth), c.state) {
+                            if (!vm.enableBluetooth()) enableLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                        }
+                        null -> Unit
+                    }
                 }
             }
         }
     }
     Spacer(Modifier.height(16.dp))
     TextButton(onClick = vm::runChecks) { Text(stringResource(R.string.onb_check_again)) }
+
+    if (wifiOpen) {
+        RaumDialog(
+            title = stringResource(R.string.net_wifi),
+            onDismiss = { wifiOpen = false },
+            width = 760.dp,
+            confirmButton = { TextButton(onClick = { wifiOpen = false }) { Text(stringResource(R.string.action_close)) } },
+        ) {
+            Column(
+                Modifier.heightIn(max = 620.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                NetworkPanel(vm.network, vm::connectWifi, vm::forgetWifi)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckActionButton(label: String, state: CheckState, onClick: () -> Unit) {
+    Spacer(Modifier.width(16.dp))
+    if (state == CheckState.WARNING) FilledTonalButton(onClick = onClick, modifier = Modifier.height(48.dp)) { Text(label) }
+    else OutlinedButton(onClick = onClick, modifier = Modifier.height(48.dp)) { Text(label) }
 }
 
 // --- 6. Matter-Fabric -----------------------------------------------------------

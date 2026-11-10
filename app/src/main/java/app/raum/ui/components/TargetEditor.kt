@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import app.raum.domain.models.CoverCapability
 import app.raum.domain.models.Device
 import app.raum.domain.models.LightCapability
 import app.raum.domain.models.ThermostatCapability
@@ -164,6 +165,30 @@ fun TargetEditor(device: Device?, target: DeviceTarget, onChange: (DeviceTarget)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = target.openPercent == 0, onClick = { onChange(target.copy(openPercent = 0)) }, label = { Text(stringResource(R.string.cover_close)) }, modifier = Modifier.height(48.dp))
                 FilterChip(selected = target.openPercent == 100, onClick = { onChange(target.copy(openPercent = 100)) }, label = { Text(stringResource(R.string.cover_open)) }, modifier = Modifier.height(48.dp))
+            }
+            // Lamellen nur, wenn der Storen sie hat (oder die Aktion schon einen Winkel enthält)
+            val cap = device?.capabilities?.find<CoverCapability>()
+            if (cap?.hasTilt == true || target.tiltOpenPercent != null) {
+                val tilt = target.tiltOpenPercent
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.cover_tilt), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.width(100.dp))
+                    FilterChip(selected = tilt == null, onClick = { onChange(target.copy(tiltOpenPercent = null)) }, label = { Text(stringResource(R.string.unchanged)) }, modifier = Modifier.height(48.dp))
+                    FilterChip(
+                        selected = tilt != null,
+                        onClick = { if (tilt == null) onChange(target.copy(tiltOpenPercent = cap?.tiltOpenPercent ?: 100)) },
+                        label = { Text(stringResource(R.string.position)) }, modifier = Modifier.height(48.dp),
+                    )
+                }
+                if (tilt != null) {
+                    val label = when (tilt) {
+                        100 -> stringResource(R.string.cover_state_open)
+                        0 -> stringResource(R.string.cover_state_closed)
+                        else -> stringResource(R.string.cover_percent_open, tilt)
+                    }
+                    LabeledSlider(stringResource(R.string.cover_tilt), tilt.toFloat(), 0f..100f, label) {
+                        onChange(target.copy(tiltOpenPercent = (it / 5).toInt() * 5))
+                    }
+                }
             }
         }
     }

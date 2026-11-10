@@ -61,6 +61,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.BuildConfig
 import app.raum.R
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import app.raum.ui.theme.glass
 import app.raum.data.preferences.TemperatureUnit
 import app.raum.data.preferences.ThemeMode
 import app.raum.data.preferences.MatterMode
@@ -110,28 +116,31 @@ fun SettingsScreen(
     }
 
     Row(Modifier.fillMaxSize()) {
+        // Kategorien als Glasliste (wie die Raumliste im Entwurf)
+        val g = app.raum.ui.theme.LocalGlass.current
         Column(
-            Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 16.dp, top = 40.dp, bottom = 24.dp),
+            Modifier.padding(start = 8.dp, end = 24.dp, top = 24.dp, bottom = 24.dp).width(340.dp).fillMaxHeight()
+                .glass(RoundedCornerShape(32.dp), g.glass, g.edge)
+                .verticalScroll(rememberScrollState()).padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 12.dp, bottom = 20.dp))
             SettingsSection.entries.forEach { s ->
-                if (s == SettingsSection.LOG) Spacer(Modifier.height(16.dp)) // Diagnose abgesetzt
+                if (s == SettingsSection.LOG) HorizontalDivider(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = g.track) // Diagnose abgesetzt
                 SectionItem(s, summary(s, state, viewModel, appliance), selected = section == s) { section = s }
             }
         }
 
-        Box(Modifier.weight(1f).fillMaxHeight().padding(end = 40.dp)) {
+        Box(Modifier.weight(1f).fillMaxHeight().padding(end = 24.dp)) {
             if (section == SettingsSection.LOG) {
                 // Protokoll füllt die Höhe und scrollt selbst
-                Column(Modifier.fillMaxSize().padding(top = 40.dp, bottom = 32.dp)) {
+                Column(Modifier.fillMaxSize().padding(top = 28.dp, bottom = 32.dp)) {
                     DetailTitle(section)
                     LogPanel(viewModel, Modifier.weight(1f))
                 }
             } else {
                 // eigene Scrollposition je Kategorie – sonst öffnet die nächste mittendrin
                 val scroll = key(section) { rememberScrollState() }
-                Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 40.dp, bottom = 32.dp)) {
+                Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 28.dp, bottom = 32.dp)) {
                     DetailTitle(section)
                     when (section) {
                         SettingsSection.HOME -> HomeSection(state, viewModel)
@@ -202,26 +211,28 @@ private fun summary(s: SettingsSection, state: HomeUiState, vm: SettingsViewMode
 
 @Composable
 private fun SectionItem(s: SettingsSection, summary: String, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.background
+    val g = app.raum.ui.theme.LocalGlass.current
     val warn = s == SettingsSection.SECURITY && summary == stringResource(R.string.pin_missing_short)
     Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(bg).clickable(onClick = onClick)
+        Modifier.fillMaxWidth()
+            .then(if (selected) Modifier.shadow(8.dp, RoundedCornerShape(24.dp), ambientColor = Color.Black.copy(alpha = 0.12f), spotColor = Color.Black.copy(alpha = 0.12f)) else Modifier)
+            .clip(RoundedCornerShape(24.dp)).background(if (selected) g.glassSolid else Color.Transparent).clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier.size(44.dp).clip(CircleShape)
-                .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                .background(if (selected) app.raum.ui.theme.Accent.Light.copy(alpha = 0.35f) else g.chip),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(s.icon, null, tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(s.icon, null, tint = if (selected) (if (g.dark) app.raum.ui.theme.Accent.Light else app.raum.ui.theme.Accent.LightDeep) else g.soft)
         }
         Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
-            Text(stringResource(s.titleRes), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(s.titleRes), style = MaterialTheme.typography.titleMedium, color = g.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 summary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = if (warn) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (warn) g.warn else g.soft,
             )
         }
     }
@@ -229,14 +240,15 @@ private fun SectionItem(s: SettingsSection, summary: String, selected: Boolean, 
 
 @Composable
 private fun DetailTitle(s: SettingsSection) {
-    Text(stringResource(s.titleRes), style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(bottom = 24.dp))
+    Text(stringResource(s.titleRes), color = app.raum.ui.theme.SkyText, fontSize = 48.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light,
+        lineHeight = 52.sp, letterSpacing = (-1).sp, modifier = Modifier.padding(bottom = 24.dp))
 }
 
 /** Gruppe mit optionaler Überschrift – Grundbaustein aller Kategorien. */
 @Composable
 internal fun Group(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     if (title != null) {
-        Text(title.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text(title.uppercase(), style = MaterialTheme.typography.labelLarge, color = androidx.compose.material3.LocalContentColor.current, letterSpacing = 1.4.sp,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
     }
     Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -317,7 +329,7 @@ private fun RegionSection(vm: SettingsViewModel) {
         SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
             AppLanguage.entries.forEachIndexed { i, l ->
                 SegmentedButton(selected = language == l, onClick = { vm.setLanguage(l) },
-                    shape = SegmentedButtonDefaults.itemShape(i, AppLanguage.entries.size)) { Text(stringResource(l.labelRes)) }
+                    shape = SegmentedButtonDefaults.itemShape(i, AppLanguage.entries.size)) { Text(stringResource(l.labelRes), maxLines = 1, softWrap = false) }
             }
         }
     }

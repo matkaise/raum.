@@ -1,5 +1,7 @@
 package app.raum.ui
 
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
 import androidx.navigation.NavHostController
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +61,23 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import app.raum.R
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import app.raum.platform.display.DisplayController
+import app.raum.ui.overview.LocalSkyScene
+import app.raum.ui.theme.SkyContentTheme
+import app.raum.ui.overview.SkyBackdrop
+import app.raum.ui.overview.rememberSkyScene
 import app.raum.domain.usecases.UiMessage
 import app.raum.ui.automations.AutomationEditorScreen
 import app.raum.ui.automations.AutomationsScreen
@@ -67,7 +86,6 @@ import app.raum.ui.components.DeviceDetailActions
 import app.raum.ui.components.DeviceDetailSheet
 import app.raum.ui.devices.DevicesScreen
 import app.raum.ui.overview.OverviewScreen
-import app.raum.ui.rooms.RoomDetailScreen
 import app.raum.ui.rooms.RoomsScreen
 import app.raum.ui.scenes.SceneEditorScreen
 import app.raum.ui.scenes.ScenesScreen
@@ -77,12 +95,12 @@ import org.koin.compose.koinInject
 import app.raum.ui.appliance.MaintenanceScreen
 import java.util.UUID
 
-private enum class TopLevel(val route: String, @StringRes val labelRes: Int, val icon: ImageVector, val selectedIcon: ImageVector) {
+private enum class TopLevel(val route: String, @StringRes val shortLabelRes: Int, val icon: ImageVector, val selectedIcon: ImageVector) {
     OVERVIEW("overview", R.string.nav_overview, Icons.Outlined.Dashboard, Icons.Filled.Dashboard),
     ROOMS("rooms", R.string.nav_rooms, Icons.Outlined.MeetingRoom, Icons.Filled.MeetingRoom),
-    DEVICES("devices", R.string.nav_devices, Icons.Outlined.Devices, Icons.Filled.Devices),
     SCENES("scenes", R.string.nav_scenes, Icons.Outlined.WbTwilight, Icons.Filled.WbTwilight),
-    AUTOMATIONS("automations", R.string.nav_automations, Icons.Outlined.AutoMode, Icons.Filled.AutoMode),
+    DEVICES("devices", R.string.nav_devices, Icons.Outlined.Devices, Icons.Filled.Devices),
+    AUTOMATIONS("automations", R.string.nav_automations_short, Icons.Outlined.AutoMode, Icons.Filled.AutoMode),
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings, Icons.Filled.Settings),
 }
 
@@ -97,6 +115,7 @@ private const val AUTOMATION_EDIT = "automations/{automationId}/edit"
 fun RaumApp(
     viewModel: HomeViewModel = koinViewModel(),
     requests: UiRequests = koinInject(),
+    display: DisplayController = koinInject(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
@@ -130,67 +149,49 @@ fun RaumApp(
         )
     }
 
-    Scaffold(
-        snackbarHost = {
-            SnackbarHost(snackbar) { data ->
-                val error = lastMessage?.isError == true
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = if (error) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.inverseOnSurface,
-                )
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-    ) { padding ->
-        Row(Modifier.fillMaxSize().padding(padding)) {
-            NavigationRail(
-                containerColor = MaterialTheme.colorScheme.background,
-                modifier = Modifier.fillMaxHeight().width(120.dp),
-                header = {
-                    Text(
-                        "raum.",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(top = 28.dp, bottom = 24.dp),
-                    )
-                },
-            ) {
-                Column(Modifier.fillMaxHeight(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
-                    TopLevel.entries.forEach { dest ->
-                        val selected = backStack?.destination?.hierarchy?.any {
-                            it.route == dest.route || (dest == TopLevel.ROOMS && it.route == ROOM_DETAIL) ||
-                                (dest == TopLevel.SCENES && (it.route == SCENE_NEW || it.route == SCENE_EDIT)) ||
-                                (dest == TopLevel.AUTOMATIONS && (it.route == AUTOMATION_NEW || it.route == AUTOMATION_EDIT)) ||
-                                (dest == TopLevel.SETTINGS && it.route == MAINTENANCE)
-                        } == true
-                        NavigationRailItem(
-                            selected = selected,
-                            onClick = { navController.navigateTopLevel(dest) },
-                            icon = { Icon(if (selected) dest.selectedIcon else dest.icon, contentDescription = null) },
-                            label = { Text(stringResource(dest.labelRes), maxLines = 1) },
-                            modifier = Modifier.padding(vertical = 6.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(48.dp))
-                }
-            }
+    val route = backStack?.destination?.route
+    val sky = LocalSkyScene.current ?: rememberSkyScene(state)
+    val selectedTop = TopLevel.entries.firstOrNull { dest ->
+        route == dest.route || (dest == TopLevel.ROOMS && route == ROOM_DETAIL) ||
+            (dest == TopLevel.SCENES && (route == SCENE_NEW || route == SCENE_EDIT)) ||
+            (dest == TopLevel.AUTOMATIONS && (route == AUTOMATION_NEW || route == AUTOMATION_EDIT)) ||
+            (dest == TopLevel.SETTINGS && route == MAINTENANCE)
+    }
 
+    CompositionLocalProvider(LocalSkyScene provides sky) {
+    run {
+    Box(Modifier.fillMaxSize()) {
+        // Himmel bewegt sich nur auf der Übersicht – sonst kostet er bei jedem Bild der anderen Seiten Rechenzeit
+        SkyBackdrop(sky, animate = selectedTop == TopLevel.OVERVIEW)
+        Row(Modifier.fillMaxSize()) {
+            GlassRail(
+                selected = selectedTop,
+                onNavigate = { navController.navigateTopLevel(it) },
+                onSleep = display::sleepNow,
+            )
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                NavHost(navController, startDestination = TopLevel.OVERVIEW.route) {
+                // Ohne Überblendung: Beim Wechsel würden sonst zwei Seiten gleichzeitig gezeichnet – auf dem Panel ruckelt
+                // das; ein sofortiger Wechsel wirkt dort ruhiger.
+                NavHost(
+                    navController, startDestination = TopLevel.OVERVIEW.route,
+                    enterTransition = { EnterTransition.None }, exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None }, popExitTransition = { ExitTransition.None },
+                ) {
                     composable(TopLevel.OVERVIEW.route) {
                         OverviewScreen(
                             state = state,
+                            scene = sky,
                             cardActions = cardActions,
                             onRunScene = viewModel::runScene,
-                            onOpenRoom = { navController.navigate("rooms/${it}") },
+                            onOpenRoom = { navController.openRoomFromOverview(it) },
                         )
                     }
                     composable(TopLevel.ROOMS.route) {
                         RoomsScreen(
                             state = state,
-                            onOpenRoom = { navController.navigate("rooms/${it}") },
+                            initialRoomId = null,
+                            cardActions = cardActions,
+                            onGroupAction = viewModel::roomAction,
                             onAddRoom = viewModel::addRoom,
                             onUpdateRoom = viewModel::updateRoom,
                             onDeleteRoom = viewModel::deleteRoom,
@@ -199,11 +200,15 @@ fun RaumApp(
                     }
                     composable(ROOM_DETAIL, arguments = listOf(navArgument("roomId") { type = NavType.StringType })) { entry ->
                         val roomId = entry.arguments?.getString("roomId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-                        RoomDetailScreen(
-                            summary = roomId?.let(state::room),
+                        RoomsScreen(
+                            state = state,
+                            initialRoomId = roomId,
                             cardActions = cardActions,
                             onGroupAction = viewModel::roomAction,
-                            onBack = { navController.popBackStack() },
+                            onAddRoom = viewModel::addRoom,
+                            onUpdateRoom = viewModel::updateRoom,
+                            onDeleteRoom = viewModel::deleteRoom,
+                            onMoveRoom = viewModel::moveRoom,
                         )
                     }
                     composable(TopLevel.DEVICES.route) {
@@ -249,8 +254,15 @@ fun RaumApp(
                 }
             }
         }
-    }
 
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) { data ->
+            val error = lastMessage?.isError == true
+            Snackbar(
+                snackbarData = data,
+                containerColor = if (error) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.inverseSurface,
+                contentColor = if (error) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.inverseOnSurface,
+            )
+        }
 
     val detailDevice = detailDeviceId?.let { id -> state.devices.firstOrNull { it.id.toString() == id } }
     if (detailDevice != null) {
@@ -263,6 +275,7 @@ fun RaumApp(
                 onRename = { d, name -> viewModel.rename(d, name) },
                 onAssignRoom = { d, room -> viewModel.assignRoom(d, room) },
                 onRemove = { d -> viewModel.remove(d) },
+                onSwitchAsLight = { d, asLight -> viewModel.setSwitchAsLight(d, asLight) },
             ),
             onDismiss = { detailDeviceId = null },
         )
@@ -270,6 +283,63 @@ fun RaumApp(
         // Gerät wurde entfernt, während das Sheet offen war.
         LaunchedEffect(detailDeviceId) { detailDeviceId = null }
     }
+    }
+    }
+    }
+}
+
+
+/**
+ * Navigation als schwebende Glasleiste links (Entwurf „Himmel“): fünf Hauptbereiche,
+ * darunter Einstellungen und Ruhezustand als runde Knöpfe.
+ */
+@Composable
+private fun GlassRail(selected: TopLevel?, onNavigate: (TopLevel) -> Unit, onSleep: () -> Unit) {
+    Column(
+        Modifier.fillMaxHeight().width(120.dp)
+            .background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.24f), Color.Transparent)))
+            .padding(top = 22.dp, bottom = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("raum.", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier.clip(RoundedCornerShape(40.dp)).background(Color.White.copy(alpha = 0.14f))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(40.dp)).padding(5.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                TopLevel.entries.filter { it != TopLevel.SETTINGS }.forEach { dest ->
+                    val on = dest == selected
+                    Column(
+                        Modifier.width(78.dp).height(72.dp).clip(RoundedCornerShape(36.dp))
+                            .background(if (on) Color.White else Color.Transparent)
+                            .clickable { onNavigate(dest) },
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                    ) {
+                        val fg = if (on) Color(0xFF10131F) else Color.White
+                        Icon(if (on) dest.selectedIcon else dest.icon, null, Modifier.size(26.dp), tint = fg)
+                        Spacer(Modifier.height(3.dp))
+                        Text(stringResource(dest.shortLabelRes), color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            RailCircle(if (selected == TopLevel.SETTINGS) Icons.Filled.Settings else Icons.Outlined.Settings, stringResource(R.string.nav_settings), selected == TopLevel.SETTINGS) {
+                onNavigate(TopLevel.SETTINGS)
+            }
+            RailCircle(Icons.Outlined.Bedtime, stringResource(R.string.sleep_now), false, onSleep)
+        }
+    }
+}
+
+@Composable
+private fun RailCircle(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(56.dp).clip(CircleShape).background(if (on) Color.White else Color.White.copy(alpha = 0.14f))
+            .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = if (on) Color(0xFF10131F) else Color.White) }
 }
 
 /** „Alle Lichter aus“ bzw. „3 Lichter an“. */
@@ -277,11 +347,24 @@ fun RaumApp(
 fun lightsStatus(lightsOn: Int): String =
     if (lightsOn == 0) stringResource(R.string.lights_all_off) else pluralStringResource(R.plurals.lights_on, lightsOn, lightsOn)
 
+/**
+ * Raum aus der Übersicht öffnen – als Wechsel in den Bereich „Räume“, nicht als Seite auf dem Stapel der Übersicht:
+ * Sonst speichert der Tipp auf „Übersicht“ den Raum mit und stellt ihn sofort wieder her.
+ */
+private fun NavHostController.openRoomFromOverview(roomId: UUID) {
+    navigate("rooms/$roomId") {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+    }
+}
+
 /** Wechsel zwischen den Hauptbereichen: je Bereich eigener, gespeicherter Stapel. */
 private fun NavHostController.navigateTopLevel(dest: TopLevel) {
     navigate(dest.route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
-        restoreState = dest != TopLevel.ROOMS
+        // Übersicht hat keine Unterseiten. Beim Speichern ordnet Navigation den abgeräumten Stapel auch dem Ziel von
+        // popUpTo (= Übersicht) zu – mit restoreState käme z. B. ein aus der Übersicht geöffneter Raum immer wieder.
+        restoreState = dest != TopLevel.ROOMS && dest != TopLevel.OVERVIEW
     }
 }

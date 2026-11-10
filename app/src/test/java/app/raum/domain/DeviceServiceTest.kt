@@ -1,5 +1,11 @@
 package app.raum.domain
 
+import kotlinx.coroutines.test.advanceTimeBy
+import app.raum.matter.controller.MatterCommand
+import app.raum.matter.controller.MatterController
+import org.junit.Assert.assertNull
+import app.raum.domain.models.asLight
+import app.raum.domain.models.DeviceCategory
 import app.raum.data.repository.InMemoryHomeRepository
 import app.raum.diagnostics.EventLog
 import app.raum.domain.models.CoverCapability
@@ -30,15 +36,26 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeviceServiceTest {
 
-    private class Fixture(scope: CoroutineScope, failureRate: Double = 0.0, latencyMs: LongRange = 0L..0L) {
+    private class Fixture(
+        scope: CoroutineScope,
+        failureRate: Double = 0.0,
+        latencyMs: LongRange = 0L..0L,
+        /** Gerät bestätigt den Befehl, meldet den neuen Zustand aber (noch) nicht – wie ein echter Bericht danach. */
+        val reportLater: Boolean = false,
+    ) {
         val controller = MockMatterController(
             scope = scope, latencyMs = latencyMs, failureRate = failureRate, simulationTickMs = null,
         )
+        private val sent: MatterController =
+            if (!reportLater) controller
+            else object : MatterController by controller {
+                override suspend fun execute(command: MatterCommand): CommandResult = CommandResult.Success
+            }
         val repository = InMemoryHomeRepository("Test", MockHomeSeed.rooms, MockHomeSeed.deviceMetadata, MockHomeSeed.scenes, MockHomeSeed.automations)
         val messages = UiMessageBus()
         val log = EventLog()
         val strings = app.raum.i18n.XmlStrings("de")
-        val service = DeviceService(controller, repository, messages, log, scope, strings)
+        val service = DeviceService(sent, repository, messages, log, scope, strings)
         val scenes = SceneRunner(service, messages, log, strings)
         fun device(name: String) = service.devices.value.first { it.displayName == name }
     }
@@ -52,6 +69,34 @@ class DeviceServiceTest {
     }
 
     @Test
+    fun `switch used as light is shown and switched as light`() = runTest {
+        val f = fixture()
+        val plug = f.device("Kaffeemaschine")
+        assertEquals(DeviceCategory.SWITCH, plug.category)
+
+        f.service.setSwitchAsLight(plug, true)
+        runCurrent()
+        val light = f.device("Kaffeemaschine")
+        assertEquals(DeviceCategory.LIGHT, light.category)
+        assertTrue(light.switchAsLight)
+        assertNull(light.capabilities.find<SwitchCapability>())
+
+        f.service.send(light, DeviceCommand.SetOn(true))
+        runCurrent()
+        assertTrue(f.device("Kaffeemaschine").capabilities.find<LightCapability>()!!.isOn)
+
+        f.service.setSwitchAsLight(f.device("Kaffeemaschine"), false)
+        runCurrent()
+        assertTrue(f.device("Kaffeemaschine").capabilities.find<SwitchCapability>()!!.isOn)
+    }
+
+    @Test
+    fun `real lights are left alone by asLight`() {
+        val caps = listOf(LightCapability(isOn = true, brightnessPercent = 40))
+        assertEquals(caps, asLight(caps))
+    }
+
+    @Test
     fun `successful command updates device state`() = runTest {
         val f = fixture()
         val lamp = f.device("Stehlampe")
@@ -59,6 +104,32 @@ class DeviceServiceTest {
         runCurrent()
         assertEquals(CommandResult.Success, result)
         assertTrue(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+    }
+
+    @Test
+    fun `optimistic state is held until the device reports it`() = runTest {
+        val f = Fixture(backgroundScope, reportLater = true).also { runCurrent() }
+        val lamp = f.device("Stehlampe")
+        f.service.send(lamp, DeviceCommand.SetOn(true))
+        runCurrent()
+        // Antwort da, Bericht noch nicht: kein Zurückspringen auf „aus“
+        assertTrue(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+
+        f.controller.simulateExternalChange(lamp.matterNodeId) { caps ->
+            caps.map { if (it is LightCapability) it.copy(isOn = true) else it }
+        }
+        runCurrent()
+        assertTrue(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
+    }
+
+    @Test
+    fun `optimistic state ends after timeout without report`() = runTest {
+        val f = Fixture(backgroundScope, reportLater = true).also { runCurrent() }
+        f.service.send(f.device("Stehlampe"), DeviceCommand.SetOn(true))
+        runCurrent()
+        advanceTimeBy(3_500)
+        runCurrent()
+        assertFalse(f.device("Stehlampe").capabilities.find<LightCapability>()!!.isOn)
     }
 
     @Test

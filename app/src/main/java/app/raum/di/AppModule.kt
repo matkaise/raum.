@@ -26,6 +26,8 @@ import app.raum.security.MaintenanceSession
 import java.io.File
 import app.raum.CoreStartup
 import app.raum.data.database.RaumDatabase
+import app.raum.history.SensorHistory
+import app.raum.history.SensorHistorySource
 import app.raum.data.database.RoomHomeRepository
 import app.raum.diagnostics.EventLog
 import app.raum.automation.engine.AutomationEngine
@@ -110,6 +112,8 @@ val appModule = module {
         )
     }
     single { DeviceEventRecorder(get(), get(), get(), get()) }
+    single { SensorHistory(get<RaumDatabase>().sensorSampleDao(), get<DeviceService>().confirmedDevices, get()) }
+    single<SensorHistorySource> { get<SensorHistory>() }
 
     // --- Appliance-Betrieb (M5) ---
     single { CrashRecorder(File(androidContext().filesDir, "last_crash.txt")) }
@@ -170,7 +174,7 @@ val appModule = module {
     }
     single { CityIndex { androidContext().assets.open(CityIndex.ASSET) } }
 
-    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
     single { DeviceService(get(), get(), get(), get(), get(), get()) }
     single { SceneRunner(get(), get(), get(), get()) }

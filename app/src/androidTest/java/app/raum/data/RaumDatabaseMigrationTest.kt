@@ -6,6 +6,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.raum.data.database.ALL_MIGRATIONS
 import app.raum.data.database.MIGRATION_1_2
 import app.raum.data.database.MIGRATION_2_3
+import app.raum.data.database.MIGRATION_3_4
+import app.raum.data.database.MIGRATION_4_5
 import app.raum.data.database.RaumDatabase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -70,6 +72,30 @@ class RaumDatabaseMigrationTest {
                 db.execSQL("INSERT INTO devices (id, matterNodeId, displayName, favorite, endpointId) VALUES ('d3', 17, 'doppelt', 0, 2)")
             }
             assertTrue(duplicate.isFailure)
+        }
+    }
+
+    @Test
+    fun migrate3To4AddsEmptySensorHistory() {
+        helper.createDatabase(TEST_DB, 3).use { db ->
+            db.execSQL("INSERT INTO devices (id, matterNodeId, displayName, favorite) VALUES ('d', 17, 'Klima', 0)")
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, MIGRATION_3_4).use { db ->
+            db.execSQL("INSERT INTO sensor_samples (deviceId, metric, timestampMs, value) VALUES ('d', 'temp', 1, 21.5)")
+            db.query("SELECT COUNT(*) FROM devices").use { c -> assertTrue(c.moveToFirst()); assertEquals(1, c.getInt(0)) }
+        }
+    }
+
+    @Test
+    fun migrate4To5KeepsDevicesAsSwitches() {
+        helper.createDatabase(TEST_DB, 4).use { db ->
+            db.execSQL("INSERT INTO devices (id, matterNodeId, displayName, favorite) VALUES ('d', 17, 'Shelly', 0)")
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5).use { db ->
+            db.query("SELECT switchAsLight FROM devices WHERE id = 'd'").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(0, c.getInt(0))
+            }
         }
     }
 

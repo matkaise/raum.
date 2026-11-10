@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import app.raum.MainActivity
@@ -52,10 +53,7 @@ class KioskManager(private val context: Context) {
         dpm.setKeyguardDisabled(admin, true)
         dpm.setStatusBarDisabled(admin, true)
         // Benachrichtigung des Kerndienstes ohne Nachfrage erlauben
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) runCatching {
-            dpm.setPermissionGrantState(admin, context.packageName, Manifest.permission.POST_NOTIFICATIONS,
-                DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) grantPermission(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     fun status(activity: Activity? = null): KioskStatus {
@@ -80,14 +78,27 @@ class KioskManager(private val context: Context) {
     }
 
     /** Zeitzone systemweit setzen (ONB-003) – nur als Device Owner möglich. */
-    fun setTimeZone(zoneId: String): Boolean =
-        isDeviceOwner && runCatching { dpm.setTimeZone(admin, zoneId) }.getOrDefault(false)
+    fun setTimeZone(zoneId: String): Boolean = isDeviceOwner && runCatching {
+        // Android ignoriert setTimeZone, solange „Zeitzone automatisch“ an ist (Werkseinstellung vieler
+        // Geräte). Ein Wandpanel ohne SIM/Standort erkennt die Zone ohnehin nicht – die manuelle Wahl gilt.
+        // Die Uhrzeit selbst (NTP, AUTO_TIME) bleibt automatisch.
+        if (dpm.getAutoTimeZoneEnabled(admin)) dpm.setAutoTimeZoneEnabled(admin, false)
+        dpm.setTimeZone(admin, zoneId)
+    }.getOrDefault(false)
 
     /** Display sofort aus (nur Device Owner; Keyguard ist deaktiviert, daher kein Sperrbildschirm). */
-    /** Laufzeitberechtigung als Geräteeigentümer selbst erteilen (keine Nachfrage im Kiosk). */
-    fun grantPermission(permission: String): Boolean = isDeviceOwner && runCatching {
-        dpm.setPermissionGrantState(admin, context.packageName, permission, DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED)
-    }.getOrDefault(false)
+    /**
+     * Laufzeitberechtigung als Geräteeigentümer selbst erteilen (keine Nachfrage im Kiosk).
+     * Bereits erteilte Berechtigungen nicht erneut setzen: setPermissionGrantState wartet synchron auf den
+     * Berechtigungsdienst, und der stürzt auf manchen Geräten (Rockchip RK3576, Android 14) dabei ab –
+     * der Aufruf blockierte so jeden Start ~20 s und zeigte einen Absturzdialog über dem Kiosk.
+     */
+    fun grantPermission(permission: String): Boolean {
+        if (context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) return true
+        return isDeviceOwner && runCatching {
+            dpm.setPermissionGrantState(admin, context.packageName, permission, DevicePolicyManager.PERMISSION_GRANT_STATE_GRANTED)
+        }.getOrDefault(false)
+    }
 
     /** Standortdienst (nur für die WLAN-Suche unter Android 11/12 nötig – es wird nichts geortet). */
     fun setLocationEnabled(enabled: Boolean): Boolean =

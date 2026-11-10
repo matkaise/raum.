@@ -31,6 +31,7 @@ class CommandSerializationTest {
             DeviceCommand.SetTargetTemperature(24.0, ThermostatMode.COOL),
             DeviceCommand.SetThermostatMode(ThermostatMode.AUTO),
             DeviceCommand.SetCoverPosition(55),
+            DeviceCommand.SetCoverTilt(40),
             DeviceCommand.OpenCover,
             DeviceCommand.CloseCover,
             DeviceCommand.StopCover,

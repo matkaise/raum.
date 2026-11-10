@@ -1,5 +1,8 @@
 package app.raum.domain.usecases
 
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
+import app.raum.domain.models.asLight
 import app.raum.i18n.ErrorTexts
 import app.raum.i18n.Strings
 import app.raum.R
@@ -44,7 +47,7 @@ class DeviceService(
     private val repository: HomeRepository,
     private val messages: UiMessageBus,
     private val log: EventLog,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val strings: Strings,
 ) {
     private data class Pending(val version: Long, val capabilities: List<Capability>)
@@ -147,14 +150,37 @@ class DeviceService(
                 onlineState = state?.onlineState ?: OnlineState.UNKNOWN,
                 favorite = meta.favorite,
                 lastSeenAt = state?.lastSeenAt,
-                capabilities = overlay[meta.id]?.capabilities ?: live.orEmpty(),
+                capabilities = overlay[meta.id]?.capabilities
+                    ?: live.orEmpty().let { if (meta.switchAsLight) asLight(it) else it },
                 network = state?.network,
                 endpointId = meta.endpointId,
+                switchAsLight = meta.switchAsLight,
             )
         }
     }
 
     fun device(id: UUID): Device? = devices.value.firstOrNull { it.id == id }
+
+    /** Nur die eigene Überlagerung entfernen – ein neuerer Befehl hat Vorrang. */
+    private fun clearPending(id: UUID, version: Long) {
+        pending.update { map -> if (map[id]?.version == version) map - id else map }
+    }
+
+    /**
+     * Überlagerung entfernen, sobald der bestätigte Zustand den Befehl schon enthält (der Befehl ändert dort nichts
+     * mehr) – spätestens nach [CONFIRM_TIMEOUT_MS], falls das Gerät gerundet oder gar nicht meldet.
+     */
+    private fun holdUntilConfirmed(id: UUID, version: Long, command: DeviceCommand) {
+        scope.launch {
+            withTimeoutOrNull(CONFIRM_TIMEOUT_MS) {
+                confirmedDevices.first { list ->
+                    val confirmed = list.firstOrNull { it.id == id }?.capabilities ?: return@first true
+                    CapabilityReducer.apply(confirmed, command) == confirmed
+                }
+            }
+            clearPending(id, version)
+        }
+    }
 
     /**
      * Sendet einen Befehl mit optimistischer Anzeige.
@@ -178,11 +204,13 @@ class DeviceService(
             map + (device.id to Pending(version, CapabilityReducer.apply(base, command)))
         }
 
+        var outcome: CommandResult? = null
         val result = try {
-            controller.execute(MatterCommand(nodeId, command, device.endpointId))
+            controller.execute(MatterCommand(nodeId, command, device.endpointId)).also { outcome = it }
         } finally {
-            // Auch bei Abbruch/Exception: nur die eigene Überlagerung entfernen – ein neuerer Befehl hat Vorrang.
-            pending.update { map -> if (map[device.id]?.version == version) map - device.id else map }
+            // Erfolg: Überlagerung halten, bis das Gerät den Wert meldet – der Bericht kommt erst nach der Antwort,
+            // sonst springt die Anzeige kurz auf den alten Wert zurück. Fehler, Abbruch, Exception: sofort entfernen.
+            if (outcome is CommandResult.Success) holdUntilConfirmed(device.id, version, command) else clearPending(device.id, version)
         }
 
         if (result is CommandResult.Failure) {
@@ -215,6 +243,7 @@ class DeviceService(
     suspend fun assignRoom(device: Device, roomId: UUID?) = updateMetadata(device) { it.copy(roomId = roomId) }
     /** Über die Metadaten, damit auch ein noch nicht gespeichertes (entdecktes) Gerät Favorit werden kann. */
     suspend fun setFavorite(device: Device, favorite: Boolean) = updateMetadata(device) { it.copy(favorite = favorite) }
+    suspend fun setSwitchAsLight(device: Device, asLight: Boolean) = updateMetadata(device) { it.copy(switchAsLight = asLight) }
 
     /** DEV-007: entfernt das Gerät aus der eigenen Fabric und aus der lokalen Konfiguration – mit allen Kanälen des Nodes. */
     suspend fun remove(device: Device) {
@@ -227,9 +256,12 @@ class DeviceService(
     private suspend fun updateMetadata(device: Device, transform: (DeviceMetadata) -> DeviceMetadata) {
         val stored = repository.deviceMetadata.value.firstOrNull { it.id == device.id }
             ?: DeviceMetadata(device.id, device.matterNodeId, device.displayName, device.roomId,
-                device.vendorName, device.productName, device.favorite, device.endpointId)
+                device.vendorName, device.productName, device.favorite, device.endpointId, device.switchAsLight)
         // Erste Änderung eines unveränderten Geräts: abgeleiteten Namen und Raum festschreiben
         val current = if (stored.displayName.isBlank()) stored.copy(displayName = device.displayName, roomId = device.roomId) else stored
         repository.upsertDevice(transform(current))
     }
 }
+
+/** Längste Wartezeit auf den bestätigenden Bericht nach einem erfolgreichen Befehl. */
+private const val CONFIRM_TIMEOUT_MS = 3_000L

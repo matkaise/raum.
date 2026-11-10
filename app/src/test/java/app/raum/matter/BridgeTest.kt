@@ -98,7 +98,7 @@ class BridgeTest {
     @Test fun `Fehlgeschlagener Bridge-Reset hat eine eigene, verständliche Meldung`() {
         val e = app.raum.matter.bridge.BridgeResetException("bridge process still running")
         assertTrue(app.raum.i18n.ErrorTexts.maintenance(e, XmlStrings("de"))!!.contains("nichts gelöscht"))
-        assertTrue(app.raum.i18n.ErrorTexts.maintenance(e, XmlStrings("en"))!!.contains("nothing was deleted"))
+        assertTrue(app.raum.i18n.ErrorTexts.maintenance(e, XmlStrings("en"))!!.contains("nothing deleted"))
     }
 
     // --- Befehlspipeline -------------------------------------------------------------------------

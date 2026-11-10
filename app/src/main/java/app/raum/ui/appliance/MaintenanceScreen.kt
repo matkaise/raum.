@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.ui.components.RaumAlertDialog
 import app.raum.ui.components.SectionHeader
@@ -73,13 +74,13 @@ fun MaintenanceScreen(vm: ApplianceViewModel, onClose: () -> Unit, dataVm: DataM
     LaunchedEffect(unlocked) { if (!unlocked) onClose() }
     LaunchedEffect(Unit) { while (true) { vm.refreshKioskStatus(); delay(2_000) } }
 
-    Column(Modifier.fillMaxSize().padding(start = 24.dp, end = 40.dp, top = 32.dp).verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 28.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose, modifier = Modifier.size(56.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back)) }
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.maintenance), style = MaterialTheme.typography.headlineMedium)
-                Text(stringResource(R.string.maintenance_autolock), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.maintenance), fontSize = 40.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light)
+                Text(stringResource(R.string.maintenance_autolock), color = app.raum.ui.theme.SkyTextSoft)
             }
             Button(onClick = { vm.lock(); onClose() }) { Icon(Icons.Outlined.Lock, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.lock)) }
         }

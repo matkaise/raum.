@@ -60,6 +60,7 @@ object Attr {
     // Window Covering
     const val OPERATIONAL_STATUS = 0x000AL
     const val CURRENT_LIFT_PERCENT_100THS = 0x000EL
+    const val CURRENT_TILT_PERCENT_100THS = 0x000FL
     // Power Source
     const val BAT_PERCENT_REMAINING = 0x000CL
     // Electrical Power/Energy
@@ -87,8 +88,15 @@ object Cmd {
     const val COVER_DOWN_OR_CLOSE = 0x01L
     const val COVER_STOP = 0x02L
     const val COVER_GO_TO_LIFT_PERCENTAGE = 0x05L
+    const val COVER_GO_TO_TILT_PERCENTAGE = 0x08L
     const val REMOVE_FABRIC = 0x0AL
     const val REVOKE_COMMISSIONING = 0x02L
+}
+
+/** Feature-Bits (FeatureMap) des WindowCovering-Clusters. */
+object CoverFeature {
+    const val TILT = 0x02L
+    const val POSITION_AWARE_TILT = 0x10L
 }
 
 object DeviceType {

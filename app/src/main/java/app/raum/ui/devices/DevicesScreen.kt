@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.raum.domain.models.DeviceCategory
 import app.raum.ui.HomeUiState
-import app.raum.ui.components.DeviceCard
 import app.raum.ui.components.DeviceCardActions
 import app.raum.ui.components.EmptyState
 import app.raum.ui.components.ScreenTitle
@@ -61,19 +60,17 @@ fun DevicesScreen(
         (noRoom to visible.filter { d -> d in state.unassigned })
     val available = DeviceCategory.entries.filter { c -> state.devices.any { it.category == c } }
 
-    Column(Modifier.fillMaxSize().padding(start = 24.dp, end = 40.dp, top = 40.dp)) {
+    val g = app.raum.ui.theme.LocalGlass.current
+    Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 36.dp)) {
         ScreenTitle(
             stringResource(R.string.nav_devices),
             pluralStringResource(R.plurals.devices_count, state.devices.size, state.devices.size) + " · " +
                 stringResource(R.string.offline_count, state.offline.size),
         ) {
-            FilledTonalButton(onClick = { adding = true }) {
-                Icon(Icons.Outlined.Add, null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.device_add))
-            }
+            app.raum.ui.rooms.PillButton(Icons.Outlined.Add, stringResource(R.string.device_add), g.glassStrong, g.ink, border = g.edge) { adding = true }
         }
 
+        app.raum.ui.theme.OnSky {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 16.dp)) {
             item {
                 FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text(stringResource(R.string.filter_all)) }, modifier = Modifier.height(48.dp))
@@ -87,6 +84,7 @@ fun DevicesScreen(
                 )
             }
         }
+        }
 
         if (state.devices.isEmpty()) {
             EmptyState(Icons.Outlined.Devices, stringResource(R.string.devices_empty), stringResource(R.string.devices_empty_text)) {
@@ -94,9 +92,9 @@ fun DevicesScreen(
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 240.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                columns = GridCells.Fixed(4),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(bottom = 32.dp),
             ) {
                 groups.filter { it.second.isNotEmpty() }.forEach { (title, devices) ->
@@ -104,12 +102,7 @@ fun DevicesScreen(
                         Row { SectionHeader(title, Modifier.padding(top = 8.dp)) }
                     }
                     items(devices, key = { it.id }) { device ->
-                        DeviceCard(
-                            device = device,
-                            onToggle = cardActions.onToggle,
-                            onCommand = cardActions.onCommand,
-                            onOpenDetails = cardActions.onOpenDetails,
-                        )
+                        app.raum.ui.components.GlassDeviceTile(device, cardActions, Modifier.height(190.dp))
                     }
                 }
             }

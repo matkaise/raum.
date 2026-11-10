@@ -1,6 +1,7 @@
 package app.raum
 
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -17,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import app.raum.data.preferences.SettingsStore
 import app.raum.platform.display.DisplayController
+import app.raum.platform.display.FrameHints
 import app.raum.platform.display.DisplayMode
 import app.raum.platform.kiosk.KioskManager
 import app.raum.platform.service.CoreService
@@ -40,12 +42,20 @@ class MainActivity : ComponentActivity() {
     private val kiosk: KioskManager by inject()
     private val maintenance: MaintenanceSession by inject()
 
+    /** Leistungshinweise für flüssige Bilder (siehe [FrameHints]). */
+    private val frameHints = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) FrameHints(this) else null
+
     /** Berührung, die das Display geweckt hat, wird komplett verschluckt (bis zum Loslassen). */
     private var swallowGesture = false
 
     /** Sprache der App (ONB-003) – vor allem anderen, damit alle Texte in der gewählten Sprache erscheinen. */
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(KoinJavaComponent.get<LocaleController>(LocaleController::class.java).wrap(newBase))
+    }
+
+    override fun onPause() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) frameHints?.stop()
+        super.onPause()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +100,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Nach dem nächsten Bild: dann läuft der Render-Thread sicher
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window.decorView.post { frameHints?.start() }
         display.wake()
         if (settings.kioskEnabled.value && !maintenance.kioskPaused.value) kiosk.enterLockTask(this)
     }

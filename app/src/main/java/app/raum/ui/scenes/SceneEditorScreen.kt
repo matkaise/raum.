@@ -1,6 +1,7 @@
 package app.raum.ui.scenes
 
 import app.raum.R
+import app.raum.ui.components.GlassPanel
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 
@@ -71,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.domain.models.Device
 import app.raum.domain.models.LightCapability
@@ -118,15 +120,15 @@ fun SceneEditorScreen(
     }
 
     val byId = devices.associateBy { it.id }
-    Row(Modifier.fillMaxSize().padding(start = 24.dp, end = 40.dp, top = 32.dp)) {
+    Row(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 28.dp)) {
         // Linke Spalte: Name, Icon, Aktionen
         Column(Modifier.width(420.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = back, modifier = Modifier.size(56.dp)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back)) }
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(if (state.isNew) R.string.scene_new else R.string.scene_edit), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(if (state.isNew) R.string.scene_new else R.string.scene_edit), fontSize = 32.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.height(24.dp))
+            GlassPanel(Modifier.padding(top = 20.dp)) {
             OutlinedTextField(
                 value = state.name,
                 onValueChange = viewModel::setName,
@@ -181,6 +183,7 @@ fun SceneEditorScreen(
                         Text(stringResource(R.string.scene_delete))
                     }
                 }
+            }
             }
         }
 

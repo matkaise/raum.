@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,46 +22,30 @@ import androidx.compose.ui.unit.dp
 import app.raum.domain.models.Device
 import app.raum.domain.models.Scene
 import app.raum.ui.theme.SectionLabelStyle
+import app.raum.ui.theme.glass
+import app.raum.ui.theme.SkyText
+import app.raum.ui.theme.SkyTextSoft
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: @Composable () -> Unit = {}) {
     Row(modifier.padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title.uppercase(), style = SectionLabelStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(title.uppercase(), style = SectionLabelStyle, color = androidx.compose.material3.LocalContentColor.current, modifier = Modifier.weight(1f))
         trailing()
     }
 }
 
 @Composable
 fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable () -> Unit = {}) {
-    Row(Modifier.padding(bottom = 24.dp), verticalAlignment = Alignment.Bottom) {
+    Row(Modifier.padding(start = 20.dp, bottom = 24.dp), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.displaySmall)
+            Text(title, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, lineHeight = 60.sp, letterSpacing = (-1.5).sp)
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = SkyTextSoft)
             }
         }
         trailing()
-    }
-}
-
-@Composable
-fun SceneTile(scene: Scene, running: Boolean, enabled: Boolean, onRun: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onRun,
-        enabled = enabled,
-        shape = MaterialTheme.shapes.large,
-        color = if (running) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        modifier = modifier,
-    ) {
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (running) {
-                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-            } else {
-                Icon(RaumIcons.scene(scene.icon), null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(Modifier.width(14.dp))
-            Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-        }
     }
 }
 
@@ -71,11 +56,11 @@ fun EmptyState(icon: ImageVector, title: String, text: String, modifier: Modifie
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(icon, null, Modifier.size(64.dp), tint = SkyTextSoft)
         Spacer(Modifier.size(16.dp))
-        Text(title, style = MaterialTheme.typography.headlineMedium)
+        Text(title, color = SkyText, fontSize = 32.sp, fontWeight = FontWeight.Light)
         Spacer(Modifier.size(8.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = SkyTextSoft)
         Spacer(Modifier.size(24.dp))
         action()
     }
@@ -87,3 +72,15 @@ data class DeviceCardActions(
     val onCommand: (Device, app.raum.domain.models.DeviceCommand) -> Unit,
     val onOpenDetails: (Device) -> Unit,
 )
+
+/** Glasfläche für Formulare und Listen auf dem Himmel. */
+@Composable
+fun GlassPanel(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    val g = app.raum.ui.theme.LocalGlass.current
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides g.ink) {
+        Column(
+            modifier.fillMaxWidth().glass(androidx.compose.foundation.shape.RoundedCornerShape(32.dp), g.glass, g.edge).padding(24.dp),
+            content = content,
+        )
+    }
+}

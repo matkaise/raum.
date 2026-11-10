@@ -27,7 +27,8 @@ sealed interface DeviceTarget {
 
     data class Thermostat(val targetCelsius: Double, val mode: ThermostatMode? = null) : DeviceTarget
 
-    data class Cover(val openPercent: Int) : DeviceTarget
+    /** @param tiltOpenPercent Lamellenwinkel nach der Fahrt; null = Lamellen unverändert (bzw. keine vorhanden). */
+    data class Cover(val openPercent: Int, val tiltOpenPercent: Int? = null) : DeviceTarget
 }
 
 object SceneTargets {
@@ -51,12 +52,14 @@ object SceneTargets {
             // Modus mitgeben: der Moduswechsel davor ist beim Gerät evtl. noch nicht zurückgemeldet
             add(DeviceCommand.SetTargetTemperature(target.targetCelsius, target.mode))
         }
-        is DeviceTarget.Cover -> listOf(
+        is DeviceTarget.Cover -> listOfNotNull(
             when (target.openPercent) {
                 100 -> DeviceCommand.OpenCover
                 0 -> DeviceCommand.CloseCover
                 else -> DeviceCommand.SetCoverPosition(target.openPercent)
-            }
+            },
+            // Nach der Höhe: die Fahrt verstellt die Lamellen
+            target.tiltOpenPercent?.let { DeviceCommand.SetCoverTilt(it) },
         )
     }
 
@@ -68,7 +71,7 @@ object SceneTargets {
         if (commands.isEmpty()) return null
         val isCover = commands.any {
             it is DeviceCommand.SetCoverPosition || it == DeviceCommand.OpenCover ||
-                it == DeviceCommand.CloseCover || it == DeviceCommand.StopCover
+                it == DeviceCommand.CloseCover || it == DeviceCommand.StopCover || it is DeviceCommand.SetCoverTilt
         }
         val isThermostat = commands.any { it is DeviceCommand.SetTargetTemperature || it is DeviceCommand.SetThermostatMode }
         val isSwitch = device?.capabilities?.find<SwitchCapability>() != null &&
@@ -80,6 +83,7 @@ object SceneTargets {
                     DeviceCommand.OpenCover -> t.copy(openPercent = 100)
                     DeviceCommand.CloseCover -> t.copy(openPercent = 0)
                     is DeviceCommand.SetCoverPosition -> t.copy(openPercent = c.openPercent.coerceIn(0, 100))
+                    is DeviceCommand.SetCoverTilt -> t.copy(tiltOpenPercent = c.openPercent.coerceIn(0, 100))
                     else -> t
                 }
             }
@@ -122,7 +126,7 @@ object SceneTargets {
         }
         caps.find<SwitchCapability>()?.let { return DeviceTarget.Switch(it.isOn) }
         caps.find<ThermostatCapability>()?.let { return DeviceTarget.Thermostat(it.targetCelsius, it.mode) }
-        caps.find<CoverCapability>()?.let { return DeviceTarget.Cover(it.openPercent) }
+        caps.find<CoverCapability>()?.let { return DeviceTarget.Cover(it.openPercent, it.tiltOpenPercent) }
         return null
     }
 

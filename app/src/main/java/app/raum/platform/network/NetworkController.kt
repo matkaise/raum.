@@ -20,9 +20,13 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import app.raum.platform.kiosk.KioskManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.Inet4Address
 
 enum class WifiSecurity { OPEN, WEP, PSK, SAE, ENTERPRISE }
@@ -257,6 +261,21 @@ class NetworkController(
         val ok = runCatching { w.enableNetwork(id, true) && w.reconnect() }.getOrDefault(false)
         if (ok) lastConnectedSsid = network.ssid
         return if (ok) ConnectResult.Ok else ConnectResult.Failed
+    }
+
+    /** Verbindet und wartet bis zu 20 s darauf, dass das Netz tatsächlich aktiv ist. */
+    suspend fun connectAndAwait(target: WifiNetwork, password: String?): Boolean {
+        val r = withContext(Dispatchers.IO) { connect(target, password) }
+        if (r != ConnectResult.Ok) return false
+        return withTimeoutOrNull(20_000) {
+            while (true) {
+                refreshStatus()
+                val st = status.value
+                if (st.wifiConnected && (st.ssid == null || st.ssid == target.ssid)) break
+                delay(500)
+            }
+            true
+        } ?: false
     }
 
     /** Aktuelles WLAN vergessen (nur Geräteeigentümer). */

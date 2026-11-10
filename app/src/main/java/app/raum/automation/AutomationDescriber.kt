@@ -97,10 +97,10 @@ class AutomationDescriber(
             else -> s(R.string.auto_target_set_to, Units.format(t.targetCelsius, unit, locale)) to null
         }
         is DeviceTarget.Cover -> when (t.openPercent) {
-            100 -> s(R.string.auto_target_open) to null
-            0 -> s(R.string.auto_target_close) to null
-            else -> s(R.string.auto_target_open_to, t.openPercent) to null
-        }
+            100 -> s(R.string.auto_target_open)
+            0 -> s(R.string.auto_target_close)
+            else -> s(R.string.auto_target_open_to, t.openPercent)
+        } to t.tiltOpenPercent?.let { s(R.string.auto_target_tilt, it) }
     }
 
     fun time(minuteOfDay: Int): String = "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)

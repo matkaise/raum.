@@ -61,6 +61,8 @@ fun LogPanel(viewModel: SettingsViewModel, modifier: Modifier = Modifier) {
 
     val logTime = rememberLogTimeFormatter()
     Column(modifier) {
+        app.raum.ui.theme.OnSky {
+        Column {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = filter.category == null, onClick = { viewModel.setCategory(null) }, label = { Text(stringResource(R.string.filter_all)) }, modifier = Modifier.height(48.dp))
             LogCategory.entries.forEach { c ->
@@ -85,6 +87,8 @@ fun LogPanel(viewModel: SettingsViewModel, modifier: Modifier = Modifier) {
                     }
                 }
             }
+        }
+        }
         }
         Spacer(Modifier.height(12.dp))
         Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, modifier = Modifier.weight(1f).fillMaxWidth()) {

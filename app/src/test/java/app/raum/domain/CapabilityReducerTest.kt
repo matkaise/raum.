@@ -50,6 +50,11 @@ class CapabilityReducerTest {
         assertEquals(CoverMovement.OPENING, (CapabilityReducer.apply(caps, DeviceCommand.SetCoverPosition(80)).single() as CoverCapability).movement)
         assertEquals(CoverMovement.CLOSING, (CapabilityReducer.apply(caps, DeviceCommand.CloseCover).single() as CoverCapability).movement)
         assertEquals(CoverMovement.STOPPED, (CapabilityReducer.apply(caps, DeviceCommand.SetCoverPosition(40)).single() as CoverCapability).movement)
+        // Lamellen nur bei Storen, die sie haben
+        assertFalse(CapabilityReducer.supports(caps, DeviceCommand.SetCoverTilt(50)))
+        val tilting = listOf(CoverCapability(40, tiltOpenPercent = 100))
+        assertTrue(CapabilityReducer.supports(tilting, DeviceCommand.SetCoverTilt(50)))
+        assertEquals(50, (CapabilityReducer.apply(tilting, DeviceCommand.SetCoverTilt(50)).single() as CoverCapability).tiltOpenPercent)
     }
 
     @Test
