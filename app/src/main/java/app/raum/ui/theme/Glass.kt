@@ -87,6 +87,10 @@ object Accent {
 
 /** Weiß auf Himmel. */
 val SkyText = Color.White
+
+/** Weicher Schatten unter weißer Schrift direkt auf dem Himmel – lesbar auch vor hellen Wolken. */
+val SkyTextShadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(0f, 1.5f), blurRadius = 10f)
+val SkyTextStyle = androidx.compose.ui.text.TextStyle(shadow = SkyTextShadow)
 val SkyTextSoft = Color.White.copy(alpha = 0.85f)
 
 /** Glasfläche mit feiner heller Kante. */

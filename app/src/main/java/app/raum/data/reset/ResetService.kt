@@ -40,6 +40,7 @@ class ResetService(
     private val weather: WeatherService,
     private val bridge: MatterBridge,
     private val credentials: NetworkCredentialStore,
+    private val homeConnect: app.raum.homeconnect.HomeConnectService,
 ) {
     /**
      * Übergabe, Schritt 1: allen anderen Apps (Apple Home, Google Home …) den Zugriff auf alle Geräte entziehen –
@@ -75,6 +76,8 @@ class ResetService(
         credentials.clearAll()
         // Vorhersage enthält den (gerundeten) Standort – bei beiden Varianten entfernen
         weather.clearCache()
+        // Home-Connect-Anmeldung gehört den bisherigen Bewohnern (Konto bei BSH)
+        homeConnect.clearAll()
         if (mode == ResetMode.FULL) {
             settings.clearAll()
             listOf(File(context.filesDir, "last_crash.txt")).forEach { it.delete() }

@@ -1,5 +1,7 @@
 package app.raum.ui.overview
 
+import androidx.compose.animation.core.animateFloatAsState
+
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import android.provider.Settings
@@ -144,6 +146,17 @@ internal fun skyColors(phase: SkyPhase): List<Color> = when (phase) {
     SkyPhase.DUSK -> listOf(Color(0xFF2E2552), Color(0xFF9C4A68), Color(0xFFE08A52))
 }
 
+/**
+ * Abdunkelung für Lesbarkeit: Bei Tag mit Wolken oder Nebel liegen helle Wolken hinter der weißen Schrift.
+ * Klarer Himmel und Nacht bleiben (fast) unverändert.
+ */
+internal fun legibilityVeil(phase: SkyPhase, v: WeatherVisual?, dark: Boolean): Float {
+    if (dark) return 0f
+    val daylight = when (phase) { SkyPhase.DAY -> 1f; SkyPhase.DAWN, SkyPhase.DUSK -> 0.4f; SkyPhase.NIGHT -> 0f }
+    val bright = 0.15f + (v?.let { it.cloudCover * 0.6f + (if (it.fog) 0.4f else 0f) } ?: 0f)
+    return (daylight * bright * 0.24f).coerceIn(0f, 0.26f)
+}
+
 /** Bewölkung und Niederschlag trüben den Himmel ein (bis max. 80 %). */
 private fun overcast(colors: List<Color>, phase: SkyPhase, v: WeatherVisual?): List<Color> {
     if (v == null) return colors
@@ -204,6 +217,9 @@ fun SkyBackdrop(scene: SkyScene, animate: Boolean, modifier: Modifier = Modifier
             }
             scene.visual?.let { WeatherLayer(it, night = !sunUp, time = time, modifier = Modifier.fillMaxSize()) }
         }
+        // Heller Taghimmel (Nebel, Wolken): weiße Schrift und die Glasleiste verlieren den Kontrast – leicht abdunkeln
+        val veil by animateFloatAsState(legibilityVeil(scene.phase, scene.visual, glass.dark), tween(1500), label = "veil")
+        if (veil > 0.01f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = veil)))
     }
 }
 

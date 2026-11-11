@@ -54,6 +54,7 @@ class CoreStartup(
     private val bridgeSync: BridgeSync,
     private val thread: ThreadService,
     private val sensorHistory: app.raum.history.SensorHistory,
+    private val homeConnect: app.raum.homeconnect.HomeConnectService,
 ) {
     private val _step = MutableStateFlow(StartupStep.DATABASE)
     /** Fortschritt für den Startbildschirm (SYS-008). */
@@ -88,6 +89,7 @@ class CoreStartup(
             deviceEvents.start()
             sensorHistory.start()
             weather.start(scope)
+            homeConnect.start(scope)
             bridgeSync.start(scope)
             // Border Router suchen (Statushinweise) – nach den Abos, damit Namensauflösungen nicht konkurrieren
             scope.launch { delay(20_000); thread.scanBriefly() }

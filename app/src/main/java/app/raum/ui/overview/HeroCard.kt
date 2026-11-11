@@ -93,10 +93,10 @@ fun HomeHero(state: HomeUiState, scene: SkyScene, onOpenForecast: ((Int) -> Unit
         Column(Modifier.weight(1f).fillMaxHeight().padding(start = 24.dp, top = 20.dp)) {
             Text(
                 listOfNotNull(stringResource(Sky.greetingRes(now.hour)), state.home?.name).joinToString(" · "),
-                color = SkyTextSoft, fontSize = 22.sp, fontWeight = FontWeight.Medium,
+                style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 22.sp, fontWeight = FontWeight.Medium,
             )
-            Text(now.format(TimeFormat), color = SkyText, fontSize = 148.sp, fontWeight = FontWeight.Light, lineHeight = 150.sp, letterSpacing = (-4).sp)
-            Text(now.format(rememberLongDateFormatter()), color = SkyTextSoft, fontSize = 22.sp)
+            Text(now.format(TimeFormat), style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 148.sp, fontWeight = FontWeight.Light, lineHeight = 150.sp, letterSpacing = (-4).sp)
+            Text(now.format(rememberLongDateFormatter()), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 22.sp)
             Spacer(Modifier.weight(1f).heightIn(min = 24.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SkyChip(Icons.Outlined.Lightbulb, Accent.Light, lightsStatus(state.lightsOn))
@@ -216,7 +216,7 @@ private fun SunArc(scene: SkyScene) {
     val sunrise = scene.sunrise
     val sunset = scene.sunset
     if (sunrise == null || sunset == null) {
-        Text(stringResource(R.string.hero_no_location), color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(end = 10.dp))
+        Text(stringResource(R.string.hero_no_location), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(end = 10.dp))
         return
     }
     val progress = scene.sunProgress
@@ -244,9 +244,9 @@ private fun SunArc(scene: SkyScene) {
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-            Text(stringResource(R.string.hero_sunrise, sunrise.format(TimeFormat)), color = SkyTextSoft, fontSize = 16.sp)
+            Text(stringResource(R.string.hero_sunrise, sunrise.format(TimeFormat)), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp)
             Spacer(Modifier.weight(1f))
-            Text(stringResource(R.string.hero_sunset, sunset.format(TimeFormat)), color = SkyTextSoft, fontSize = 16.sp)
+            Text(stringResource(R.string.hero_sunset, sunset.format(TimeFormat)), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp)
         }
     }
 }

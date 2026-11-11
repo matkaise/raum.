@@ -6,10 +6,10 @@ Stand: 22.09.2026 · App 0.7.0 · DB-Schema v2 · Prüfung gegen Spezifikation K
 
 | Bereich | Anforderung | Umsetzung | Status |
 |---|---|---|---|
-| Local-first | 11.1, 12.4 | Keine Telemetrie, kein Konto; Ortssuche über eingebaute Liste statt Ortungsdienst. Einzige Internetverbindung: freiwilliges Wetter (ab Werk aus, siehe unten) | ⚠️ Abweichung (opt-in) |
+| Local-first | 11.1, 12.4 | Keine Telemetrie, kein eigenes Konto; Ortssuche über eingebaute Liste statt Ortungsdienst. Internetverbindungen nur freiwillig und ab Werk aus: Wetter und Home Connect (siehe unten) | ⚠️ Abweichung (opt-in) |
 | Teilen (Multi-Admin) | – | Kopplungsfenster nur auf Nutzeraktion, PIN-geschützt, 15 min gültig, wird beim Schließen des Dialogs widerrufen; neue Admins und Entzug im Protokoll; „Übergabe vorbereiten“ entfernt alle fremden Admins vor dem Auflösen der eigenen Fabric – je Gerät frisch gelesen und durch erneutes Lesen bestätigt; nicht bestätigte Geräte werden angezeigt, die eigenen Schlüssel nur nach ausdrücklicher Wahl („Unvollständig abschließen“) gelöscht | ✅ |
 | Bridge | – | Einschalten und Koppeln PIN-geschützt; Kopplungsfenster nur auf Nutzeraktion (15 min); Befehle nur für freigegebene Geräte und nur von gekoppelten Apps, jeweils mit Quelle im Protokoll; über denselben Weg wie Bedienung am Panel (Offline-Schutz). Werksreset und Übergabe löschen alle Bridge-Kopplungen – durch Beenden des Bridge-Prozesses und direktes Löschen seines Speichers, auch bei ausgeschalteter Bridge; sonst bricht der Reset ab. Die echte Bridge ist ein Matter-Server im LAN (mDNS, UDP/TCP 5540) im eigenen Prozess `:bridge` – nur bei eingeschalteter Bridge; Zugriff nur für per Kopplung aufgenommene Apps (CASE, ACL je Fabric). Kopplungsfenster mit einmaligem Code je Öffnung, nur mDNS (kein BLE), nicht beim Start. Bridge-Identität (Fabrics anderer Apps, Betriebsschlüssel) in eigenem AES-GCM/Keystore-Speicher (`raum_bridge_kvs`). Echtheitsnachweis: DAC-Schlüssel wird im Android-Keystore des Panels erzeugt (StrongBox, wenn vorhanden; nur CSR verlässt das Gerät) oder – alternativ – mit Schlüssel importiert; Kette, IDs und Schlüsselzugehörigkeit geprüft, Signatur im Keystore; ohne eigenes: Test-DAC des SDK (0xFFF1/0x8000). Siehe docs/VENDOR.md | ✅ / ⚠️ Test-DAC bis zur Zertifizierung |
-| Internet-Berechtigung | 11.1 | `INTERNET` nur für das Wetter (HTTPS zu api.met.no; `usesCleartextTraffic=false`) und später Matter über IP (M2) | ✅ |
+| Internet-Berechtigung | 11.1 | `INTERNET` nur für das Wetter (HTTPS zu api.met.no), Home Connect (HTTPS zu api.home-connect.com) und Matter über IP; `usesCleartextTraffic=false` | ✅ |
 | WLAN-Verwaltung | 11.1 | Verbinden/Schalten nur als Device Owner. Berechtigungen: `ACCESS/CHANGE_WIFI_STATE`, `NEARBY_WIFI_DEVICES` (`neverForLocation`), `ACCESS_FINE/COARSE_LOCATION` – Letztere nur, weil Android Netznamen und Suchergebnisse sonst verbirgt; raum. fragt nie einen Standort ab. Als Device Owner erteilt raum. sich diese Berechtigungen selbst. WLAN-Passwörter speichert Android, nicht raum. | ✅ |
 | Klartextverkehr | 11.1 | `usesCleartextTraffic="false"`. Einzige Ausnahme: das Dataset eines OpenThread Border Routers per HTTP (REST-API, Port 8081 – dort nur HTTP), über einen eigenen Minimal-Client, der **nur private/Link-lokale Adressen** (10/8, 172.16/12, 192.168/16, fe80::/10, fc00::/7) zulässt und nur auf ausdrückliche Nutzeraktion. Ansonsten fragt raum. dort nur `/node/state` ab (Erkennung) | ✅ (begrenzte Ausnahme) |
 | Thread-Dataset und WLAN für Commissioning | 11.2, 10.3 | AES-256-GCM mit Schlüssel im Android Keystore (`raum_secrets_v1`, hardwaregestützt, sofern vorhanden); Schlüsselname als AAD. Auf dem Datenträger nur IV + Chiffrat; Netzname nur zur Anzeige aus dem entschlüsselten Dataset. Nie im Protokoll, nie angezeigt (nur Netzname, Kanal, PAN-IDs). Ändern PIN-geschützt; Werksreset und Übergabe löschen beides. Gerätetest prüft, dass kein Klartext gespeichert wird | ✅ |
@@ -71,6 +71,25 @@ in `gradle.properties` setzen: `raumWeatherContact=mailto:betrieb@example.com` (
 Kontakt, kann MET Anfragen mit 403 ablehnen – raum. zeigt dann „vom Dienst abgelehnt“.
 
 Lokale Alternative ohne Internet: einen Matter-Temperatursensor als Außensensor wählen (Einstellungen → Wetter).
+
+## Bewusste Abweichung: Home Connect über die Cloud (11.1)
+
+Auf Wunsch des Auftraggebers (10.11.2026) bindet raum. Bosch-/Siemens-/Neff-/Gaggenau-Hausgeräte über die offizielle
+**Home Connect API** der BSH Hausgeräte GmbH ein (Seite „Haushalt“). Diese Geräte sprechen kein Matter; die einzige
+offizielle Schnittstelle ist die Cloud. Vorbild für Abläufe und Grenzen: das Indigo-Plugin
+simons-plugins/indigo-home-connect.
+
+| Punkt | Umsetzung |
+|---|---|
+| Einwilligung | Ab Werk **aus**. Einstellungen → Home Connect: „Aus“, „Demo“ (simuliert, ohne Netz) oder „Eigene Geräte“, mit Erklärung, was übertragen wird. Seite und Übersichtsreihe erscheinen nur, wenn eingeschaltet |
+| Anmeldung | OAuth 2.0 **Device Flow**: raum. zeigt Code + QR-Code, bestätigt wird auf dem Telefon mit der SingleKey ID – das Passwort wird nie am Panel eingegeben. Client-ID einer eigenen Anwendung (developer.home-connect.com) – fest eingebaut über die Build-Eigenschaft `raumHomeConnectClientId` oder am Panel eingetragen; optional Client Secret (eingebautes liegt im APK, ein am Panel eingetragenes verschlüsselt im Keystore). Scopes: `IdentifyAppliance Monitor Settings Control` |
+| Zugangsdaten | Access-/Refresh-Token und Client Secret AES-256-GCM-verschlüsselt im Keystore (`raum_secrets_v1`, Einträge `homeconnect_*`); Refresh-Token wechselt bei jeder Erneuerung, Erneuerungen serialisiert. Widerrufene Anmeldung → Hinweis „neu anmelden“. Client-ID und Programm-Zwischenspeicher (nicht geheim) in `raum_homeconnect` |
+| Übertragene Daten | Befehle (Programm starten/stoppen/pausieren, Ein/Aus) und Abfragen zu Gerätezustand und Programmen des eigenen Home-Connect-Kontos; `Accept-Language` für Programmnamen. Keine Daten anderer Geräte, kein Standort |
+| Häufigkeit | Ein einziger Ereignisstrom (SSE) für alle Geräte statt Abfragen; nach (Wieder-)Verbinden Status neu lesen; Programmlisten 24 h zwischengespeichert, Programmdetails einmalig. Tageszähler (BSH: 1000/Tag) – Abfragen ab 900, Befehle ab 990 gesperrt; `Retry-After` bei 429; Wiederverbinden mit Rückoff bis 15 min. Befehle werden vorher lokal geprüft (Fernstart erlaubt, nicht am Gerät bedient, bereit), damit keine absehbar abgelehnten Anfragen das Kontingent oder die BSH-Sperre (10 Fehler/10 min) auslösen |
+| Fernstart | Nur möglich, solange „Fernstart“ am Gerät erlaubt ist (BSH-Regel, verfällt nach ~24 h); raum. kann das nicht umgehen und zeigt den Hinweis |
+| Ausfall | Kern (Matter, Szenen, Automationen) hängt nicht davon ab; Seite zeigt „Verbindung unterbrochen – neuer Versuch um …“ |
+| Datenhaltung | „Abmelden“ löscht die Tokens; „Übergabe vorbereiten“ und Werksreset löschen Tokens, Client Secret, Einstellungen und Zwischenspeicher |
+| Transport | Nur HTTPS, Zertifikatsprüfung durch Android |
 
 ## Bewusste Abweichung: Administrator-PIN optional
 

@@ -24,6 +24,11 @@ android {
         // Kontakt im User-Agent für api.met.no (Nutzungsbedingungen) – vor Auslieferung setzen:
         // gradle.properties: raumWeatherContact=mailto:betrieb@example.com  oder  https://…
         buildConfigField("String", "WEATHER_CONTACT", "\"${project.findProperty("raumWeatherContact") ?: ""}\"")
+        // Home Connect: Client-ID der eigenen Anwendung (developer.home-connect.com, „Device Flow“). Fest eingebaut muss
+        // am Panel nur noch angemeldet werden. Nicht ins Repository – in ~/.gradle/gradle.properties:
+        // raumHomeConnectClientId=…   (optional raumHomeConnectClientSecret=…)
+        buildConfigField("String", "HC_CLIENT_ID", "\"${(project.findProperty("raumHomeConnectClientId") as String?)?.trim() ?: ""}\"")
+        buildConfigField("String", "HC_CLIENT_SECRET", "\"${(project.findProperty("raumHomeConnectClientSecret") as String?)?.trim() ?: ""}\"")
         // Matter-Hersteller: ohne Angabe die Test-ID der CSA (0xFFF1) – vor Auslieferung eigene ID (docs/VENDOR.md).
         // gradle.properties: raumVendorId=0x1234, raumVendorName=…, raumBridgeProductId=0x0001, raumBridgeProductName=…
         fun hexProp(name: String, default: Int): Int =

@@ -48,4 +48,15 @@ class SkyTest {
         assertEquals(R.string.greeting_night, Sky.greetingRes(23))
         assertEquals(R.string.greeting_night, Sky.greetingRes(2))
     }
+
+    @org.junit.Test
+    fun `veil darkens only bright daytime skies`() {
+        val fog = app.raum.ui.overview.WeatherVisual(cloudCover = 1f, fog = true)
+        org.junit.Assert.assertEquals(0f, app.raum.ui.overview.legibilityVeil(app.raum.ui.overview.SkyPhase.NIGHT, fog, dark = false), 0f)
+        org.junit.Assert.assertEquals(0f, app.raum.ui.overview.legibilityVeil(app.raum.ui.overview.SkyPhase.DAY, fog, dark = true), 0f)
+        val clear = app.raum.ui.overview.legibilityVeil(app.raum.ui.overview.SkyPhase.DAY, null, dark = false)
+        val foggy = app.raum.ui.overview.legibilityVeil(app.raum.ui.overview.SkyPhase.DAY, fog, dark = false)
+        org.junit.Assert.assertTrue(clear < 0.05f)
+        org.junit.Assert.assertTrue(foggy > 0.2f)
+    }
 }

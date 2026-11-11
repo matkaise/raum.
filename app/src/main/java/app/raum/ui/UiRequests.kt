@@ -7,4 +7,6 @@ class UiRequests {
     val openCommissioning = MutableStateFlow(false)
     /** Einstellungen in einer bestimmten Kategorie öffnen (Name aus SettingsSection), z. B. nach einem Kopplungsfehler. */
     val openSettings = MutableStateFlow<String?>(null)
+    /** Haushaltsgerät (haId) auf der Seite „Haushalt“ öffnen, z. B. aus der Übersicht. */
+    val openAppliance = MutableStateFlow<String?>(null)
 }

@@ -62,6 +62,8 @@ fun OverviewScreen(
     cardActions: DeviceCardActions,
     onRunScene: (Scene) -> Unit,
     onOpenRoom: (UUID) -> Unit,
+    /** Reihe „Haushalt“ (Home Connect) unter den Favoriten – leer, wenn ausgeschaltet. */
+    householdRow: @Composable () -> Unit = {},
 ) {
     var forecastDay by remember { mutableStateOf<Int?>(null) }
     val finished = rememberFinishedScene(state.runningSceneId)
@@ -79,12 +81,14 @@ fun OverviewScreen(
 
         SkySection(stringResource(R.string.favorites), top = 26.dp)
         if (state.favorites.isEmpty()) {
-            Text(stringResource(R.string.favorites_empty), color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(start = 20.dp))
+            Text(stringResource(R.string.favorites_empty), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(start = 20.dp))
         } else {
             FixedGrid(state.favorites, columns = 5) { device, mod ->
                 GlassDeviceTile(device, cardActions, mod.height(200.dp), roomName = state.roomName(device.roomId))
             }
         }
+
+        householdRow()
 
         if (state.scenes.isNotEmpty()) {
             SkySection(stringResource(R.string.nav_scenes))

@@ -26,6 +26,7 @@ Apple Home, Google Home, Alexa or SmartThings.
 | **Operations** | Encrypted backup and restore, factory reset and handover, diagnostics bundle, signed local updates, restore points before migrations |
 | **Security** | Matter fabric keys, Thread credentials and secrets are encrypted with Android Keystore (AES-GCM). No cleartext traffic except for local border-router REST |
 | **Weather (opt-in)** | MET Norway forecast using a rounded location, with an animated sky and a 7-day strip. Off by default |
+| **Home Connect (opt-in)** | Bosch/Siemens/Neff/Gaggenau appliances via the official Home Connect cloud API: “Household” page (coffee carousel, oven dial, washer/dryer drum, dishwasher with delayed start) and an overview row. Device-flow sign-in, one event stream, local pre-checks, daily quota. Off by default; demo mode without account |
 | **Offline place search** | Built-in GeoNames list (~64,000 places), so sunrise and sunset are computed without location services or internet |
 
 ## Architecture

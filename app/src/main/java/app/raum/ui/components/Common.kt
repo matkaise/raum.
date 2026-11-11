@@ -40,9 +40,9 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: @Compo
 fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable () -> Unit = {}) {
     Row(Modifier.padding(start = 20.dp, bottom = 24.dp), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, lineHeight = 60.sp, letterSpacing = (-1.5).sp)
+            Text(title, style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, lineHeight = 60.sp, letterSpacing = (-1.5).sp)
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = SkyTextSoft)
+                Text(subtitle, style = MaterialTheme.typography.bodyLarge.copy(shadow = app.raum.ui.theme.SkyTextShadow), color = SkyTextSoft)
             }
         }
         trailing()
@@ -58,9 +58,9 @@ fun EmptyState(icon: ImageVector, title: String, text: String, modifier: Modifie
     ) {
         Icon(icon, null, Modifier.size(64.dp), tint = SkyTextSoft)
         Spacer(Modifier.size(16.dp))
-        Text(title, color = SkyText, fontSize = 32.sp, fontWeight = FontWeight.Light)
+        Text(title, style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 32.sp, fontWeight = FontWeight.Light)
         Spacer(Modifier.size(8.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = SkyTextSoft)
+        Text(text, style = MaterialTheme.typography.bodyLarge.copy(shadow = app.raum.ui.theme.SkyTextShadow), color = SkyTextSoft)
         Spacer(Modifier.size(24.dp))
         action()
     }

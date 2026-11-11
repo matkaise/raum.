@@ -2,6 +2,7 @@ package app.raum.ui.settings
 
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Kitchen
 import android.os.Build
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -85,6 +86,7 @@ enum class SettingsSection(@StringRes val titleRes: Int, val icon: ImageVector) 
     DISPLAY(R.string.settings_display_design, Icons.Outlined.Palette),
     REGION(R.string.settings_language_region, Icons.Outlined.Language),
     WEATHER(R.string.settings_weather, Icons.Outlined.Cloud),
+    HOME_CONNECT(R.string.settings_home_connect, Icons.Outlined.Kitchen),
     SHARE(R.string.settings_share, Icons.Outlined.Share),
     MATTER(R.string.settings_matter, Icons.Outlined.DeviceHub),
     SECURITY(R.string.security_maintenance, Icons.Outlined.Shield),
@@ -149,6 +151,7 @@ fun SettingsScreen(
                         SettingsSection.REGION -> RegionSection(viewModel)
                         SettingsSection.SHARE -> ShareSection(roomName = { state.roomName(it.roomId) })
                         SettingsSection.WEATHER -> WeatherSection(state, viewModel, onOpenRegion = { section = SettingsSection.REGION })
+                        SettingsSection.HOME_CONNECT -> HomeConnectSection()
                         SettingsSection.MATTER -> { ThreadSection(); MatterSection(viewModel) }
                         SettingsSection.SECURITY -> SecurityCard(appliance, onOpenMaintenance)
                         SettingsSection.ABOUT -> AboutSection()
@@ -195,6 +198,7 @@ private fun summary(s: SettingsSection, state: HomeUiState, vm: SettingsViewMode
         ).joinToString(" · ")
     }
     SettingsSection.WEATHER -> weatherSummary(vm)
+    SettingsSection.HOME_CONNECT -> homeConnectSummary()
     SettingsSection.SHARE -> shareSummary()
     SettingsSection.MATTER -> threadSummary()
     SettingsSection.SECURITY -> {
@@ -240,7 +244,7 @@ private fun SectionItem(s: SettingsSection, summary: String, selected: Boolean, 
 
 @Composable
 private fun DetailTitle(s: SettingsSection) {
-    Text(stringResource(s.titleRes), color = app.raum.ui.theme.SkyText, fontSize = 48.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light,
+    Text(stringResource(s.titleRes), style = app.raum.ui.theme.SkyTextStyle, color = app.raum.ui.theme.SkyText, fontSize = 48.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Light,
         lineHeight = 52.sp, letterSpacing = (-1).sp, modifier = Modifier.padding(bottom = 24.dp))
 }
 
@@ -427,5 +431,6 @@ private fun AboutSection() {
     Group(stringResource(R.string.settings_licenses)) {
         Text(stringResource(R.string.settings_license_geonames), style = MaterialTheme.typography.bodyLarge)
         Text(stringResource(R.string.settings_license_met), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.settings_license_home_connect), style = MaterialTheme.typography.bodyLarge)
     }
 }

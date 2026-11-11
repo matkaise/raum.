@@ -17,6 +17,7 @@ Spezifikation: `raum_matter_controller_spezifikation.md` (v0.1).
 | Einrichtung (ONB) | Geführte Erstinbetriebnahme: Sprache, neu oder aus Sicherung, Name, Zeitzone/Einheit/Standort, optionale Administrator-PIN, Systemprüfung, Matter-Fabric, erstes Gerät oder Beispielwohnung; setzt nach Unterbrechung fort | ✅ |
 | Übersicht & Einstellungen (UI) | Hero mit Himmel nach echtem Sonnenstand, Uhr, Innenklima, Sonnenbogen und Hinweis-Chips; Einstellungen als Kategorien (Zuhause, Netzwerk, Display, Region, Matter, Sicherheit, Protokoll, Info); WLAN verbinden; Offline-Ortssuche | ✅ |
 | Wetter (opt-in) | Vorhersage von MET Norway (ab Werk aus, gerundeter Standort), animierter Himmel im Hero (Wolken, Regen, Schnee, Nebel, Gewitter), Regen-Ausblick, optionaler Matter-Außensensor | ✅ |
+| Home Connect (opt-in) | Bosch-/Siemens-/Neff-/Gaggenau-Geräte über die offizielle Home-Connect-Cloud: Seite „Haushalt“ (Kaffee-Karussell, Backofen-Drehring, Trommel für Waschmaschine/Trockner, Geschirrspüler mit Startzeitvorwahl) und Reihe auf der Übersicht. Anmeldung per Code am Telefon, ein Ereignisstrom, lokale Vorprüfung, Tageskontingent. Ab Werk aus; Demo ohne Konto | ✅ |
 | Wettervorhersage | 7-Tage-Leiste unter dem Hero, Detail je Tag mit Stundenwerten und Temperaturkurve, eigene gezeichnete Wettersymbole | ✅ |
 | Teilen (Multi-Admin) | Geräte zusätzlich in Apple Home, Google Home, Alexa, SmartThings: Kopplungsfenster je Gerät (QR + 11-stelliger Code, 15 min), „alle nacheinander“, verbundene Apps anzeigen und entfernen, PIN-geschützt – gegen den Simulator, echt mit M2 | ✅ (Simulator) |
 | Bridge | raum. als Matter-Bridge: einmal in Apple Home/Google Home/Alexa koppeln, alle freigegebenen Geräte erscheinen dort (neue automatisch); Geräteauswahl nach Räumen, verbundene Apps entfernen, Doppelt-Warnung; Befehle anderer Apps laufen über raum. Echt: eigener Matter-Server (Aggregator, code-basiertes Datenmodell) im Prozess `:bridge`, Leuchten (auch Farbe und Weißton), Steckdosen, Sensoren, Thermostate und Storen (eigene Cluster für Thermostat, Storen, Farbe) | ✅ (mit chip-tool getestet; Apple/Google brauchen ein Gerät im LAN) |
@@ -76,6 +77,11 @@ echte Matter- und Thread-Geräte im Heimnetz über den Mac (mDNS und IPv6 durchg
 
 Wetter (MET Norway) verlangt einen Kontakt im User-Agent – vor Auslieferung in `gradle.properties` setzen:
 `raumWeatherContact=mailto:betrieb@example.com`.
+
+Home Connect braucht eine eigene, kostenlose Anwendung auf [developer.home-connect.com](https://developer.home-connect.com)
+(OAuth-Flow „Device Flow“). Ihre Client-ID fest einbauen – nicht ins Repository, sondern in `~/.gradle/gradle.properties`:
+`raumHomeConnectClientId=…` (optional `raumHomeConnectClientSecret=…`). Dann genügt am Panel die Anmeldung mit dem
+normalen Home-Connect-Konto; ohne eingebaute ID lässt sie sich in den Einstellungen eintragen.
 
 Tests:
 

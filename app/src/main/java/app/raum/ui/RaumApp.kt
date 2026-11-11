@@ -25,6 +25,11 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.MeetingRoom
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WbTwilight
+import androidx.compose.material.icons.filled.Kitchen
+import androidx.compose.material.icons.outlined.Kitchen
+import app.raum.homeconnect.HomeConnectService
+import app.raum.ui.household.HouseholdRow
+import app.raum.ui.household.HouseholdScreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
@@ -99,6 +104,7 @@ private enum class TopLevel(val route: String, @StringRes val shortLabelRes: Int
     OVERVIEW("overview", R.string.nav_overview, Icons.Outlined.Dashboard, Icons.Filled.Dashboard),
     ROOMS("rooms", R.string.nav_rooms, Icons.Outlined.MeetingRoom, Icons.Filled.MeetingRoom),
     SCENES("scenes", R.string.nav_scenes, Icons.Outlined.WbTwilight, Icons.Filled.WbTwilight),
+    HOUSEHOLD("household", R.string.nav_household, Icons.Outlined.Kitchen, Icons.Filled.Kitchen),
     DEVICES("devices", R.string.nav_devices, Icons.Outlined.Devices, Icons.Filled.Devices),
     AUTOMATIONS("automations", R.string.nav_automations_short, Icons.Outlined.AutoMode, Icons.Filled.AutoMode),
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings, Icons.Filled.Settings),
@@ -116,8 +122,11 @@ fun RaumApp(
     viewModel: HomeViewModel = koinViewModel(),
     requests: UiRequests = koinInject(),
     display: DisplayController = koinInject(),
+    homeConnect: HomeConnectService = koinInject(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val household by homeConnect.state.collectAsStateWithLifecycle()
+    val openAppliance by requests.openAppliance.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val snackbar = remember { SnackbarHostState() }
@@ -158,6 +167,18 @@ fun RaumApp(
             (dest == TopLevel.SETTINGS && route == MAINTENANCE)
     }
 
+    // Home Connect: „fertig“/„vorgeheizt“ als Snackbar – außer auf „Haushalt“, dort steht der Hinweis oben auf der Seite
+    val currentTop by androidx.compose.runtime.rememberUpdatedState(selectedTop)
+    LaunchedEffect(homeConnect) {
+        homeConnect.notices.collect { n ->
+            if (n.global && currentTop != TopLevel.HOUSEHOLD) {
+                lastMessage = UiMessage(n.text)
+                snackbar.currentSnackbarData?.dismiss()
+                snackbar.showSnackbar(n.text, duration = SnackbarDuration.Short)
+            }
+        }
+    }
+
     CompositionLocalProvider(LocalSkyScene provides sky) {
     run {
     Box(Modifier.fillMaxSize()) {
@@ -166,6 +187,8 @@ fun RaumApp(
         Row(Modifier.fillMaxSize()) {
             GlassRail(
                 selected = selectedTop,
+                // „Haushalt“ nur, wenn Home Connect eingeschaltet ist
+                hidden = if (household.active) emptySet() else setOf(TopLevel.HOUSEHOLD),
                 onNavigate = { navController.navigateTopLevel(it) },
                 onSleep = display::sleepNow,
             )
@@ -184,6 +207,12 @@ fun RaumApp(
                             cardActions = cardActions,
                             onRunScene = viewModel::runScene,
                             onOpenRoom = { navController.openRoomFromOverview(it) },
+                            householdRow = {
+                                HouseholdRow(household, homeConnect) { haId ->
+                                    requests.openAppliance.value = haId
+                                    navController.navigateTopLevel(TopLevel.HOUSEHOLD)
+                                }
+                            },
                         )
                     }
                     composable(TopLevel.ROOMS.route) {
@@ -226,6 +255,13 @@ fun RaumApp(
                             onEditScene = { scene -> navController.navigate(if (scene == null) SCENE_NEW else "scenes/${scene.id}/edit") },
                             onDuplicateScene = viewModel::duplicateScene,
                             onDeleteScene = viewModel::deleteScene,
+                        )
+                    }
+                    composable(TopLevel.HOUSEHOLD.route) {
+                        HouseholdScreen(
+                            requestedAppliance = openAppliance,
+                            onRequestHandled = { requests.openAppliance.value = null },
+                            onOpenSettings = { requests.openSettings.value = "HOME_CONNECT" },
                         )
                     }
                     composable(SCENE_NEW) {
@@ -290,25 +326,25 @@ fun RaumApp(
 
 
 /**
- * Navigation als schwebende Glasleiste links (Entwurf „Himmel“): fünf Hauptbereiche,
+ * Navigation als schwebende Glasleiste links (Entwurf „Himmel“): fünf Hauptbereiche (sechs mit „Haushalt“),
  * darunter Einstellungen und Ruhezustand als runde Knöpfe.
  */
 @Composable
-private fun GlassRail(selected: TopLevel?, onNavigate: (TopLevel) -> Unit, onSleep: () -> Unit) {
+private fun GlassRail(selected: TopLevel?, hidden: Set<TopLevel>, onNavigate: (TopLevel) -> Unit, onSleep: () -> Unit) {
     Column(
         Modifier.fillMaxHeight().width(120.dp)
             .background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.24f), Color.Transparent)))
             .padding(top = 22.dp, bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("raum.", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Text("raum.", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, color = Color.White, style = app.raum.ui.theme.SkyTextStyle)
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Column(
                 Modifier.clip(RoundedCornerShape(40.dp)).background(Color.White.copy(alpha = 0.14f))
                     .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(40.dp)).padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                TopLevel.entries.filter { it != TopLevel.SETTINGS }.forEach { dest ->
+                TopLevel.entries.filter { it != TopLevel.SETTINGS && it !in hidden }.forEach { dest ->
                     val on = dest == selected
                     Column(
                         Modifier.width(78.dp).height(72.dp).clip(RoundedCornerShape(36.dp))

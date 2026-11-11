@@ -72,6 +72,14 @@ import app.raum.thread.NetworkCredentialStore
 import app.raum.thread.NsdBorderRouterDiscovery
 import app.raum.thread.ThreadService
 import app.raum.ui.settings.ThreadViewModel
+import app.raum.homeconnect.DemoHomeConnect
+import app.raum.homeconnect.HcAuth
+import app.raum.homeconnect.HcBudget
+import app.raum.homeconnect.HcCloudBackend
+import app.raum.homeconnect.HcPrefs
+import app.raum.homeconnect.HomeConnectService
+import app.raum.homeconnect.UrlConnectionHcHttp
+import app.raum.ui.household.HouseholdViewModel
 
 val appModule = module {
     /** Anwendungsweiter Scope für den Core; überlebt Activity-Neustarts (M5: Foreground Service). */
@@ -137,7 +145,7 @@ val appModule = module {
 
     // --- Stabilisierung (M7) ---
     single { BackupService(get(), get(), get(), get(), get()) }
-    single { ResetService(androidContext(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { ResetService(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     single { UpdateInstaller(androidContext(), get(), get()) }
 
     // --- Erstinbetriebnahme ---
@@ -173,8 +181,22 @@ val appModule = module {
         )
     }
     single { CityIndex { androidContext().assets.open(CityIndex.ASSET) } }
+    // Home Connect (Bosch/Siemens-Hausgeräte über die BSH-Cloud, freiwillig – ab Werk aus). Tokens im Keystore.
+    single { HcPrefs(androidContext()) }
+    single { HcAuth(KeystoreSecretStore(androidContext()), UrlConnectionHcHttp(), builtInSecret = BuildConfig.HC_CLIENT_SECRET) }
+    single { HcBudget(get<HcPrefs>()) }
+    single {
+        val locale = get<LocaleController>()
+        val language = { locale.locale().toLanguageTag() }
+        HomeConnectService(
+            settings = get<HcPrefs>(), auth = get(), budget = get(),
+            cloud = HcCloudBackend(get(), UrlConnectionHcHttp(), get(), language),
+            demoFactory = { DemoHomeConnect(german = { locale.locale().language == "de" }) },
+            language = language, log = get(), strings = get(), builtInClientId = BuildConfig.HC_CLIENT_ID,
+        )
+    }
 
-    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
     single { DeviceService(get(), get(), get(), get(), get(), get()) }
     single { SceneRunner(get(), get(), get(), get()) }
@@ -188,6 +210,7 @@ val appModule = module {
     viewModelOf(::OnboardingViewModel)
     viewModelOf(::ShareViewModel)
     viewModelOf(::ThreadViewModel)
+    viewModelOf(::HouseholdViewModel)
     viewModel { params -> AutomationEditorViewModel(params.getOrNull<UUID>(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { params -> SceneEditorViewModel(params.getOrNull<UUID>(), get(), get(), get(), get(), get(), get()) }
 }
