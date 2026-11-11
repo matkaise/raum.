@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.Icon
@@ -171,79 +172,124 @@ fun ColumnScope.CoffeePanel(a: HcAppliance, programs: List<HcProgram>, vm: House
     val warning = a.warnings.firstOrNull()
     val locked = brewing || busy
 
-    // Meine Getränke
-    Row(Modifier.fillMaxWidth().padding(top = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.hc_my_drinks).uppercase(), color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, modifier = Modifier.padding(end = 4.dp))
-        drinks.forEach { d ->
-            DrinkChip(Icons.Outlined.LocalCafe, d.label, enabled = !locked, onLongClick = { vm.removeDrink(d) }) {
-                val i = programs.indexOfFirst { it.key == d.programKey }
-                if (i >= 0) { index = i; choices[d.programKey] = d.options }
-            }
-        }
-        DrinkChip(Icons.Outlined.Add, stringResource(R.string.hc_save_drink), enabled = !locked && program.detailed) {
-            val opts = program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()
-            val strength = beans?.let { b -> value(b)?.contentOrNull?.let(b::label) }
-            val ml = fill?.let { f -> value(f)?.doubleOrNull?.toInt()?.let { "$it ml" } }
-            vm.saveDrink(SavedDrink(program.key, listOfNotNull(program.name, strength ?: ml).joinToString(" · "), opts))
-        }
-    }
-
-    // Tassen-Karussell
-    CupCarousel(programs, index, progress, brewing && !care, done, enabled = !locked) { index = it }
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(program.name, color = g.ink, fontSize = 32.sp, fontWeight = FontWeight.Medium, letterSpacing = (-0.4).sp, maxLines = 1)
-        look(program.key).descRes?.let { Text(stringResource(it), color = g.soft, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp)) }
-    }
-    Spacer(Modifier.weight(1f))
-
-    // Stärke · Menge · Temperatur
-    Row(Modifier.fillMaxWidth().alpha(if (brewing) 0.45f else 1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        if (beans != null && beans.allowed.isNotEmpty()) Column(Modifier.weight(1.25f)) {
-            val sel = beans.allowed.indexOf(value(beans)?.contentOrNull).coerceAtLeast(0)
-            SectionLabel(beans.name, trailing = beans.label(beans.allowed[sel]))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                beans.allowed.forEachIndexed { i, v ->
-                    Box(
-                        Modifier.weight(1f).height(52.dp).clip(RoundedCornerShape(14.dp))
-                            .background(if (i == sel) HcColors.Coffee.copy(alpha = 0.28f) else g.chip)
-                            .clickable(enabled = !locked) { set(beans, JsonPrimitive(v)) },
-                        contentAlignment = Alignment.Center,
-                    ) { Bean(on = i <= sel) }
+    val (ok, hint) = startHint(a)
+    // Zwei Spalten: links Getränkewahl (Meine Getränke, Karussell, Name), rechts Einstellungen und Start –
+    // so bleibt der Startknopf immer voll sichtbar, auch wenn oben die Geräteleiste Höhe braucht
+    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.hc_my_drinks).uppercase(), color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, modifier = Modifier.padding(end = 4.dp))
+                drinks.forEach { d ->
+                    DrinkChip(Icons.Outlined.LocalCafe, d.label, enabled = !locked, onLongClick = { vm.removeDrink(d) }) {
+                        val i = programs.indexOfFirst { it.key == d.programKey }
+                        if (i >= 0) { index = i; choices[d.programKey] = d.options }
+                    }
+                }
+                DrinkChip(Icons.Outlined.Add, stringResource(R.string.hc_save_drink), enabled = !locked && program.detailed) {
+                    val opts = program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()
+                    val strength = beans?.let { b -> value(b)?.contentOrNull?.let(b::label) }
+                    val ml = fill?.let { f -> value(f)?.doubleOrNull?.toInt()?.let { "$it ml" } }
+                    vm.saveDrink(SavedDrink(program.key, listOfNotNull(program.name, strength ?: ml).joinToString(" · "), opts))
                 }
             }
-        }
-        if (fill != null && fill.min != null && fill.max != null) Column(Modifier.weight(1f)) {
-            val ml = value(fill)?.doubleOrNull ?: fill.min
-            SectionLabel(stringResource(R.string.hc_amount), trailing = "${fill.min.toInt()}–${fill.max.toInt()}")
-            AmountSlider(ml, fill.min, fill.max, fill.step ?: 5.0, enabled = !locked) { set(fill, JsonPrimitive(it.toInt())) }
-        }
-        if (temp != null && temp.allowed.isNotEmpty()) Column(Modifier.weight(1f)) {
-            SectionLabel(temp.name)
-            Segmented(temp.allowed.map(temp::label), temp.allowed.indexOf(value(temp)?.contentOrNull).coerceAtLeast(0), enabled = !locked) {
-                set(temp, JsonPrimitive(temp.allowed[it]))
+            Spacer(Modifier.weight(1f))
+            CupCarousel(programs, index, progress, brewing && !care, done, enabled = !locked) { index = it }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(program.name, color = g.ink, fontSize = 32.sp, fontWeight = FontWeight.Medium, letterSpacing = (-0.4).sp, maxLines = 1)
+                look(program.key).descRes?.let { Text(stringResource(it), color = g.soft, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp)) }
             }
+            Spacer(Modifier.weight(1f))
+        }
+
+        // Einstellungen: je eine Zeile mit − / + wie bei Rollladen und Thermostat, darunter der Start
+        Column(Modifier.width(400.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.alpha(if (brewing) 0.45f else 1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (beans != null && beans.allowed.isNotEmpty()) {
+                    val sel = beans.allowed.indexOf(value(beans)?.contentOrNull).coerceAtLeast(0)
+                    Stepper(
+                        beans.name, beans.label(beans.allowed[sel]), null,
+                        canDown = sel > 0, canUp = sel < beans.allowed.lastIndex, enabled = !locked,
+                        onDown = { set(beans, JsonPrimitive(beans.allowed[sel - 1])) },
+                        onUp = { set(beans, JsonPrimitive(beans.allowed[sel + 1])) },
+                    ) {
+                        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            beans.allowed.indices.forEach { i -> Bean(on = i <= sel, small = true) }
+                        }
+                    }
+                }
+                if (fill != null && fill.min != null && fill.max != null) {
+                    val ml = value(fill)?.doubleOrNull ?: fill.min
+                    // Mindestens 10 ml je Tipp – die allgemeine Schrittweite (5 ml) wäre mühsam
+                    val st = (fill.step ?: 10.0).coerceAtLeast(10.0)
+                    Stepper(
+                        stringResource(R.string.hc_amount), "${ml.toInt()} ml", "${fill.min.toInt()}–${fill.max.toInt()} ml",
+                        canDown = ml > fill.min, canUp = ml < fill.max, enabled = !locked,
+                        onDown = { set(fill, fill.fit(JsonPrimitive((ml - st).coerceAtLeast(fill.min))) ?: JsonPrimitive(fill.min)) },
+                        onUp = { set(fill, fill.fit(JsonPrimitive((ml + st).coerceAtMost(fill.max))) ?: JsonPrimitive(fill.max)) },
+                    )
+                }
+                if (temp != null && temp.allowed.isNotEmpty()) Column {
+                    SectionLabel(temp.name)
+                    Segmented(temp.allowed.map(temp::label), temp.allowed.indexOf(value(temp)?.contentOrNull).coerceAtLeast(0), enabled = !locked) {
+                        set(temp, JsonPrimitive(temp.allowed[it]))
+                    }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+
+            val button = Modifier.fillMaxWidth()
+            when {
+                warning != null -> ActionButton(stringResource(R.string.hc_fix_warning, stringResource(HomeConnectService.warningLabel(warning))), Icons.Outlined.ErrorOutline,
+                    g.chip, g.soft, button, height = 72.dp, enabled = false) {}
+                care -> ActionButton(stringResource(R.string.hc_care_running), Icons.Outlined.HourglassTop,
+                    g.chip, g.soft, button, height = 72.dp, enabled = false) {}
+                brewing -> ActionButton(stringResource(R.string.hc_brewing_cancel, (progress * 100).roundToInt()), Icons.Outlined.StopCircle,
+                    HcColors.Coffee, Color(0xFF1F1206), button, height = 72.dp, enabled = !busy, progress = progress) { vm.stop(a.haId) }
+                done -> ActionButton(stringResource(R.string.hc_brew_done, a.activeProgram?.let { k -> programs.firstOrNull { it.key == k }?.name } ?: program.name), Icons.Outlined.Check,
+                    HcColors.Done, Color(0xFF0F2E1A), button, height = 72.dp) {}
+                // Menge steht direkt darüber – im Knopf nur das Getränk, damit nichts abgeschnitten wird
+                else -> ActionButton(
+                    stringResource(R.string.hc_brew, program.name),
+                    Icons.Outlined.PlayArrow, if (ok) HcColors.Coffee else g.chip, if (ok) Color(0xFF1F1206) else g.soft,
+                    button, height = 72.dp, enabled = ok && !busy && program.detailed,
+                ) { vm.start(a.haId, program.key, program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()) }
+            }
+            if (!ok && warning == null && !brewing) FootNote(false, hint)
         }
     }
+}
 
-    // Startknopf
-    val (ok, hint) = startHint(a)
-    val ml = fill?.let { value(it)?.doubleOrNull?.toInt() }
-    when {
-        warning != null -> ActionButton(stringResource(R.string.hc_fix_warning, stringResource(HomeConnectService.warningLabel(warning))), Icons.Outlined.ErrorOutline,
-            g.chip, g.soft, Modifier.fillMaxWidth().padding(top = 18.dp), height = 68.dp, enabled = false) {}
-        care -> ActionButton(stringResource(R.string.hc_care_running), Icons.Outlined.HourglassTop,
-            g.chip, g.soft, Modifier.fillMaxWidth().padding(top = 18.dp), height = 68.dp, enabled = false) {}
-        brewing -> ActionButton(stringResource(R.string.hc_brewing_cancel, (progress * 100).roundToInt()), Icons.Outlined.StopCircle,
-            HcColors.Coffee, Color(0xFF1F1206), Modifier.fillMaxWidth().padding(top = 18.dp), height = 68.dp, enabled = !busy, progress = progress) { vm.stop(a.haId) }
-        done -> ActionButton(stringResource(R.string.hc_brew_done, a.activeProgram?.let { k -> programs.firstOrNull { it.key == k }?.name } ?: program.name), Icons.Outlined.Check,
-            HcColors.Done, Color(0xFF0F2E1A), Modifier.fillMaxWidth().padding(top = 18.dp), height = 68.dp) {}
-        else -> ActionButton(
-            if (ml != null) stringResource(R.string.hc_brew_ml, program.name, ml) else stringResource(R.string.hc_brew, program.name),
-            Icons.Outlined.PlayArrow, if (ok) HcColors.Coffee else g.chip, if (ok) Color(0xFF1F1206) else g.soft,
-            Modifier.fillMaxWidth().padding(top = 18.dp), height = 68.dp, enabled = ok && !busy && program.detailed,
-        ) { vm.start(a.haId, program.key, program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()) }
+/** Einstellung als Zeile: − Wert + (wie die Favoriten-Karten), Bezeichnung und Bereich darüber. */
+@Composable
+private fun Stepper(
+    label: String, value: String, range: String?, canDown: Boolean, canUp: Boolean, enabled: Boolean,
+    onDown: () -> Unit, onUp: () -> Unit, extra: (@Composable () -> Unit)? = null,
+) {
+    val g = LocalGlass.current
+    Column {
+        SectionLabel(label, trailing = range)
+        Row(
+            Modifier.fillMaxWidth().height(72.dp).clip(RoundedCornerShape(36.dp)).background(g.chip).padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StepButton(Icons.Outlined.Remove, enabled && canDown, onDown)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(value, color = g.ink, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                extra?.invoke()
+            }
+            StepButton(Icons.Outlined.Add, enabled && canUp, onUp)
+        }
     }
-    if (!ok && warning == null && !brewing) FootNote(false, hint)
+}
+
+@Composable
+private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    Box(
+        Modifier.size(56.dp).shadow(if (enabled) 4.dp else 0.dp, CircleShape).clip(CircleShape).background(g.glassSolid)
+            .clickable(enabled = enabled, onClick = onClick).alpha(if (enabled) 1f else 0.35f),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, Modifier.size(26.dp), tint = g.ink) }
 }
 
 @Composable
@@ -270,9 +316,9 @@ private fun DrinkChip(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 
 /** Kaffeebohne: gefüllt bis zur gewählten Stärke. */
 @Composable
-private fun Bean(on: Boolean) {
+private fun Bean(on: Boolean, small: Boolean = false) {
     val g = LocalGlass.current
-    Canvas(Modifier.size(14.dp, 20.dp).rotate(25f)) {
+    Canvas(Modifier.size(if (small) 8.dp else 14.dp, if (small) 12.dp else 20.dp).rotate(25f)) {
         drawOval(if (on) Color(0xFF6B4128) else g.track)
         if (on) drawLine(Color(0xFFC98B4E), Offset(size.width / 2, size.height * 0.15f), Offset(size.width / 2, size.height * 0.85f), strokeWidth = 2.dp.toPx())
     }
