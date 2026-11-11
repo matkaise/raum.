@@ -36,6 +36,10 @@ data class Playback(
     val canPause: Boolean = true,
     val shuffle: Boolean = false,
     val repeat: RepeatMode = RepeatMode.OFF,
+    /** Musikdienst, aus dem der Titel kommt (aus der sid der Adresse), z. B. „YouTube Music“ */
+    val service: String? = null,
+    /** Favorit, den raum. in dieser Gruppe gestartet hat – solange die Warteschlange dieselbe ist */
+    val startedFrom: String? = null,
 ) {
     val playing: Boolean get() = state == TransportState.PLAYING || state == TransportState.TRANSITIONING
     /** Etwas geladen, das sich fortsetzen lässt */

@@ -75,6 +75,10 @@ class SonosService(
     /** Offene Ansichten → gewünschter Abfrageabstand */
     private val watchers = java.util.concurrent.ConcurrentHashMap<Any, Long>()
     private val lock = Mutex()
+
+    /** Von raum. gestarteter Favorit je Gruppe – gilt, solange dieselbe Warteschlange bzw. derselbe Sender läuft. */
+    private class Started(val title: String, val streamUri: String?, var tracks: Int? = null)
+    private val started = java.util.concurrent.ConcurrentHashMap<String, Started>()
     private var scope: CoroutineScope? = null
 
     @Volatile private var topologyDue = true
@@ -226,6 +230,21 @@ class SonosService(
         return if (expected == n.positionS || (expected != null && n.positionS != null && kotlin.math.abs(expected - n.positionS) <= 2)) old else new
     }
 
+    private fun startedFrom(groupId: String, source: PlaySource, media: MediaInfo): String? {
+        val s = started[groupId]
+        val valid = when {
+            s == null -> false
+            s.streamUri != null -> media.currentUri == s.streamUri
+            source != PlaySource.QUEUE -> false
+            s.tracks == null -> { s.tracks = media.tracks; true }
+            else -> s.tracks == media.tracks
+        }
+        if (valid) return s!!.title
+        started.remove(groupId)
+        // Sender, die als Favorit gespeichert sind, erkennt raum. auch, wenn sie anderswo gestartet wurden
+        return if (source == PlaySource.STREAM) _state.value.favorites.firstOrNull { it.uri == media.currentUri }?.title else null
+    }
+
     private fun readGroup(g: SonosGroup): SonosGroup {
         val host = g.coordinator.host
         val transport = api.transportState(host)
@@ -242,6 +261,8 @@ class SonosService(
             }
         }
         val playback = Playback(
+            service = SonosXml.serviceName(position.trackUri) ?: SonosXml.serviceName(media.currentUri),
+            startedFrom = startedFrom(g.id, source, media),
             state = transport,
             source = source,
             track = track,
@@ -344,8 +365,9 @@ class SonosService(
             api.setUri(host, "x-rincon-queue:${g.coordinator.uuid}#0", "")
         }
         api.play(host)
+        started[g.id] = Started(item.title, item.uri.takeIf { item.isStream })
         log.info(LogCategory.DEVICE, strings.get(R.string.sonos_log_play, item.title), g.name)
-        g.copy(playback = g.playback.copy(state = TransportState.TRANSITIONING, stationName = item.title.takeIf { item.isStream }, track = SonosTrack(item.title, artUrl = item.artUrls.firstOrNull())))
+        g.copy(playback = g.playback.copy(state = TransportState.TRANSITIONING, stationName = item.title.takeIf { item.isStream }, track = SonosTrack(item.title, artUrl = item.artUrls.firstOrNull()), startedFrom = item.title))
     }
 
     private suspend fun command(groupId: String, action: (SonosGroup) -> SonosGroup): Result<Unit> {

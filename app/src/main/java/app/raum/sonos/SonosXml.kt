@@ -151,6 +151,17 @@ object SonosXml {
         }
     }
 
+    /** Musikdienst aus der sid einer Sonos-Adresse („…?sid=284&…“ → „YouTube Music“). */
+    fun serviceName(uri: String?): String? {
+        val sid = Regex("[?&]sid=(\\d+)").find(uri ?: return null)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        return SERVICES[sid]
+    }
+
+    private val SERVICES = mapOf(
+        284 to "YouTube Music", 303 to "Sonos Radio", 12 to "Spotify", 204 to "Apple Music", 201 to "Amazon Music",
+        254 to "TuneIn", 160 to "SoundCloud", 2 to "Deezer", 174 to "TIDAL", 236 to "Audible", 333 to "TuneIn",
+    )
+
     /** „http://192.168.1.39:1400/xml/device_description.xml“ → „192.168.1.39“. */
     fun hostOf(location: String?): String? {
         val m = Regex("^https?://(\\[[^\\]]+]|[^:/]+)").find(location?.trim() ?: return null) ?: return null

@@ -191,6 +191,21 @@ class SonosTest {
     }
 
     @Test
+    fun `service names come from the sid and started favorites are remembered`() = runTest {
+        assertEquals("YouTube Music", SonosXml.serviceName("x-sonosapi-hls-static:ALk?sid=284&flags=8&sn=2"))
+        assertEquals("Sonos Radio", SonosXml.serviceName("x-sonosapi-radio:2997?sid=303&flags=8296&sn=1"))
+        assertNull(SonosXml.serviceName("x-rincon-queue:RINCON_X#0"))
+        val api = FakeApi()
+        val s = service(api, FakeSettings(), discovery = { setOf("192.168.1.39") })
+        s.start(backgroundScope); runCurrent()
+        assertNull(s.state.value.group("ARC")!!.playback.startedFrom) // in der Sonos-App gestartet: unbekannt
+        val mix = s.state.value.favorites[1]
+        s.play("ARC", mix)
+        advanceTimeBy(SonosService.CONFIRM_DELAY_MS + 10); runCurrent()
+        assertEquals("Mix", s.state.value.group("ARC")!!.playback.startedFrom)
+    }
+
+    @Test
     fun `nothing found, then found after rescan`() = runTest {
         val api = FakeApi()
         var hosts = emptySet<String>()

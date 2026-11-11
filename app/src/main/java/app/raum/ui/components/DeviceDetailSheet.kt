@@ -429,7 +429,7 @@ private fun LightDial(light: LightCapability, mode: LightDialMode, online: Boole
  * gesendet wird beim Loslassen. Mit [track] ist der ganze Ring ein Verlauf (Weißton, Farbe) statt einer Füllung.
  */
 @Composable
-private fun Dial(
+internal fun Dial(
     fraction: Float,
     accent: Color,
     enabled: Boolean,
@@ -441,6 +441,7 @@ private fun Dial(
     knobColor: ((Float) -> Color)? = null,
     centerContent: (@Composable (Float) -> Unit)? = null,
     modifier: Modifier = Modifier.size(380.dp),
+    ringWidth: androidx.compose.ui.unit.Dp = 30.dp,
     onCommit: (Float) -> Unit,
 ) {
     val g = LocalGlass.current
@@ -469,7 +470,7 @@ private fun Dial(
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val ring = 30.dp.toPx()
+            val ring = ringWidth.toPx()
             val r = size.minDimension / 2f - ring / 2f
             val tl = Offset(center.x - r, center.y - r)
             val arc = Size(r * 2, r * 2)

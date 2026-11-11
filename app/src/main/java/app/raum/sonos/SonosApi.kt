@@ -2,7 +2,7 @@ package app.raum.sonos
 
 /** Was raum. für die Wiedergabe eines Koordinators liest. */
 data class PositionInfo(val trackUri: String?, val metadata: DidlEntry?, val positionS: Int?, val durationS: Int?)
-data class MediaInfo(val currentUri: String?, val metadata: DidlEntry?)
+data class MediaInfo(val currentUri: String?, val metadata: DidlEntry?, val tracks: Int? = null)
 
 /**
  * Lokale UPnP-Schnittstelle der Sonos-Lautsprecher (Port 1400). Sonos dokumentiert sie nicht offiziell, sie ist aber
@@ -78,7 +78,10 @@ class UpnpSonosApi(private val transport: SonosTransport) : SonosApi {
 
     override fun mediaInfo(host: String): MediaInfo {
         val doc = SonosXml.parse(call(host, Svc.AV, "GetMediaInfo", instance))
-        return MediaInfo(SonosXml.value(doc, "CurrentURI")?.ifBlank { null }, SonosXml.didl(SonosXml.value(doc, "CurrentURIMetaData")).firstOrNull())
+        return MediaInfo(
+            SonosXml.value(doc, "CurrentURI")?.ifBlank { null }, SonosXml.didl(SonosXml.value(doc, "CurrentURIMetaData")).firstOrNull(),
+            SonosXml.value(doc, "NrTracks")?.trim()?.toIntOrNull(),
+        )
     }
 
     override fun transportActions(host: String): Set<String> =
