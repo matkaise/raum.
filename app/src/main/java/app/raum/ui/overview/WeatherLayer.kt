@@ -52,8 +52,8 @@ data class WeatherVisual(
  */
 @Composable
 /**
- * Uhr für Himmelsanimationen. [fast] = Regen/Schnee (schnelle Teilchen); sonst bewegt sich nur langsam Wolke und Funkeln,
- * dafür reichen ~12 Bilder/s – spart auf dem Panel spürbar Rechenzeit.
+ * Uhr für Himmelsanimationen. [fast] = Regen/Schnee: jedes Bild (bis 60/s). Sonst ~12 Bilder/s – Wolken und Funkeln
+ * bewegen sich so langsam, dass mehr nicht auffällt, und jede ihrer Aktualisierungen ist auf dem Panel teuer.
  */
 fun rememberAnimationClock(running: Boolean, fast: Boolean = true): State<Float> {
     val t = remember { mutableFloatStateOf(0f) }
@@ -61,8 +61,8 @@ fun rememberAnimationClock(running: Boolean, fast: Boolean = true): State<Float>
         if (!running) return@LaunchedEffect
         var last = withFrameNanos { it }
         while (true) {
-            // Während der Nutzer scrollt, steht der Himmel – jedes Bild gehört dann der Bedienung
-            if (SkyMotion.paused) {
+            // Beim Scrollen stehen nur Wolken und Sterne (teure große Verläufe) – Regen und Schnee laufen weiter
+            if (!fast && SkyMotion.paused) {
                 while (SkyMotion.paused) {
                     kotlinx.coroutines.withTimeoutOrNull(300) { snapshotFlow { SkyMotion.paused }.first { !it } }
                     // Sicherheitsnetz: endet ein Wischen ohne Fling-Meldung, läuft der Himmel nach kurzer Ruhe weiter
@@ -71,14 +71,15 @@ fun rememberAnimationClock(running: Boolean, fast: Boolean = true): State<Float>
                 last = withFrameNanos { it }
             }
             withFrameNanos { now -> t.floatValue += (now - last) / 1_000_000_000f; last = now }
-            delay(if (fast) 30 else 70)
+            if (!fast) delay(70)
         }
     }
     return t
 }
 
 /**
- * Pausiert die Himmelsanimation, solange irgendeine Seite scrollt – jedes Bild gehört dann der Bedienung. Gemeldet über
+ * Hält die langsamen Himmelsteile (Wolken, Sterne) an, solange irgendeine Seite scrollt; Regen und Schnee laufen
+ * weiter, sie sind billig. Gemeldet über
  * [scrollPause], das RaumApp um den ganzen Inhaltsbereich legt.
  */
 object SkyMotion {
@@ -112,13 +113,14 @@ private val PUFFS = listOf(
     Triple(0.78f, 0.14f, 0.26f), Triple(0.38f, 0.22f, 0.30f),
 )
 
-/** Wettereffekte über dem Himmel der Hero-Karte. [time] wird nur beim Zeichnen gelesen (kein Recompose). */
+/**
+ * Langsame Wettereffekte: Wolken und Nebel. Viele große Verläufe – deshalb mit der langsamen Uhr und in einer eigenen,
+ * zwischengespeicherten Ebene (SkyBackdrop). [time] wird nur beim Zeichnen gelesen (kein Recompose).
+ */
 @Composable
-fun WeatherLayer(visual: WeatherVisual, night: Boolean, time: State<Float>, modifier: Modifier = Modifier) {
+fun WeatherClouds(visual: WeatherVisual, night: Boolean, time: State<Float>, modifier: Modifier = Modifier) {
     val far = remember { particles(11, 6) }
     val near = remember { particles(23, 5) }
-    val drops = remember { particles(37, 180) }
-    val flakes = remember { particles(41, 160) }
     val fogBlobs = remember { particles(53, 6) }
 
     Spacer(modifier.drawWithCache {
@@ -138,7 +140,24 @@ fun WeatherLayer(visual: WeatherVisual, night: Boolean, time: State<Float>, modi
             clouds(near.take((cover * near.size + 0.2f).toInt()), t, drift, nearTint, scale = 0.85f, band = 0.00f..0.55f)
 
             if (visual.fog) fog(fogBlobs, t)
+        }
+    })
+}
 
+/** Ob [WeatherParticles] etwas zu zeichnen hat (dann läuft die schnelle Uhr). */
+fun WeatherVisual.hasParticles() = precip != PrecipType.NONE || thunder
+
+/**
+ * Schnelle Wettereffekte: Regen, Schnee, Blitz – wenige gebündelte Zeichenbefehle, deshalb jedes Bild. Eigene Ebene,
+ * damit ein Schritt die Wolken nicht neu zeichnet.
+ */
+@Composable
+fun WeatherParticles(visual: WeatherVisual, time: State<Float>, modifier: Modifier = Modifier) {
+    val drops = remember { particles(37, 180) }
+    val flakes = remember { particles(41, 160) }
+    Spacer(modifier.drawWithCache {
+        onDrawBehind {
+            val t = time.value
             when (visual.precip) {
                 PrecipType.RAIN -> rain(drops, count(visual.rate, 45f, 30, 180), t, visual)
                 PrecipType.SNOW -> snow(flakes, count(visual.rate, 60f, 40, 160), t, visual)

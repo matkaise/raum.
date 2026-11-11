@@ -184,10 +184,10 @@ fun SkyBackdrop(scene: SkyScene, animate: Boolean, modifier: Modifier = Modifier
     val c1 by animateColorAsState(target[1], tween(1500), label = "sky1")
     val c2 by animateColorAsState(target[2], tween(1500), label = "sky2")
     val sunUp = scene.sunProgress != null
-    val time = rememberAnimationClock(
-        animate && scene.motion && (scene.visual != null || !sunUp || scene.phase != SkyPhase.DAY),
-        fast = scene.visual?.let { it.precip != PrecipType.NONE || it.thunder } == true,
-    )
+    val moving = animate && scene.motion
+    // Zwei Uhren: Wolken und Sterne langsam (~12/s, teure große Verläufe), Regen/Schnee jedes Bild (billige Punkte)
+    val slowTime = rememberAnimationClock(moving && (scene.visual != null || !sunUp || scene.phase != SkyPhase.DAY), fast = false)
+    val particleTime = rememberAnimationClock(moving && scene.visual?.hasParticles() == true, fast = true)
 
     Box(modifier.fillMaxSize()) {
         // Ruhende Teile (Verlauf, Sonnenschein, Dunst) als eigene Ebene: einmal gerendert, danach nur noch als fertiges
@@ -210,12 +210,16 @@ fun SkyBackdrop(scene: SkyScene, animate: Boolean, modifier: Modifier = Modifier
                     .background(Brush.verticalGradient(listOf(Color.Transparent, glass.haze))),
             )
         }
-        // Bewegte Teile in eigener Ebene – ein Animationsschritt rendert nur sie neu
+        // Langsam bewegte Teile in eigener, zwischengespeicherter Ebene: Ein Regenschritt setzt sie nur als fertiges Bild ein
         Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
             if (!sunUp || scene.phase != SkyPhase.DAY) {
-                TwinklingStars(cover, time, Modifier.fillMaxSize().alpha(if (sunUp) 0.35f else 1f))
+                TwinklingStars(cover, slowTime, Modifier.fillMaxSize().alpha(if (sunUp) 0.35f else 1f))
             }
-            scene.visual?.let { WeatherLayer(it, night = !sunUp, time = time, modifier = Modifier.fillMaxSize()) }
+            scene.visual?.let { WeatherClouds(it, night = !sunUp, time = slowTime, modifier = Modifier.fillMaxSize()) }
+        }
+        // Regen, Schnee, Blitz: eigene Ebene, damit jedes Bild nur diese wenigen Befehle neu aufzeichnet
+        scene.visual?.takeIf { it.hasParticles() }?.let { v ->
+            WeatherParticles(v, particleTime, Modifier.fillMaxSize().graphicsLayer {})
         }
         // Heller Taghimmel (Nebel, Wolken): weiße Schrift und die Glasleiste verlieren den Kontrast – leicht abdunkeln
         val veil by animateFloatAsState(legibilityVeil(scene.phase, scene.visual, glass.dark), tween(1500), label = "veil")

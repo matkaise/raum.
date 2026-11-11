@@ -7,7 +7,6 @@ import androidx.compose.ui.res.pluralStringResource
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,10 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -91,18 +88,15 @@ fun DevicesScreen(
                 FilledTonalButton(onClick = { adding = true }) { Text(stringResource(R.string.device_add)) }
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(bottom = 32.dp),
-            ) {
-                groups.filter { it.second.isNotEmpty() }.forEach { (title, devices) ->
-                    item(span = { GridItemSpan(maxLineSpan) }, key = "header-$title") {
-                        Row { SectionHeader(title, Modifier.padding(top = 8.dp)) }
-                    }
-                    items(devices, key = { it.id }) { device ->
-                        app.raum.ui.components.GlassDeviceTile(device, cardActions, Modifier.height(190.dp))
+            // Kein Lazy-Grid: Das baute neue Kacheln erst beim Hineinscrollen – auf dem Panel bis 60 ms pro Reihe, sichtbar
+            // als Ruckeln. Wie die Übersicht: alle Kacheln einmal aufbauen, beim Scrollen nur verschieben.
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
+                groups.filter { it.second.isNotEmpty() }.forEachIndexed { i, (title, devices) ->
+                    Row { SectionHeader(title, Modifier.padding(top = if (i == 0) 8.dp else 22.dp, bottom = 14.dp)) }
+                    app.raum.ui.components.FixedGrid(devices, columns = 4) { device, mod ->
+                        androidx.compose.runtime.key(device.id) {
+                            app.raum.ui.components.GlassDeviceTile(device, cardActions, mod.height(190.dp))
+                        }
                     }
                 }
             }
