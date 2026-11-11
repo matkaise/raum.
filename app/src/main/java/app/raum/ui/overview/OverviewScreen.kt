@@ -1,9 +1,5 @@
 package app.raum.ui.overview
 
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -68,13 +64,9 @@ fun OverviewScreen(
     var forecastDay by remember { mutableStateOf<Int?>(null) }
     val finished = rememberFinishedScene(state.runningSceneId)
     val scroll = rememberScrollState()
-    // Himmel anhalten, solange gescrollt wird (siehe SkyMotion)
-    LaunchedEffect(scroll.isScrollInProgress) { SkyMotion.paused = scroll.isScrollInProgress }
-    DisposableEffect(Unit) { onDispose { SkyMotion.paused = false } }
 
     Column(
-        // Eigene Ebene: Ein Animationsschritt des Himmels dahinter muss den (unveränderten) Inhalt nicht neu aufbereiten
-        Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.verticalScroll(scroll)
+        Modifier.fillMaxSize().verticalScroll(scroll)
             .padding(start = 8.dp, end = 24.dp, top = 24.dp, bottom = 32.dp),
     ) {
         HomeHero(state, scene, onOpenForecast = if (scene.days.isNotEmpty()) ({ forecastDay = it }) else null)

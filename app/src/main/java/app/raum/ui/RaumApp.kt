@@ -56,6 +56,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -196,8 +198,8 @@ fun RaumApp(
     CompositionLocalProvider(LocalSkyScene provides sky) {
     run {
     Box(Modifier.fillMaxSize()) {
-        // Himmel bewegt sich nur auf der Übersicht – sonst kostet er bei jedem Bild der anderen Seiten Rechenzeit
-        SkyBackdrop(sky, animate = selectedTop == TopLevel.OVERVIEW)
+        // Himmel (Regen, Schnee, Wolken, Sterne) bewegt sich auf allen Seiten; beim Scrollen steht er (SkyMotion)
+        SkyBackdrop(sky, animate = true)
         Row(Modifier.fillMaxSize()) {
             GlassRail(
                 selected = selectedTop,
@@ -210,7 +212,13 @@ fun RaumApp(
                 onNavigate = { navController.navigateTopLevel(it) },
                 onSleep = display::sleepNow,
             )
-            Box(Modifier.weight(1f).fillMaxHeight()) {
+            // Eigene Ebene für den Inhalt: Ein Animationsschritt des Himmels dahinter setzt ihn nur als fertiges Bild ein,
+            // statt jede Seite neu aufzubereiten. Scrollen irgendwo hält den Himmel an.
+            Box(
+                Modifier.weight(1f).fillMaxHeight()
+                    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                    .nestedScroll(app.raum.ui.overview.SkyMotion.scrollPause),
+            ) {
                 // Ohne Überblendung: Beim Wechsel würden sonst zwei Seiten gleichzeitig gezeichnet – auf dem Panel ruckelt
                 // das; ein sofortiger Wechsel wirkt dort ruhiger.
                 NavHost(

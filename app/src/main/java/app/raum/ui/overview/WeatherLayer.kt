@@ -63,7 +63,11 @@ fun rememberAnimationClock(running: Boolean, fast: Boolean = true): State<Float>
         while (true) {
             // Während der Nutzer scrollt, steht der Himmel – jedes Bild gehört dann der Bedienung
             if (SkyMotion.paused) {
-                snapshotFlow { SkyMotion.paused }.first { !it }
+                while (SkyMotion.paused) {
+                    kotlinx.coroutines.withTimeoutOrNull(300) { snapshotFlow { SkyMotion.paused }.first { !it } }
+                    // Sicherheitsnetz: endet ein Wischen ohne Fling-Meldung, läuft der Himmel nach kurzer Ruhe weiter
+                    if (android.os.SystemClock.uptimeMillis() - SkyMotion.lastScroll > SkyMotion.RESUME_AFTER_MS) SkyMotion.paused = false
+                }
                 last = withFrameNanos { it }
             }
             withFrameNanos { now -> t.floatValue += (now - last) / 1_000_000_000f; last = now }
@@ -73,9 +77,27 @@ fun rememberAnimationClock(running: Boolean, fast: Boolean = true): State<Float>
     return t
 }
 
-/** Pausiert die Himmelsanimation, solange eine Seite scrollt (z. B. die Übersicht). */
+/**
+ * Pausiert die Himmelsanimation, solange irgendeine Seite scrollt – jedes Bild gehört dann der Bedienung. Gemeldet über
+ * [scrollPause], das RaumApp um den ganzen Inhaltsbereich legt.
+ */
 object SkyMotion {
     var paused by mutableStateOf(false)
+    @Volatile var lastScroll = 0L
+    const val RESUME_AFTER_MS = 600L
+
+    val scrollPause = object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+        override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+            lastScroll = android.os.SystemClock.uptimeMillis()
+            if (!paused) paused = true
+            return androidx.compose.ui.geometry.Offset.Zero
+        }
+
+        override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+            paused = false
+            return androidx.compose.ui.unit.Velocity.Zero
+        }
+    }
 }
 
 private class Particle(val x: Float, val y: Float, val speed: Float, val size: Float, val phase: Float)
