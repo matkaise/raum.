@@ -123,9 +123,11 @@ fun RaumApp(
     requests: UiRequests = koinInject(),
     display: DisplayController = koinInject(),
     homeConnect: HomeConnectService = koinInject(),
+    grohe: app.raum.grohe.GroheService = koinInject(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val household by homeConnect.state.collectAsStateWithLifecycle()
+    val groheState by grohe.state.collectAsStateWithLifecycle()
     val openAppliance by requests.openAppliance.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -188,7 +190,7 @@ fun RaumApp(
             GlassRail(
                 selected = selectedTop,
                 // „Haushalt“ nur, wenn Home Connect eingeschaltet ist
-                hidden = if (household.active) emptySet() else setOf(TopLevel.HOUSEHOLD),
+                hidden = if (household.active || groheState.active) emptySet() else setOf(TopLevel.HOUSEHOLD),
                 onNavigate = { navController.navigateTopLevel(it) },
                 onSleep = display::sleepNow,
             )
@@ -208,7 +210,7 @@ fun RaumApp(
                             onRunScene = viewModel::runScene,
                             onOpenRoom = { navController.openRoomFromOverview(it) },
                             householdRow = {
-                                HouseholdRow(household, homeConnect) { haId ->
+                                HouseholdRow(household, homeConnect, groheState) { haId ->
                                     requests.openAppliance.value = haId
                                     navController.navigateTopLevel(TopLevel.HOUSEHOLD)
                                 }

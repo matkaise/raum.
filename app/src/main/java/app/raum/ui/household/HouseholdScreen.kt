@@ -60,6 +60,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.R
 import app.raum.homeconnect.HcAppliance
+import app.raum.grohe.GroheDevice
+import app.raum.grohe.GroheMode
+import app.raum.grohe.GroheState
 import app.raum.homeconnect.HcKeys
 import app.raum.homeconnect.HcLink
 import app.raum.homeconnect.HcMode
@@ -86,6 +89,7 @@ fun HouseholdScreen(
     vm: HouseholdViewModel = koinViewModel(),
 ) {
     val st by vm.state.collectAsStateWithLifecycle()
+    val gs by vm.groheState.collectAsStateWithLifecycle()
     val selectedId by vm.selected.collectAsStateWithLifecycle()
     val toast = rememberToast(vm.service)
     val now = rememberNow()
@@ -93,37 +97,54 @@ fun HouseholdScreen(
     LaunchedEffect(requestedAppliance) {
         if (requestedAppliance != null) { vm.select(requestedAppliance); onRequestHandled() }
     }
-    val selected = st.appliances.firstOrNull { it.haId == selectedId } ?: st.appliances.firstOrNull()
-    LaunchedEffect(selected?.haId) { if (selected != null && selected.haId != selectedId) vm.select(selected.haId) }
+    // Gewählt ist entweder ein Home-Connect-Gerät oder ein Grohe Blue („grohe:…“)
+    val groheSel = selectedId?.takeIf { it.startsWith(GroheDevice.PREFIX) }?.let(gs::device)
+    val selected = if (groheSel != null) null else st.appliances.firstOrNull { it.haId == selectedId } ?: st.appliances.firstOrNull()
+    val groheShown = groheSel ?: if (selected == null) gs.devices.firstOrNull() else null
+    val shownId = groheShown?.id ?: selected?.haId
+    LaunchedEffect(shownId) { if (shownId != null && shownId != selectedId) vm.select(shownId) }
 
     Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 20.dp, bottom = 24.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, bottom = 20.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.nav_household), style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, letterSpacing = (-1.5).sp, lineHeight = 58.sp)
-                Text(headline(st), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 17.sp, modifier = Modifier.padding(top = 8.dp))
+                Text(headline(st, gs), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 17.sp, modifier = Modifier.padding(top = 8.dp))
             }
             if (toast != null) ToastChip(toast)
         }
         when {
-            st.appliances.isEmpty() -> EmptyHousehold(st, onOpenSettings)
-            selected != null -> Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ApplianceList(st, selected.haId, now, vm.service, vm::select)
-                DetailPanel(selected, st, vm, now, Modifier.weight(1f).fillMaxHeight())
+            st.appliances.isEmpty() && gs.devices.isEmpty() -> EmptyHousehold(st, gs.loading, onOpenSettings)
+            shownId != null -> Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ApplianceList(st, gs, shownId, now, vm.service, vm::select)
+                if (groheShown != null) GroheDetail(groheShown, gs, vm, now, Modifier.weight(1f).fillMaxHeight())
+                else if (selected != null) DetailPanel(selected, st, vm, now, Modifier.weight(1f).fillMaxHeight())
             }
         }
     }
 }
 
 @Composable
-private fun headline(st: HomeConnectState): String {
-    val n = st.appliances.count { it.connected }
+private fun headline(st: HomeConnectState, gs: GroheState): String {
+    val n = st.appliances.count { it.connected } + gs.devices.count { it.online }
     val base = when {
         st.link == HcLink.CONNECTING && st.appliances.isEmpty() -> stringResource(R.string.hc_connecting)
         st.link == HcLink.RETRYING -> stringResource(R.string.hc_link_retrying_short)
-        st.link == HcLink.NEEDS_SIGN_IN -> stringResource(R.string.hc_link_reauth)
+        st.link == HcLink.NEEDS_SIGN_IN || gs.needsReauth -> stringResource(R.string.hc_link_reauth)
         else -> pluralStringResource(R.plurals.hc_connected_count, n, n)
     }
-    return listOfNotNull("Home Connect", if (st.mode == HcMode.DEMO) stringResource(R.string.hc_mode_demo) else null, base).joinToString(" · ")
+    val sources = listOfNotNull(if (st.active) "Home Connect" else null, if (gs.active) "Grohe" else null).joinToString(" + ")
+    val demo = st.mode == HcMode.DEMO || gs.mode == GroheMode.DEMO
+    return listOfNotNull(sources.ifBlank { null }, if (demo) stringResource(R.string.hc_mode_demo) else null, base).joinToString(" · ")
+}
+
+/** Detailbereich für den Grohe Blue. */
+@Composable
+private fun GroheDetail(d: GroheDevice, gs: GroheState, vm: HouseholdViewModel, now: java.time.Instant, modifier: Modifier) {
+    val g = LocalGlass.current
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    Column(modifier.glass(RoundedCornerShape(36.dp), g.glassStrong, g.edge).padding(horizontal = 28.dp, vertical = 24.dp)) {
+        GrohePanel(d, gs.pouring[d.id], vm, d.id in busy, now)
+    }
 }
 
 @Composable
@@ -139,13 +160,13 @@ private fun ToastChip(text: String) {
 }
 
 @Composable
-private fun EmptyHousehold(st: HomeConnectState, onOpenSettings: () -> Unit) {
+private fun EmptyHousehold(st: HomeConnectState, groheLoading: Boolean, onOpenSettings: () -> Unit) {
     val g = LocalGlass.current
     Column(
         Modifier.fillMaxWidth().padding(top = 24.dp).glass(RoundedCornerShape(32.dp), g.glass, g.edge).padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val loading = st.link == HcLink.CONNECTING || st.link == HcLink.LIVE
+        val loading = st.link == HcLink.CONNECTING || st.link == HcLink.LIVE || groheLoading
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             if (loading) CircularProgressIndicator(Modifier.size(28.dp), color = g.ink, strokeWidth = 3.dp)
             else Icon(Icons.Outlined.CloudOff, null, Modifier.size(28.dp), tint = g.soft)
@@ -163,32 +184,39 @@ private fun EmptyHousehold(st: HomeConnectState, onOpenSettings: () -> Unit) {
 // --- Liste ------------------------------------------------------------------------------------
 
 @Composable
-private fun ApplianceList(st: HomeConnectState, selected: String, now: java.time.Instant, service: app.raum.homeconnect.HomeConnectService, onPick: (String) -> Unit) {
-    val g = LocalGlass.current
-    val many = st.appliances.size > 5
+private fun ApplianceList(st: HomeConnectState, gs: GroheState, selected: String, now: java.time.Instant, service: app.raum.homeconnect.HomeConnectService, onPick: (String) -> Unit) {
+    val many = st.appliances.size + gs.devices.size > 5
     Column(
         Modifier.width(288.dp).fillMaxHeight().then(if (many) Modifier.verticalScroll(rememberScrollState()) else Modifier),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        val cardMod = if (many) Modifier.height(116.dp) else Modifier.weight(1f).heightIn(max = 140.dp)
         st.appliances.forEach { a ->
-            val on = a.haId == selected
-            val s = summarize(a, service, now)
-            val bg by animateColorAsState(if (on) g.glassSolid else g.glass, label = "card")
-            Row(
-                (if (many) Modifier.height(116.dp) else Modifier.weight(1f).heightIn(max = 140.dp)).fillMaxWidth()
-                    .then(if (on) Modifier.shadow(14.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f)) else Modifier)
-                    .clip(RoundedCornerShape(28.dp)).background(bg)
-                    .border(1.dp, if (on) Color.White.copy(alpha = 0.95f) else g.edge, RoundedCornerShape(28.dp))
-                    .clickable { onPick(a.haId) }.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                ApplianceRing(a.type, s, 64.dp, 28.dp)
-                Column(Modifier.weight(1f)) {
-                    Text(a.name, color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(s.status, color = statusColor(s), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-                    if (s.sub.isNotBlank()) Text(s.sub, color = subColor(s), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
+            ListCard(a.name, iconFor(a.type), summarize(a, service, now), a.haId == selected, cardMod) { onPick(a.haId) }
+        }
+        gs.devices.forEach { d ->
+            ListCard(d.name, GroheIcon, summarizeGrohe(d, gs.pouring[d.id], now), d.id == selected, cardMod) { onPick(d.id) }
+        }
+    }
+}
+
+@Composable
+private fun ListCard(name: String, icon: ImageVector, s: ApplianceSummary, on: Boolean, size: Modifier, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    val bg by animateColorAsState(if (on) g.glassSolid else g.glass, label = "card")
+    Row(
+        size.fillMaxWidth()
+            .then(if (on) Modifier.shadow(14.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f)) else Modifier)
+            .clip(RoundedCornerShape(28.dp)).background(bg)
+            .border(1.dp, if (on) Color.White.copy(alpha = 0.95f) else g.edge, RoundedCornerShape(28.dp))
+            .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ApplianceRing(icon, s, 64.dp, 28.dp)
+        Column(Modifier.weight(1f)) {
+            Text(name, color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(s.status, color = statusColor(s), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            if (s.sub.isNotBlank()) Text(s.sub, color = subColor(s), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

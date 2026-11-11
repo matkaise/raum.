@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
 /** Seite „Haushalt“: Auswahl, Befehle und Fehlermeldungen. */
 class HouseholdViewModel(
     val service: HomeConnectService,
+    val grohe: app.raum.grohe.GroheService,
     private val messages: UiMessageBus,
     private val strings: Strings,
 ) : ViewModel() {
@@ -36,9 +37,21 @@ class HouseholdViewModel(
     private val _busy = MutableStateFlow<Set<String>>(emptySet())
     val busy: StateFlow<Set<String>> = _busy.asStateFlow()
 
+    val groheState = grohe.state
+
     fun select(haId: String) {
         _selected.value = haId
-        viewModelScope.launch { service.ensurePrograms(haId) }
+        if (haId.startsWith(app.raum.grohe.GroheDevice.PREFIX)) grohe.refreshSoon()
+        else viewModelScope.launch { service.ensurePrograms(haId) }
+    }
+
+    /** Grohe Blue: Wasser zapfen. */
+    fun dispense(id: String, type: app.raum.grohe.WaterType, ml: Int) = act(id) {
+        grohe.dispense(id, type, ml).fold({ Result.success(Unit) }, { e ->
+            val ge = e as? app.raum.grohe.GroheException
+            messages.error(listOfNotNull(strings.get(if (ge?.kind == app.raum.grohe.GroheException.Kind.AUTH) app.raum.R.string.grohe_fail_auth else app.raum.R.string.grohe_fail), ge?.detail).joinToString(" – "))
+            Result.success(Unit)
+        })
     }
 
     fun ensureDetail(haId: String, key: String) {

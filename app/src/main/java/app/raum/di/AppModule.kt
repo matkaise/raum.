@@ -73,6 +73,11 @@ import app.raum.thread.NsdBorderRouterDiscovery
 import app.raum.thread.ThreadService
 import app.raum.ui.settings.ThreadViewModel
 import app.raum.homeconnect.DemoHomeConnect
+import app.raum.grohe.DemoGrohe
+import app.raum.grohe.GroheAuth
+import app.raum.grohe.GroheCloudBackend
+import app.raum.grohe.GrohePrefs
+import app.raum.grohe.GroheService
 import app.raum.homeconnect.HcAuth
 import app.raum.homeconnect.HcBudget
 import app.raum.homeconnect.HcCloudBackend
@@ -145,7 +150,7 @@ val appModule = module {
 
     // --- Stabilisierung (M7) ---
     single { BackupService(get(), get(), get(), get(), get()) }
-    single { ResetService(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { ResetService(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     single { UpdateInstaller(androidContext(), get(), get()) }
 
     // --- Erstinbetriebnahme ---
@@ -185,6 +190,15 @@ val appModule = module {
     single { HcPrefs(androidContext()) }
     single { HcAuth(KeystoreSecretStore(androidContext()), UrlConnectionHcHttp(), builtInSecret = BuildConfig.HC_CLIENT_SECRET) }
     single { HcBudget(get<HcPrefs>()) }
+    // Grohe Blue (inoffizielle Grohe-Cloud, freiwillig – ab Werk aus). Tokens im Keystore.
+    single { GroheAuth(KeystoreSecretStore(androidContext()), UrlConnectionHcHttp()) }
+    single {
+        GroheService(
+            settings = GrohePrefs(androidContext()), auth = get(),
+            cloud = GroheCloudBackend(get(), UrlConnectionHcHttp()),
+            demoFactory = { DemoGrohe() }, log = get(), strings = get(),
+        )
+    }
     single {
         val locale = get<LocaleController>()
         val language = { locale.locale().toLanguageTag() }
@@ -196,7 +210,7 @@ val appModule = module {
         )
     }
 
-    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
     single { DeviceService(get(), get(), get(), get(), get(), get()) }
     single { SceneRunner(get(), get(), get(), get()) }

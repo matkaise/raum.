@@ -6,10 +6,10 @@ Stand: 22.09.2026 · App 0.7.0 · DB-Schema v2 · Prüfung gegen Spezifikation K
 
 | Bereich | Anforderung | Umsetzung | Status |
 |---|---|---|---|
-| Local-first | 11.1, 12.4 | Keine Telemetrie, kein eigenes Konto; Ortssuche über eingebaute Liste statt Ortungsdienst. Internetverbindungen nur freiwillig und ab Werk aus: Wetter und Home Connect (siehe unten) | ⚠️ Abweichung (opt-in) |
+| Local-first | 11.1, 12.4 | Keine Telemetrie, kein eigenes Konto; Ortssuche über eingebaute Liste statt Ortungsdienst. Internetverbindungen nur freiwillig und ab Werk aus: Wetter, Home Connect und Grohe Blue (siehe unten) | ⚠️ Abweichung (opt-in) |
 | Teilen (Multi-Admin) | – | Kopplungsfenster nur auf Nutzeraktion, PIN-geschützt, 15 min gültig, wird beim Schließen des Dialogs widerrufen; neue Admins und Entzug im Protokoll; „Übergabe vorbereiten“ entfernt alle fremden Admins vor dem Auflösen der eigenen Fabric – je Gerät frisch gelesen und durch erneutes Lesen bestätigt; nicht bestätigte Geräte werden angezeigt, die eigenen Schlüssel nur nach ausdrücklicher Wahl („Unvollständig abschließen“) gelöscht | ✅ |
 | Bridge | – | Einschalten und Koppeln PIN-geschützt; Kopplungsfenster nur auf Nutzeraktion (15 min); Befehle nur für freigegebene Geräte und nur von gekoppelten Apps, jeweils mit Quelle im Protokoll; über denselben Weg wie Bedienung am Panel (Offline-Schutz). Werksreset und Übergabe löschen alle Bridge-Kopplungen – durch Beenden des Bridge-Prozesses und direktes Löschen seines Speichers, auch bei ausgeschalteter Bridge; sonst bricht der Reset ab. Die echte Bridge ist ein Matter-Server im LAN (mDNS, UDP/TCP 5540) im eigenen Prozess `:bridge` – nur bei eingeschalteter Bridge; Zugriff nur für per Kopplung aufgenommene Apps (CASE, ACL je Fabric). Kopplungsfenster mit einmaligem Code je Öffnung, nur mDNS (kein BLE), nicht beim Start. Bridge-Identität (Fabrics anderer Apps, Betriebsschlüssel) in eigenem AES-GCM/Keystore-Speicher (`raum_bridge_kvs`). Echtheitsnachweis: DAC-Schlüssel wird im Android-Keystore des Panels erzeugt (StrongBox, wenn vorhanden; nur CSR verlässt das Gerät) oder – alternativ – mit Schlüssel importiert; Kette, IDs und Schlüsselzugehörigkeit geprüft, Signatur im Keystore; ohne eigenes: Test-DAC des SDK (0xFFF1/0x8000). Siehe docs/VENDOR.md | ✅ / ⚠️ Test-DAC bis zur Zertifizierung |
-| Internet-Berechtigung | 11.1 | `INTERNET` nur für das Wetter (HTTPS zu api.met.no), Home Connect (HTTPS zu api.home-connect.com) und Matter über IP; `usesCleartextTraffic=false` | ✅ |
+| Internet-Berechtigung | 11.1 | `INTERNET` nur für das Wetter (HTTPS zu api.met.no), Home Connect (HTTPS zu api.home-connect.com), Grohe Blue (HTTPS zu idp2-apigw.cloud.grohe.com) und Matter über IP; `usesCleartextTraffic=false` | ✅ |
 | WLAN-Verwaltung | 11.1 | Verbinden/Schalten nur als Device Owner. Berechtigungen: `ACCESS/CHANGE_WIFI_STATE`, `NEARBY_WIFI_DEVICES` (`neverForLocation`), `ACCESS_FINE/COARSE_LOCATION` – Letztere nur, weil Android Netznamen und Suchergebnisse sonst verbirgt; raum. fragt nie einen Standort ab. Als Device Owner erteilt raum. sich diese Berechtigungen selbst. WLAN-Passwörter speichert Android, nicht raum. | ✅ |
 | Klartextverkehr | 11.1 | `usesCleartextTraffic="false"`. Einzige Ausnahme: das Dataset eines OpenThread Border Routers per HTTP (REST-API, Port 8081 – dort nur HTTP), über einen eigenen Minimal-Client, der **nur private/Link-lokale Adressen** (10/8, 172.16/12, 192.168/16, fe80::/10, fc00::/7) zulässt und nur auf ausdrückliche Nutzeraktion. Ansonsten fragt raum. dort nur `/node/state` ab (Erkennung) | ✅ (begrenzte Ausnahme) |
 | Thread-Dataset und WLAN für Commissioning | 11.2, 10.3 | AES-256-GCM mit Schlüssel im Android Keystore (`raum_secrets_v1`, hardwaregestützt, sofern vorhanden); Schlüsselname als AAD. Auf dem Datenträger nur IV + Chiffrat; Netzname nur zur Anzeige aus dem entschlüsselten Dataset. Nie im Protokoll, nie angezeigt (nur Netzname, Kanal, PAN-IDs). Ändern PIN-geschützt; Werksreset und Übergabe löschen beides. Gerätetest prüft, dass kein Klartext gespeichert wird | ✅ |
@@ -89,6 +89,22 @@ simons-plugins/indigo-home-connect.
 | Fernstart | Nur möglich, solange „Fernstart“ am Gerät erlaubt ist (BSH-Regel, verfällt nach ~24 h); raum. kann das nicht umgehen und zeigt den Hinweis |
 | Ausfall | Kern (Matter, Szenen, Automationen) hängt nicht davon ab; Seite zeigt „Verbindung unterbrochen – neuer Versuch um …“ |
 | Datenhaltung | „Abmelden“ löscht die Tokens; „Übergabe vorbereiten“ und Werksreset löschen Tokens, Client Secret, Einstellungen und Zwischenspeicher |
+| Transport | Nur HTTPS, Zertifikatsprüfung durch Android |
+
+## Bewusste Abweichung: Grohe Blue über die Grohe-Cloud (11.1)
+
+Auf Wunsch des Auftraggebers (11.11.2026) kann raum. einen Grohe Blue (Wasser still/medium/sprudelnd) auf der Seite
+„Haushalt“ bedienen. Grohe bietet dafür **keine offizielle Schnittstelle**; raum. nutzt die Grohe-Cloud „ONDUS“, die
+auch die Grohe-App verwendet (Vorbild: lennartkaden/Grohe-Blue-API-Python, koproductions-code/groheblue). Sie kann sich
+ohne Ankündigung ändern.
+
+| Punkt | Umsetzung |
+|---|---|
+| Einwilligung | Ab Werk **aus**. Einstellungen → Grohe Blue: „Aus“, „Demo“ (simuliert, ohne Netz) oder „Eigenes Gerät“, mit Hinweis auf die inoffizielle Schnittstelle |
+| Anmeldung | Grohes eigene Login-Seite in einem WebView im Panel. raum. liest Eingaben nicht mit und speichert kein Passwort; abgefangen wird nur die Weiterleitung `ondus://…`, die gegen Tokens eingelöst wird. Vor jeder Anmeldung werden WebView-Cookies gelöscht |
+| Zugangsdaten | Access-/Refresh-Token AES-256-GCM-verschlüsselt im Keystore (`raum_secrets_v1`, Eintrag `grohe_tokens`); abgelaufene Anmeldung → „neu anmelden“ |
+| Übertragene Daten | Abfrage `GET /v3/iot/dashboard` (Geräte, Filter-/CO₂-Stand) alle 10 min und nach dem Zapfen; Zapfbefehl (Wasserart, Menge 50–2000 ml) nur auf Knopfdruck |
+| Datenhaltung | „Abmelden“ löscht die Tokens; „Übergabe vorbereiten“ und Werksreset löschen Tokens und Einstellungen |
 | Transport | Nur HTTPS, Zertifikatsprüfung durch Android |
 
 ## Bewusste Abweichung: Administrator-PIN optional

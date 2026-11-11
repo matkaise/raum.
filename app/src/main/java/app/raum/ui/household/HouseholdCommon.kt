@@ -248,7 +248,10 @@ fun subColor(s: ApplianceSummary): Color = if (s.subAlert) LocalGlass.current.wa
 
 /** Fortschrittsring mit Gerätesymbol in der Mitte (Karten im Entwurf). */
 @Composable
-fun ApplianceRing(type: HcType, summary: ApplianceSummary, size: Dp, iconSize: Dp) {
+fun ApplianceRing(type: HcType, summary: ApplianceSummary, size: Dp, iconSize: Dp) = ApplianceRing(iconFor(type), summary, size, iconSize)
+
+@Composable
+fun ApplianceRing(icon: ImageVector, summary: ApplianceSummary, size: Dp, iconSize: Dp) {
     val g = LocalGlass.current
     val ringColor = if (summary.done) HcColors.Done else summary.accent
     val iconColor = when {
@@ -265,7 +268,7 @@ fun ApplianceRing(type: HcType, summary: ApplianceSummary, size: Dp, iconSize: D
                 size = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w), style = Stroke(w, cap = StrokeCap.Butt))
         }
         Box(Modifier.size(size - 10.dp).clip(CircleShape).background(g.glassSolid), contentAlignment = Alignment.Center) {
-            Icon(iconFor(type), null, Modifier.size(iconSize), tint = iconColor)
+            Icon(icon, null, Modifier.size(iconSize), tint = iconColor)
         }
     }
 }

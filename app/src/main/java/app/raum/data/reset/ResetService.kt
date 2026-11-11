@@ -41,6 +41,7 @@ class ResetService(
     private val bridge: MatterBridge,
     private val credentials: NetworkCredentialStore,
     private val homeConnect: app.raum.homeconnect.HomeConnectService,
+    private val grohe: app.raum.grohe.GroheService,
 ) {
     /**
      * Übergabe, Schritt 1: allen anderen Apps (Apple Home, Google Home …) den Zugriff auf alle Geräte entziehen –
@@ -78,6 +79,7 @@ class ResetService(
         weather.clearCache()
         // Home-Connect-Anmeldung gehört den bisherigen Bewohnern (Konto bei BSH)
         homeConnect.clearAll()
+        grohe.clearAll()
         if (mode == ResetMode.FULL) {
             settings.clearAll()
             listOf(File(context.filesDir, "last_crash.txt")).forEach { it.delete() }

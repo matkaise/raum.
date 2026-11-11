@@ -280,7 +280,7 @@ private fun Bean(on: Boolean) {
 
 /** Menge als Schieber: tippen oder ziehen, auf die Schrittweite der Maschine gerundet. */
 @Composable
-private fun AmountSlider(value: Double, min: Double, max: Double, step: Double, enabled: Boolean, onChange: (Double) -> Unit) {
+internal fun AmountSlider(value: Double, min: Double, max: Double, step: Double, enabled: Boolean, onChange: (Double) -> Unit) {
     val g = LocalGlass.current
     var width by remember { mutableFloatStateOf(1f) }
     // Die Gesten laufen über Getränkewechsel hinweg weiter – immer die aktuellen Grenzen und das aktuelle Getränk
