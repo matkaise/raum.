@@ -1562,4 +1562,27 @@
     <string name="sonos_resume">Fortsetzen</string>
     <string name="sonos_row_hint">antippen öffnet die Musik</string>
     <string name="settings_license_sonos">Sonos: lokale Steuerung über UPnP im Heimnetz, ohne Cloud.</string>
+    <!-- Haushalt: Geräteleiste und Übersichtsreihe -->
+    <plurals name="hc_count_running">
+        <item quantity="one">%1$d läuft</item>
+        <item quantity="other">%1$d laufen</item>
+    </plurals>
+    <plurals name="hc_count_done">
+        <item quantity="one">%1$d fertig</item>
+        <item quantity="other">%1$d fertig</item>
+    </plurals>
+    <plurals name="hc_count_appliances">
+        <item quantity="one">%1$d Gerät</item>
+        <item quantity="other">%1$d Geräte</item>
+    </plurals>
+    <plurals name="hc_group_ready">
+        <item quantity="one">%1$d bereit</item>
+        <item quantity="other">%1$d bereit</item>
+    </plurals>
+    <plurals name="hc_all_ready">
+        <item quantity="one">%1$d Gerät bereit</item>
+        <item quantity="other">%1$d Geräte bereit</item>
+    </plurals>
+    <string name="hc_all_quiet">Alles ruhig</string>
+    <string name="hc_choose_appliance">Gerät wählen</string>
 </resources>

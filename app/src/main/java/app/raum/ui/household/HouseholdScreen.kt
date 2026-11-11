@@ -2,6 +2,10 @@ package app.raum.ui.household
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,8 +81,8 @@ import app.raum.ui.theme.glass
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * „Haushalt“ (Entwurf raum Redesign, Turn 10): Home-Connect-Geräte links als Karten mit Fortschrittsring,
- * rechts das gewählte Gerät – Kaffee als Tassen-Karussell, Backofen mit Drehring, Wäsche/Geschirr mit Trommel bzw.
+ * „Haushalt“ (Entwurf „raum. Haushalt Redesign“): Geräte als Leiste oben rechts wie die Räume bei Musik,
+ * darunter über die volle Breite das gewählte Gerät – Kaffee als Tassen-Karussell, Backofen mit Drehring, Wäsche/Geschirr mit Trommel bzw.
  * Innenansicht, Restzeit und Programmwahl.
  */
 @Composable
@@ -104,37 +108,45 @@ fun HouseholdScreen(
     val shownId = groheShown?.id ?: selected?.haId
     LaunchedEffect(shownId) { if (shownId != null && shownId != selectedId) vm.select(shownId) }
 
+    val entries = householdEntries(st, gs, vm.service, now)
+
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 20.dp, bottom = 24.dp)) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, bottom = 20.dp), verticalAlignment = Alignment.Bottom) {
-            Column(Modifier.weight(1f)) {
+        // Kopf wie bei Musik: Titel links, Geräteleiste rechts
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 18.dp),
+            verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Column(Modifier.widthIn(min = 220.dp, max = 360.dp)) {
                 Text(stringResource(R.string.nav_household), style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, letterSpacing = (-1.5).sp, lineHeight = 58.sp)
-                Text(headline(st, gs), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 17.sp, modifier = Modifier.padding(top = 8.dp))
+                Text(headline(st, gs, entries), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 17.sp, lineHeight = 22.sp, maxLines = 2, modifier = Modifier.padding(top = 8.dp))
             }
-            if (toast != null) ToastChip(toast)
+            Spacer(Modifier.weight(1f))
+            if (entries.isNotEmpty() && shownId != null) ApplianceTabs(entries, shownId, vm::select)
         }
         when {
             st.appliances.isEmpty() && gs.devices.isEmpty() -> EmptyHousehold(st, gs.loading, onOpenSettings)
-            shownId != null -> Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ApplianceList(st, gs, shownId, now, vm.service, vm::select)
-                if (groheShown != null) GroheDetail(groheShown, gs, vm, now, Modifier.weight(1f).fillMaxHeight())
-                else if (selected != null) DetailPanel(selected, st, vm, now, Modifier.weight(1f).fillMaxHeight())
-            }
+            // Ohne Liste daneben bekommt das gewählte Gerät die volle Breite
+            groheShown != null -> GroheDetail(groheShown, gs, vm, now, Modifier.weight(1f).fillMaxWidth())
+            selected != null -> DetailPanel(selected, st, vm, now, Modifier.weight(1f).fillMaxWidth())
         }
+    }
+    // Hinweis schwebt über dem Detail, damit nichts verrutscht
+    if (toast != null) Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp)) { ToastChip(toast) }
     }
 }
 
 @Composable
-private fun headline(st: HomeConnectState, gs: GroheState): String {
-    val n = st.appliances.count { it.connected } + gs.devices.count { it.online }
+private fun headline(st: HomeConnectState, gs: GroheState, entries: List<HouseholdEntry>): String {
+    val n = entries.size
     val base = when {
         st.link == HcLink.CONNECTING && st.appliances.isEmpty() -> stringResource(R.string.hc_connecting)
         st.link == HcLink.RETRYING -> stringResource(R.string.hc_link_retrying_short)
         st.link == HcLink.NEEDS_SIGN_IN || gs.needsReauth -> stringResource(R.string.hc_link_reauth)
-        else -> pluralStringResource(R.plurals.hc_connected_count, n, n)
+        else -> listOf(activityLine(entries), pluralStringResource(R.plurals.hc_count_appliances, n, n)).filter { it.isNotBlank() }.joinToString(" · ")
     }
-    val sources = listOfNotNull(if (st.active) "Home Connect" else null, if (gs.active) "Grohe" else null).joinToString(" + ")
     val demo = st.mode == HcMode.DEMO || gs.mode == GroheMode.DEMO
-    return listOfNotNull(sources.ifBlank { null }, if (demo) stringResource(R.string.hc_mode_demo) else null, base).joinToString(" · ")
+    return listOfNotNull(if (demo) stringResource(R.string.hc_mode_demo) else null, base).joinToString(" · ")
 }
 
 /** Detailbereich für den Grohe Blue. */
@@ -181,43 +193,51 @@ private fun EmptyHousehold(st: HomeConnectState, groheLoading: Boolean, onOpenSe
     }
 }
 
-// --- Liste ------------------------------------------------------------------------------------
+// --- Geräteleiste -----------------------------------------------------------------------------
 
+/**
+ * Geräte als Leiste wie die Raumleiste bei Musik; jede Taste aufgebaut wie die Navigationsleiste (Ring oben, Name und
+ * Zustand darunter), die gewählte weiß. Bei vielen Geräten scrollt die Leiste waagrecht.
+ */
 @Composable
-private fun ApplianceList(st: HomeConnectState, gs: GroheState, selected: String, now: java.time.Instant, service: app.raum.homeconnect.HomeConnectService, onPick: (String) -> Unit) {
-    val many = st.appliances.size + gs.devices.size > 5
-    Column(
-        Modifier.width(288.dp).fillMaxHeight().then(if (many) Modifier.verticalScroll(rememberScrollState()) else Modifier),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+private fun ApplianceTabs(entries: List<HouseholdEntry>, selected: String, onPick: (String) -> Unit) {
+    val desc = stringResource(R.string.hc_choose_appliance)
+    Row(
+        Modifier.semantics { contentDescription = desc }.clip(RoundedCornerShape(36.dp)).background(Color.White.copy(alpha = 0.14f))
+            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(36.dp)).horizontalScroll(rememberScrollState()).padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val cardMod = if (many) Modifier.height(116.dp) else Modifier.weight(1f).heightIn(max = 140.dp)
-        st.appliances.forEach { a ->
-            ListCard(a.name, iconFor(a.type), summarize(a, service, now), a.haId == selected, cardMod) { onPick(a.haId) }
-        }
-        gs.devices.forEach { d ->
-            ListCard(d.name, GroheIcon, summarizeGrohe(d, gs.pouring[d.id], now), d.id == selected, cardMod) { onPick(d.id) }
-        }
+        entries.forEach { e -> ApplianceTab(e, e.id == selected) { onPick(e.id) } }
     }
 }
 
+private val TabInk = Color(0xFF10131F)
+
 @Composable
-private fun ListCard(name: String, icon: ImageVector, s: ApplianceSummary, on: Boolean, size: Modifier, onClick: () -> Unit) {
-    val g = LocalGlass.current
-    val bg by animateColorAsState(if (on) g.glassSolid else g.glass, label = "card")
-    Row(
-        size.fillMaxWidth()
-            .then(if (on) Modifier.shadow(14.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f)) else Modifier)
-            .clip(RoundedCornerShape(28.dp)).background(bg)
-            .border(1.dp, if (on) Color.White.copy(alpha = 0.95f) else g.edge, RoundedCornerShape(28.dp))
-            .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+private fun ApplianceTab(e: HouseholdEntry, on: Boolean, onClick: () -> Unit) {
+    val s = e.summary
+    val bg by animateColorAsState(if (on) Color.White else Color.Transparent, label = "tab")
+    val statusColor = when {
+        on -> when { s.alert -> HcColors.Alert; s.done -> HcColors.DoneInk; s.running -> TabInk; else -> TabInk.copy(alpha = 0.62f) }
+        s.alert || (s.subAlert && s.calm) -> Color(0xFFFFB4A8)
+        s.done -> Color(0xFFC8F3D2)
+        s.live -> Color.White
+        else -> Color.White.copy(alpha = 0.75f)
+    }
+    Column(
+        Modifier.width(128.dp).height(124.dp)
+            .then(if (on) Modifier.shadow(14.dp, RoundedCornerShape(30.dp), ambientColor = Color(0xFF0A081E), spotColor = Color(0xFF0A081E)) else Modifier)
+            .clip(RoundedCornerShape(30.dp)).background(bg).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
-        ApplianceRing(icon, s, 64.dp, 28.dp)
-        Column(Modifier.weight(1f)) {
-            Text(name, color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(s.status, color = statusColor(s), fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-            if (s.sub.isNotBlank()) Text(s.sub, color = subColor(s), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        ApplianceRing(
+            e.icon, s, 56.dp, 22.dp,
+            modifier = Modifier.alpha(if (s.calm && !on && !s.offline) 0.8f else 1f),
+            track = if (on) TabInk.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.28f),
+            core = Color.White.copy(alpha = 0.94f), idleIcon = TabInk.copy(alpha = 0.62f),
+        )
+        Text(e.name, color = if (on) TabInk else Color.White, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+        Text(s.status, color = statusColor, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = if (s.running || s.done) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

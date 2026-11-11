@@ -3,11 +3,14 @@ package app.raum.ui.household
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Air
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.CoffeeMaker
 import androidx.compose.material.icons.outlined.DryCleaning
 import androidx.compose.material.icons.outlined.Eco
@@ -17,6 +20,7 @@ import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.LocalLaundryService
 import androidx.compose.material.icons.outlined.LocalPizza
 import androidx.compose.material.icons.outlined.OutdoorGrill
+import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.VerticalAlignBottom
 import androidx.compose.material.icons.outlined.VerticalAlignCenter
 import androidx.compose.material.icons.outlined.Whatshot
@@ -30,8 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -169,7 +175,18 @@ data class ApplianceSummary(
     val alert: Boolean,
     /** Zweite Zeile ist ein Hinweis (Nachfüllen, Tür offen) */
     val subAlert: Boolean = false,
-)
+    /** Startet später (Startzeit gesetzt): gestrichelter Ring */
+    val delayed: Boolean = false,
+    val paused: Boolean = false,
+    val offline: Boolean = false,
+) {
+    /** Läuft gerade wirklich (nicht nur geplant) */
+    val running: Boolean get() = live && !delayed
+    /** Nichts zu tun, nichts zu melden: Bereit, Standby, Aus, offline */
+    val calm: Boolean get() = !live && !done && !alert && !subAlert
+    /** Roter Punkt am Ring */
+    val badgeAlert: Boolean get() = alert || subAlert
+}
 
 @Composable
 fun summarize(a: HcAppliance, service: HomeConnectService?, now: Instant): ApplianceSummary {
@@ -182,18 +199,18 @@ fun summarize(a: HcAppliance, service: HomeConnectService?, now: Instant): Appli
     val finishAt = remaining?.let { hm(now.plusSeconds(it)) }
     // Hinweis als zweite Zeile: Nachfüllen o. Ä. vor offener Tür; der Status selbst bleibt der Betriebszustand
     val notice = warning ?: if (a.doorOpen == true && !op.active) stringResource(R.string.hc_door_open) else null
-    if (!a.connected) return ApplianceSummary(stringResource(R.string.hc_status_offline), "", 0f, accent, false, false, false)
+    if (!a.connected) return ApplianceSummary(stringResource(R.string.hc_status_offline), "", 0f, accent, false, false, false, offline = true)
     return when (op) {
         OperationState.DELAYED_START -> {
             val at = a.delayedStartAt()
             ApplianceSummary(
                 at?.let { stringResource(R.string.hc_status_start_at, hm(it)) } ?: stringResource(R.string.hc_status_delayed),
-                warning ?: program, 0f, accent, true, false, false, subAlert = warning != null,
+                warning ?: program, 0f, accent, true, false, false, subAlert = warning != null, delayed = true,
             )
         }
         OperationState.RUN, OperationState.ACTION_REQUIRED, OperationState.PAUSE -> {
             val paused = op == OperationState.PAUSE
-            when {
+            val s = when {
                 // Spülen beim Ein-/Ausschalten, Reinigung, Entkalkung – kein Getränk
                 isCareProgram(a.type, a.activeProgram) -> ApplianceSummary(stringResource(R.string.hc_status_care), "", progress, accent, true, false, false)
                 a.type == HcType.COFFEE -> ApplianceSummary(stringResource(R.string.hc_status_brewing), program, progress, accent, true, false, false)
@@ -225,6 +242,7 @@ fun summarize(a: HcAppliance, service: HomeConnectService?, now: Instant): Appli
                     progress, accent, true, false, op == OperationState.ACTION_REQUIRED,
                 )
             }
+            s.copy(paused = paused)
         }
         OperationState.FINISHED -> ApplianceSummary(
             stringResource(R.string.hc_status_finished),
@@ -246,32 +264,69 @@ fun summarize(a: HcAppliance, service: HomeConnectService?, now: Instant): Appli
 @Composable
 fun subColor(s: ApplianceSummary): Color = if (s.subAlert) LocalGlass.current.warn else LocalGlass.current.soft
 
-/** Fortschrittsring mit Gerätesymbol in der Mitte (Karten im Entwurf). */
+/**
+ * Fortschrittsring mit Gerätesymbol in der Mitte. Zustände (Entwurf „Haushalt Redesign“, Ring-Zustände):
+ * Bereit grau · Läuft Fortschritt in Gerätefarbe · Pausiert Pause-Zeichen · Startet um … gestrichelt ·
+ * Fertig voller grüner Ring mit Haken · Hinweis roter Punkt · Offline blass mit Wolke.
+ * [track], [core] und [idleIcon] erlauben feste Farben direkt auf dem Himmel bzw. in der weißen Auswahl.
+ */
 @Composable
 fun ApplianceRing(type: HcType, summary: ApplianceSummary, size: Dp, iconSize: Dp) = ApplianceRing(iconFor(type), summary, size, iconSize)
 
 @Composable
-fun ApplianceRing(icon: ImageVector, summary: ApplianceSummary, size: Dp, iconSize: Dp) {
+fun ApplianceRing(
+    icon: ImageVector, summary: ApplianceSummary, size: Dp, iconSize: Dp,
+    modifier: Modifier = Modifier,
+    track: Color? = null, core: Color? = null, idleIcon: Color? = null,
+) {
     val g = LocalGlass.current
     val ringColor = if (summary.done) HcColors.Done else summary.accent
+    // Auf dunklem Kern (Dunkelmodus) die hellen Gerätefarben, auf hellem Kern die dunkleren
+    val darkCore = g.dark && core == null
     val iconColor = when {
         summary.alert -> HcColors.Alert
-        summary.live || summary.done -> ringColor
-        else -> g.soft
+        summary.done -> if (darkCore) HcColors.Done else HcColors.DoneInk
+        summary.live -> if (darkCore) ringColor else inkFor(ringColor)
+        else -> idleIcon ?: g.soft
     }
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+    val trackColor = track ?: g.track
+    val stroke = if (size >= 64.dp) 5.dp else 4.dp
+    Box(modifier.size(size).alpha(if (summary.offline) 0.5f else 1f), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(size)) {
-            val w = 5.dp.toPx()
-            drawArc(g.track, 0f, 360f, false, topLeft = androidx.compose.ui.geometry.Offset(w / 2, w / 2),
-                size = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w), style = Stroke(w))
-            if (summary.progress > 0f) drawArc(ringColor, -90f, 360f * summary.progress, false, topLeft = androidx.compose.ui.geometry.Offset(w / 2, w / 2),
-                size = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w), style = Stroke(w, cap = StrokeCap.Butt))
+            val w = stroke.toPx()
+            val tl = androidx.compose.ui.geometry.Offset(w / 2, w / 2)
+            val sz = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w)
+            if (summary.delayed) {
+                val dash = 4.dp.toPx(); val gap = 6.dp.toPx()
+                drawArc(ringColor, -90f, 360f, false, topLeft = tl, size = sz,
+                    style = Stroke(w, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, gap + w))))
+            } else {
+                drawArc(trackColor, 0f, 360f, false, topLeft = tl, size = sz, style = Stroke(w))
+                if (summary.progress > 0f) drawArc(ringColor, -90f, 360f * summary.progress, false, topLeft = tl, size = sz,
+                    style = Stroke(w, cap = if (summary.progress >= 1f) StrokeCap.Butt else StrokeCap.Round))
+            }
         }
-        Box(Modifier.size(size - 10.dp).clip(CircleShape).background(g.glassSolid), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(iconSize), tint = iconColor)
+        Box(Modifier.size(size - stroke * 2 - 6.dp).clip(CircleShape).background(core ?: g.glassSolid), contentAlignment = Alignment.Center) {
+            val shown = when {
+                summary.offline -> Icons.Outlined.CloudOff
+                summary.paused -> Icons.Outlined.Pause
+                else -> icon
+            }
+            Icon(shown, null, Modifier.size(iconSize), tint = iconColor)
+        }
+        val badge = (size * 0.3f).coerceAtLeast(16.dp)
+        when {
+            summary.badgeAlert -> Box(Modifier.align(Alignment.TopEnd).size(badge).clip(CircleShape).background(Color.White).padding(2.dp).clip(CircleShape).background(HcColors.Alert))
+            summary.done -> Box(
+                Modifier.align(Alignment.TopEnd).size(badge).clip(CircleShape).background(Color.White).padding(2.dp).clip(CircleShape).background(HcColors.DoneInk),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Outlined.Check, null, Modifier.size(badge * 0.55f), tint = Color.White) }
         }
     }
 }
+
+/** Dunklere Fassung der Gerätefarbe für Symbole auf hellem Kern (Hellblau → Blau). */
+private fun inkFor(accent: Color): Color = Color(accent.red * 0.62f, accent.green * 0.62f, accent.blue * 0.62f, 1f)
 
 /** Kurz eingeblendeter Hinweis (z. B. „Backofen: vorgeheizt“) – verschwindet nach 4 s. */
 @Composable
@@ -284,4 +339,27 @@ fun rememberToast(service: HomeConnectService): String? {
     }
     LaunchedEffect(text) { if (text != null) { delay(4000); text = null } }
     return text
+}
+
+/** Ein Gerät der Haushalt-Seite bzw. -Reihe: Home Connect oder Grohe Blue. */
+class HouseholdEntry(val id: String, val name: String, val icon: ImageVector, val summary: ApplianceSummary)
+
+/** Alle Geräte in fester Reihenfolge (Home Connect, dann Grohe); [onlyActive] blendet abgeschaltete Dienste aus. */
+@Composable
+fun householdEntries(
+    st: app.raum.homeconnect.HomeConnectState, gs: app.raum.grohe.GroheState, service: HomeConnectService?, now: Instant,
+    onlyActive: Boolean = false,
+): List<HouseholdEntry> =
+    (if (!onlyActive || st.active) st.appliances.map { HouseholdEntry(it.haId, it.name, iconFor(it.type), summarize(it, service, now)) } else emptyList()) +
+        (if (!onlyActive || gs.active) gs.devices.map { HouseholdEntry(it.id, it.name, GroheIcon, summarizeGrohe(it, gs.pouring[it.id], now)) } else emptyList())
+
+/** „1 läuft · 1 fertig“ – leer, wenn nichts läuft und nichts fertig ist. */
+@Composable
+fun activityLine(entries: List<HouseholdEntry>): String {
+    val running = entries.count { it.summary.running }
+    val done = entries.count { it.summary.done }
+    return listOfNotNull(
+        if (running > 0) androidx.compose.ui.res.pluralStringResource(R.plurals.hc_count_running, running, running) else null,
+        if (done > 0) androidx.compose.ui.res.pluralStringResource(R.plurals.hc_count_done, done, done) else null,
+    ).joinToString(" · ")
 }

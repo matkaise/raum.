@@ -1563,4 +1563,27 @@
     <string name="sonos_resume">Resume</string>
     <string name="sonos_row_hint">tap to open music</string>
     <string name="settings_license_sonos">Sonos: local control via UPnP on the home network, no cloud.</string>
+    <!-- Haushalt: Geräteleiste und Übersichtsreihe -->
+    <plurals name="hc_count_running">
+        <item quantity="one">%1$d running</item>
+        <item quantity="other">%1$d running</item>
+    </plurals>
+    <plurals name="hc_count_done">
+        <item quantity="one">%1$d finished</item>
+        <item quantity="other">%1$d finished</item>
+    </plurals>
+    <plurals name="hc_count_appliances">
+        <item quantity="one">%1$d appliance</item>
+        <item quantity="other">%1$d appliances</item>
+    </plurals>
+    <plurals name="hc_group_ready">
+        <item quantity="one">%1$d ready</item>
+        <item quantity="other">%1$d ready</item>
+    </plurals>
+    <plurals name="hc_all_ready">
+        <item quantity="one">%1$d appliance ready</item>
+        <item quantity="other">%1$d appliances ready</item>
+    </plurals>
+    <string name="hc_all_quiet">All quiet</string>
+    <string name="hc_choose_appliance">Choose appliance</string>
 </resources>

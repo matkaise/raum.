@@ -71,7 +71,7 @@ val GroheIcon = Icons.Outlined.WaterDrop
 @Composable
 fun summarizeGrohe(d: GroheDevice, pouring: Pouring?, now: Instant): ApplianceSummary {
     val accent = GroheColors.Water
-    if (!d.online) return ApplianceSummary(stringResource(R.string.hc_status_offline), "", 0f, accent, false, false, false)
+    if (!d.online) return ApplianceSummary(stringResource(R.string.hc_status_offline), "", 0f, accent, false, false, false, offline = true)
     if (pouring != null && now.isBefore(pouring.end)) {
         val total = Duration.between(pouring.start, pouring.end).toMillis().coerceAtLeast(1)
         val p = (Duration.between(pouring.start, now).toMillis().toFloat() / total).coerceIn(0f, 1f)
