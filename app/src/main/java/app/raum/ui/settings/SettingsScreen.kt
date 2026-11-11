@@ -4,6 +4,7 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Kitchen
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material.icons.outlined.Speaker
 import android.os.Build
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -89,6 +90,7 @@ enum class SettingsSection(@StringRes val titleRes: Int, val icon: ImageVector) 
     WEATHER(R.string.settings_weather, Icons.Outlined.Cloud),
     HOME_CONNECT(R.string.settings_home_connect, Icons.Outlined.Kitchen),
     GROHE(R.string.settings_grohe, Icons.Outlined.WaterDrop),
+    SONOS(R.string.settings_sonos, Icons.Outlined.Speaker),
     SHARE(R.string.settings_share, Icons.Outlined.Share),
     MATTER(R.string.settings_matter, Icons.Outlined.DeviceHub),
     SECURITY(R.string.security_maintenance, Icons.Outlined.Shield),
@@ -155,6 +157,7 @@ fun SettingsScreen(
                         SettingsSection.WEATHER -> WeatherSection(state, viewModel, onOpenRegion = { section = SettingsSection.REGION })
                         SettingsSection.HOME_CONNECT -> HomeConnectSection()
                         SettingsSection.GROHE -> GroheSection()
+                        SettingsSection.SONOS -> SonosSection()
                         SettingsSection.MATTER -> { ThreadSection(); MatterSection(viewModel) }
                         SettingsSection.SECURITY -> SecurityCard(appliance, onOpenMaintenance)
                         SettingsSection.ABOUT -> AboutSection()
@@ -203,6 +206,7 @@ private fun summary(s: SettingsSection, state: HomeUiState, vm: SettingsViewMode
     SettingsSection.WEATHER -> weatherSummary(vm)
     SettingsSection.HOME_CONNECT -> homeConnectSummary()
     SettingsSection.GROHE -> groheSummary()
+    SettingsSection.SONOS -> sonosSummary()
     SettingsSection.SHARE -> shareSummary()
     SettingsSection.MATTER -> threadSummary()
     SettingsSection.SECURITY -> {
@@ -437,5 +441,6 @@ private fun AboutSection() {
         Text(stringResource(R.string.settings_license_met), style = MaterialTheme.typography.bodyLarge)
         Text(stringResource(R.string.settings_license_home_connect), style = MaterialTheme.typography.bodyLarge)
         Text(stringResource(R.string.settings_license_grohe), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.settings_license_sonos), style = MaterialTheme.typography.bodyLarge)
     }
 }

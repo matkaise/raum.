@@ -56,6 +56,7 @@ class CoreStartup(
     private val sensorHistory: app.raum.history.SensorHistory,
     private val homeConnect: app.raum.homeconnect.HomeConnectService,
     private val grohe: app.raum.grohe.GroheService,
+    private val sonos: app.raum.sonos.SonosService,
 ) {
     private val _step = MutableStateFlow(StartupStep.DATABASE)
     /** Fortschritt für den Startbildschirm (SYS-008). */
@@ -92,6 +93,7 @@ class CoreStartup(
             weather.start(scope)
             homeConnect.start(scope)
             grohe.start(scope)
+            sonos.start(scope)
             bridgeSync.start(scope)
             // Border Router suchen (Statushinweise) – nach den Abos, damit Namensauflösungen nicht konkurrieren
             scope.launch { delay(20_000); thread.scanBriefly() }

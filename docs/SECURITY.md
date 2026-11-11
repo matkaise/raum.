@@ -6,12 +6,12 @@ Stand: 22.09.2026 · App 0.7.0 · DB-Schema v2 · Prüfung gegen Spezifikation K
 
 | Bereich | Anforderung | Umsetzung | Status |
 |---|---|---|---|
-| Local-first | 11.1, 12.4 | Keine Telemetrie, kein eigenes Konto; Ortssuche über eingebaute Liste statt Ortungsdienst. Internetverbindungen nur freiwillig und ab Werk aus: Wetter, Home Connect und Grohe Blue (siehe unten) | ⚠️ Abweichung (opt-in) |
+| Local-first | 11.1, 12.4 | Keine Telemetrie, kein eigenes Konto; Ortssuche über eingebaute Liste statt Ortungsdienst. Internetverbindungen nur freiwillig und ab Werk aus: Wetter, Home Connect, Grohe Blue und Sonos-Cover aus dem Internet (siehe unten). Sonos selbst läuft lokal | ⚠️ Abweichung (opt-in) |
 | Teilen (Multi-Admin) | – | Kopplungsfenster nur auf Nutzeraktion, PIN-geschützt, 15 min gültig, wird beim Schließen des Dialogs widerrufen; neue Admins und Entzug im Protokoll; „Übergabe vorbereiten“ entfernt alle fremden Admins vor dem Auflösen der eigenen Fabric – je Gerät frisch gelesen und durch erneutes Lesen bestätigt; nicht bestätigte Geräte werden angezeigt, die eigenen Schlüssel nur nach ausdrücklicher Wahl („Unvollständig abschließen“) gelöscht | ✅ |
 | Bridge | – | Einschalten und Koppeln PIN-geschützt; Kopplungsfenster nur auf Nutzeraktion (15 min); Befehle nur für freigegebene Geräte und nur von gekoppelten Apps, jeweils mit Quelle im Protokoll; über denselben Weg wie Bedienung am Panel (Offline-Schutz). Werksreset und Übergabe löschen alle Bridge-Kopplungen – durch Beenden des Bridge-Prozesses und direktes Löschen seines Speichers, auch bei ausgeschalteter Bridge; sonst bricht der Reset ab. Die echte Bridge ist ein Matter-Server im LAN (mDNS, UDP/TCP 5540) im eigenen Prozess `:bridge` – nur bei eingeschalteter Bridge; Zugriff nur für per Kopplung aufgenommene Apps (CASE, ACL je Fabric). Kopplungsfenster mit einmaligem Code je Öffnung, nur mDNS (kein BLE), nicht beim Start. Bridge-Identität (Fabrics anderer Apps, Betriebsschlüssel) in eigenem AES-GCM/Keystore-Speicher (`raum_bridge_kvs`). Echtheitsnachweis: DAC-Schlüssel wird im Android-Keystore des Panels erzeugt (StrongBox, wenn vorhanden; nur CSR verlässt das Gerät) oder – alternativ – mit Schlüssel importiert; Kette, IDs und Schlüsselzugehörigkeit geprüft, Signatur im Keystore; ohne eigenes: Test-DAC des SDK (0xFFF1/0x8000). Siehe docs/VENDOR.md | ✅ / ⚠️ Test-DAC bis zur Zertifizierung |
-| Internet-Berechtigung | 11.1 | `INTERNET` nur für das Wetter (HTTPS zu api.met.no), Home Connect (HTTPS zu api.home-connect.com), Grohe Blue (HTTPS zu idp2-apigw.cloud.grohe.com) und Matter über IP; `usesCleartextTraffic=false` | ✅ |
+| Internet-Berechtigung | 11.1 | `INTERNET` nur für das Wetter (HTTPS zu api.met.no), Home Connect (HTTPS zu api.home-connect.com), Grohe Blue (HTTPS zu idp2-apigw.cloud.grohe.com), freiwillige Sonos-Cover (HTTPS zu den Bildservern der Musikdienste) und Matter über IP; `usesCleartextTraffic=false` | ✅ |
 | WLAN-Verwaltung | 11.1 | Verbinden/Schalten nur als Device Owner. Berechtigungen: `ACCESS/CHANGE_WIFI_STATE`, `NEARBY_WIFI_DEVICES` (`neverForLocation`), `ACCESS_FINE/COARSE_LOCATION` – Letztere nur, weil Android Netznamen und Suchergebnisse sonst verbirgt; raum. fragt nie einen Standort ab. Als Device Owner erteilt raum. sich diese Berechtigungen selbst. WLAN-Passwörter speichert Android, nicht raum. | ✅ |
-| Klartextverkehr | 11.1 | `usesCleartextTraffic="false"`. Einzige Ausnahme: das Dataset eines OpenThread Border Routers per HTTP (REST-API, Port 8081 – dort nur HTTP), über einen eigenen Minimal-Client, der **nur private/Link-lokale Adressen** (10/8, 172.16/12, 192.168/16, fe80::/10, fc00::/7) zulässt und nur auf ausdrückliche Nutzeraktion. Ansonsten fragt raum. dort nur `/node/state` ab (Erkennung) | ✅ (begrenzte Ausnahme) |
+| Klartextverkehr | 11.1 | `usesCleartextTraffic="false"`. Einzige Ausnahme: das Dataset eines OpenThread Border Routers per HTTP (REST-API, Port 8081 – dort nur HTTP), über einen eigenen Minimal-Client, der **nur private/Link-lokale Adressen** (10/8, 172.16/12, 192.168/16, fe80::/10, fc00::/7) zulässt und nur auf ausdrückliche Nutzeraktion. Ansonsten fragt raum. dort nur `/node/state` ab (Erkennung). Zweite Ausnahme: Sonos-Lautsprecher (UPnP/SOAP, Port 1400 – nur HTTP) über einen eigenen Minimal-Client mit derselben Beschränkung auf private/Link-lokale Adressen; Cover über den Lautsprecher (`/getaa`) ebenso | ✅ (begrenzte Ausnahmen) |
 | Thread-Dataset und WLAN für Commissioning | 11.2, 10.3 | AES-256-GCM mit Schlüssel im Android Keystore (`raum_secrets_v1`, hardwaregestützt, sofern vorhanden); Schlüsselname als AAD. Auf dem Datenträger nur IV + Chiffrat; Netzname nur zur Anzeige aus dem entschlüsselten Dataset. Nie im Protokoll, nie angezeigt (nur Netzname, Kanal, PAN-IDs). Ändern PIN-geschützt; Werksreset und Übergabe löschen beides. Gerätetest prüft, dass kein Klartext gespeichert wird | ✅ |
 | Bluetooth | 11.1 | `BLUETOOTH_SCAN` (`neverForLocation`), `BLUETOOTH_CONNECT`; bis Android 11 `BLUETOOTH`/`BLUETOOTH_ADMIN` + Standort (von Android für BLE-Suche verlangt). Suche nur während einer Kopplung (Matter-Dienst 0xFFF6, gefiltert nach Diskriminator) | ✅ |
 | Android-Backup | 12.4 | `allowBackup=false`, `fullBackupContent=false`, `dataExtractionRules` schließen Cloud- und Gerät-zu-Gerät-Übertragung aus | ✅ |
@@ -106,6 +106,25 @@ ohne Ankündigung ändern.
 | Übertragene Daten | Abfrage `GET /v3/iot/dashboard` (Geräte, Filter-/CO₂-Stand) alle 10 min und nach dem Zapfen; Zapfbefehl (Wasserart, Menge 50–2000 ml) nur auf Knopfdruck |
 | Datenhaltung | „Abmelden“ löscht die Tokens; „Übergabe vorbereiten“ und Werksreset löschen Tokens und Einstellungen |
 | Transport | Nur HTTPS, Zertifikatsprüfung durch Android |
+
+## Sonos im Heimnetz (lokal)
+
+Auf Wunsch des Auftraggebers (11.11.2026) steuert raum. Sonos-Lautsprecher (Seite „Musik“, Reihe auf der Übersicht).
+Das geschieht **lokal** über die UPnP-Schnittstelle der Lautsprecher – ohne Sonos-Konto, ohne Cloud. Sonos dokumentiert
+diese Schnittstelle nicht offiziell; Home Assistant und SoCo nutzen dieselben Aufrufe. Musikdienste (z. B. YouTube Music)
+spielen die Lautsprecher selbst über das in der Sonos-App verknüpfte Konto; raum. sieht keine Zugangsdaten. Die direkte
+Suche in YouTube Music ist für Dritte gesperrt (Partner-Schnittstelle nur für Sonos) – raum. bietet stattdessen die
+Sonos-Favoriten und -Wiedergabelisten an.
+
+| Punkt | Umsetzung |
+|---|---|
+| Einwilligung | Ab Werk **an**, da nur im lokalen Netz; Einstellungen → Sonos schaltet es ab. Seite und Übersichtsreihe erscheinen nur, wenn Lautsprecher gefunden sind |
+| Suche | SSDP (M-SEARCH an 239.255.255.250:1900, MulticastLock nur während der Suche), zuletzt bekannte und von Hand eingetragene Adressen – nur private/Link-lokale Adressen |
+| Verkehr | HTTP/SOAP an Port 1400 der Lautsprecher (Klartext, siehe „Klartextverkehr“). Abfrage alle 2 s bei offener Musikseite, 5 s bei sichtbarer Übersichtsreihe, sonst 15 s |
+| Befehle | Nur auf Nutzeraktion: Wiedergabe, Lautstärke, Gruppieren, Favorit starten; Favoriten im Protokoll |
+| Cover | Laufende Titel: lokal über den Lautsprecher. Favoriten, deren Cover nur beim Musikdienst liegt: **ab Werk nicht geladen**; Schalter „Cover der Favoriten aus dem Internet laden“ (HTTPS, Server sehen die Internetadresse des Panels) |
+| Datenhaltung | Gemerkte Adressen und Schalter in `raum_sonos`; „Übergabe vorbereiten“ und Werksreset löschen sie |
+| Voraussetzung | In der Sonos-App muss UPnP eingeschaltet sein (Konto → Datenschutz und Sicherheit); sonst antworten die Lautsprecher mit 403 – raum. meldet das |
 
 ## Bewusste Abweichung: Administrator-PIN optional
 

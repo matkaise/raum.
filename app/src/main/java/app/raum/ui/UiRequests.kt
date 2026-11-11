@@ -9,4 +9,6 @@ class UiRequests {
     val openSettings = MutableStateFlow<String?>(null)
     /** Haushaltsgerät (haId) auf der Seite „Haushalt“ öffnen, z. B. aus der Übersicht. */
     val openAppliance = MutableStateFlow<String?>(null)
+    /** Sonos-Gruppe (Koordinator-UUID) auf der Seite „Musik“ öffnen. */
+    val openMusicGroup = MutableStateFlow<String?>(null)
 }

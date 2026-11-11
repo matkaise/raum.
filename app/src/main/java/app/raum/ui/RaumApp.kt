@@ -27,6 +27,13 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.outlined.Kitchen
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.outlined.MusicNote
+import app.raum.sonos.SonosService
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import app.raum.ui.music.MusicRow
+import app.raum.ui.music.MusicScreen
 import app.raum.homeconnect.HomeConnectService
 import app.raum.ui.household.HouseholdRow
 import app.raum.ui.household.HouseholdScreen
@@ -105,6 +112,7 @@ private enum class TopLevel(val route: String, @StringRes val shortLabelRes: Int
     ROOMS("rooms", R.string.nav_rooms, Icons.Outlined.MeetingRoom, Icons.Filled.MeetingRoom),
     SCENES("scenes", R.string.nav_scenes, Icons.Outlined.WbTwilight, Icons.Filled.WbTwilight),
     HOUSEHOLD("household", R.string.nav_household, Icons.Outlined.Kitchen, Icons.Filled.Kitchen),
+    MUSIC("music", R.string.nav_music, Icons.Outlined.MusicNote, Icons.Filled.MusicNote),
     DEVICES("devices", R.string.nav_devices, Icons.Outlined.Devices, Icons.Filled.Devices),
     AUTOMATIONS("automations", R.string.nav_automations_short, Icons.Outlined.AutoMode, Icons.Filled.AutoMode),
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings, Icons.Filled.Settings),
@@ -124,10 +132,14 @@ fun RaumApp(
     display: DisplayController = koinInject(),
     homeConnect: HomeConnectService = koinInject(),
     grohe: app.raum.grohe.GroheService = koinInject(),
+    sonos: SonosService = koinInject(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val household by homeConnect.state.collectAsStateWithLifecycle()
     val groheState by grohe.state.collectAsStateWithLifecycle()
+    // Nur „gefunden ja/nein“ – sonst würde die ganze App bei jeder Sonos-Abfrage neu zusammengesetzt
+    val sonosActive by remember(sonos) { sonos.state.map { it.active }.distinctUntilChanged() }.collectAsStateWithLifecycle(initialValue = false)
+    val openMusicGroup by requests.openMusicGroup.collectAsStateWithLifecycle()
     val openAppliance by requests.openAppliance.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -190,7 +202,11 @@ fun RaumApp(
             GlassRail(
                 selected = selectedTop,
                 // „Haushalt“ nur, wenn Home Connect eingeschaltet ist
-                hidden = if (household.active || groheState.active) emptySet() else setOf(TopLevel.HOUSEHOLD),
+                hidden = setOfNotNull(
+                    TopLevel.HOUSEHOLD.takeUnless { household.active || groheState.active },
+                    // „Musik“ erst, wenn Sonos-Lautsprecher gefunden sind
+                    TopLevel.MUSIC.takeUnless { sonosActive },
+                ),
                 onNavigate = { navController.navigateTopLevel(it) },
                 onSleep = display::sleepNow,
             )
@@ -213,6 +229,10 @@ fun RaumApp(
                                 HouseholdRow(household, homeConnect, groheState) { haId ->
                                     requests.openAppliance.value = haId
                                     navController.navigateTopLevel(TopLevel.HOUSEHOLD)
+                                }
+                                MusicRow(sonos) { groupId ->
+                                    requests.openMusicGroup.value = groupId
+                                    navController.navigateTopLevel(TopLevel.MUSIC)
                                 }
                             },
                         )
@@ -264,6 +284,13 @@ fun RaumApp(
                             requestedAppliance = openAppliance,
                             onRequestHandled = { requests.openAppliance.value = null },
                             onOpenSettings = { requests.openSettings.value = "HOME_CONNECT" },
+                        )
+                    }
+                    composable(TopLevel.MUSIC.route) {
+                        MusicScreen(
+                            requestedGroup = openMusicGroup,
+                            onRequestHandled = { requests.openMusicGroup.value = null },
+                            onOpenSettings = { requests.openSettings.value = "SONOS" },
                         )
                     }
                     composable(SCENE_NEW) {

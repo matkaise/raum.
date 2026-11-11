@@ -85,6 +85,7 @@ import app.raum.homeconnect.HcPrefs
 import app.raum.homeconnect.HomeConnectService
 import app.raum.homeconnect.UrlConnectionHcHttp
 import app.raum.ui.household.HouseholdViewModel
+import app.raum.ui.music.MusicViewModel
 
 val appModule = module {
     /** Anwendungsweiter Scope für den Core; überlebt Activity-Neustarts (M5: Foreground Service). */
@@ -150,7 +151,7 @@ val appModule = module {
 
     // --- Stabilisierung (M7) ---
     single { BackupService(get(), get(), get(), get(), get()) }
-    single { ResetService(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { ResetService(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     single { UpdateInstaller(androidContext(), get(), get()) }
 
     // --- Erstinbetriebnahme ---
@@ -210,7 +211,17 @@ val appModule = module {
         )
     }
 
-    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    // Sonos (lokal über UPnP, ohne Cloud – ab Werk an; die Seite erscheint erst, wenn Lautsprecher gefunden sind)
+    single { app.raum.sonos.SocketSonosTransport() }
+    single { app.raum.sonos.SonosArt(get<app.raum.sonos.SocketSonosTransport>(), allowOnline = { get<app.raum.sonos.SonosService>().onlineArt.value }) }
+    single {
+        app.raum.sonos.SonosService(
+            settings = app.raum.sonos.SonosPrefs(androidContext()), api = app.raum.sonos.UpnpSonosApi(get<app.raum.sonos.SocketSonosTransport>()),
+            discovery = app.raum.sonos.SsdpSonosDiscovery(androidContext()), log = get(), strings = get(),
+        )
+    }
+
+    single { CoreStartup(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 
     single { DeviceService(get(), get(), get(), get(), get(), get()) }
     single { SceneRunner(get(), get(), get(), get()) }
@@ -225,6 +236,7 @@ val appModule = module {
     viewModelOf(::ShareViewModel)
     viewModelOf(::ThreadViewModel)
     viewModelOf(::HouseholdViewModel)
+    viewModelOf(::MusicViewModel)
     viewModel { params -> AutomationEditorViewModel(params.getOrNull<UUID>(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { params -> SceneEditorViewModel(params.getOrNull<UUID>(), get(), get(), get(), get(), get(), get()) }
 }
