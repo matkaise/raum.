@@ -1286,6 +1286,8 @@
     <string name="hc_duration_hour">1 h</string>
     <string name="hc_duration_min">%1$d min</string>
     <string name="hc_duration_none">None</string>
+    <string name="hc_duration_hm">%1$d:%2$02d h</string>
+    <string name="hc_mw_minsec">%1$s min</string>
     <string name="hc_empty_loading">Loading appliances …</string>
     <string name="hc_empty_text">No appliances found. They must be paired in the Home Connect app with the same account.</string>
     <string name="hc_empty_title">No appliances</string>

@@ -1,5 +1,15 @@
 package app.raum.ui.household
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.semantics.semantics
@@ -26,6 +36,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,6 +57,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -409,6 +423,61 @@ fun ToggleRow(labels: List<String>, on: List<Boolean>, modifier: Modifier = Modi
             ) { Text(l, color = if (on[i]) inverseInk() else g.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp)) }
         }
     }
+}
+
+/**
+ * Wert mit − / + (Stärke, Menge, Temperatur, Dauer). Halten wiederholt den Schritt.
+ */
+@Composable
+fun Stepper(
+    label: String, value: String, range: String?, canDown: Boolean, canUp: Boolean, enabled: Boolean,
+    onDown: () -> Unit, onUp: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false, extra: (@Composable () -> Unit)? = null,
+) {
+    val g = LocalGlass.current
+    val h = if (compact) 60.dp else 72.dp
+    val b = if (compact) 46.dp else 56.dp
+    Column(modifier) {
+        SectionLabel(label, trailing = range)
+        Row(
+            Modifier.fillMaxWidth().height(h).clip(RoundedCornerShape(h / 2)).background(g.chip).padding(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            StepButton(androidx.compose.material.icons.Icons.Outlined.Remove, enabled && canDown, b, onDown)
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(value, color = g.ink, fontSize = if (compact) 20.sp else 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                extra?.invoke()
+            }
+            StepButton(androidx.compose.material.icons.Icons.Outlined.Add, enabled && canUp, b, onUp)
+        }
+    }
+}
+
+@Composable
+fun StepButton(icon: ImageVector, enabled: Boolean, size: Dp, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    val step by androidx.compose.runtime.rememberUpdatedState(onClick)
+    var pressed by remember { mutableStateOf(false) }
+    Box(
+        // Schatten bleibt immer gleich – ein Wechsel der Höhe beim Freigeben zeichnet ihn eckig
+        Modifier.size(size).graphicsLayer { val s = if (pressed) 0.92f else 1f; scaleX = s; scaleY = s; alpha = if (enabled) 1f else 0.4f }
+            .shadow(4.dp, CircleShape).clip(CircleShape).background(g.glassSolid)
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                // Tippen = ein Schritt, Halten = nach kurzer Pause schnell weiter
+                coroutineScope {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        pressed = true
+                        step()
+                        val repeat = launch { delay(450); while (true) { step(); delay(90) } }
+                        waitForUpOrCancellation()
+                        repeat.cancel()
+                        pressed = false
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, Modifier.size(26.dp), tint = g.ink) }
 }
 
 @Composable

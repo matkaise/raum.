@@ -261,38 +261,6 @@ fun ColumnScope.CoffeePanel(a: HcAppliance, programs: List<HcProgram>, vm: House
 
 /** Einstellung als Zeile: − Wert + (wie die Favoriten-Karten), Bezeichnung und Bereich darüber. */
 @Composable
-private fun Stepper(
-    label: String, value: String, range: String?, canDown: Boolean, canUp: Boolean, enabled: Boolean,
-    onDown: () -> Unit, onUp: () -> Unit, extra: (@Composable () -> Unit)? = null,
-) {
-    val g = LocalGlass.current
-    Column {
-        SectionLabel(label, trailing = range)
-        Row(
-            Modifier.fillMaxWidth().height(72.dp).clip(RoundedCornerShape(36.dp)).background(g.chip).padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StepButton(Icons.Outlined.Remove, enabled && canDown, onDown)
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(value, color = g.ink, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                extra?.invoke()
-            }
-            StepButton(Icons.Outlined.Add, enabled && canUp, onUp)
-        }
-    }
-}
-
-@Composable
-private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    val g = LocalGlass.current
-    Box(
-        Modifier.size(56.dp).shadow(if (enabled) 4.dp else 0.dp, CircleShape).clip(CircleShape).background(g.glassSolid)
-            .clickable(enabled = enabled, onClick = onClick).alpha(if (enabled) 1f else 0.35f),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, Modifier.size(26.dp), tint = g.ink) }
-}
-
-@Composable
 fun LoadingPrograms() {
     val g = LocalGlass.current
     Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) {

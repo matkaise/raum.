@@ -4,25 +4,36 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Microwave
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.StopCircle
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,14 +42,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.material.icons.outlined.Microwave
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -46,9 +54,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,14 +67,40 @@ import app.raum.homeconnect.HcAppliance
 import app.raum.homeconnect.HcKeys
 import app.raum.homeconnect.HcOptionDef
 import app.raum.homeconnect.HcProgram
+import app.raum.homeconnect.OperationState
 import app.raum.ui.theme.LocalGlass
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
 import java.time.Instant
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+
+/** Dauerstufen in Minuten: fein bis zur Stunde, danach gröber. 0 = ohne Dauer. */
+private val OVEN_DURATIONS = listOf(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 75, 90, 105, 120, 150, 180, 210, 240, 300, 360, 480, 600, 720)
+
+@Composable
+private fun minutesLabel(m: Int): String = when {
+    m == 0 -> stringResource(R.string.hc_duration_none)
+    m < 60 -> stringResource(R.string.hc_duration_min, m)
+    m % 60 == 0 -> stringResource(R.string.duration_h, m / 60)
+    else -> stringResource(R.string.hc_duration_hm, m / 60, m % 60)
+}
+
+@Composable
+private fun idleLabel(a: HcAppliance): String = when {
+    a.operation == OperationState.FINISHED -> stringResource(R.string.hc_status_finished)
+    !a.poweredOn -> stringResource(if (a.power == "Standby") R.string.hc_status_standby else R.string.hc_status_off)
+    else -> stringResource(R.string.hc_status_ready)
+}
+
+/** Nächster Wert im Raster [step] in Richtung [dir], innerhalb [lo]..[hi]. */
+private fun stepTo(v: Double, dir: Int, step: Double, lo: Double, hi: Double): Double {
+    val snapped = if (dir > 0) Math.floor(v / step + 1e-6) * step + step else Math.ceil(v / step - 1e-6) * step - step
+    return snapped.coerceIn(lo, hi)
+}
+
 
 @Composable
 fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: HouseholdViewModel, busy: Boolean, now: Instant) {
@@ -75,11 +111,11 @@ fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: Hous
     val microwave = allPrograms.filter { isMicrowave(it.key) }
     var microwaveMode by remember(a.haId) { mutableStateOf(false) }
     LaunchedEffect(a.activeProgram, running) { if (running) microwaveMode = isMicrowave(a.activeProgram) }
-    // Umschalter steht oben in der rechten Spalte (an Stelle der Überschrift) – so bleibt die Höhe gleich
+    // Umschalter steht über der Illustration – gilt für beide Ansichten gleich
     val modeSwitch: (@Composable () -> Unit)? = if (microwave.isEmpty()) null else ({
         Segmented(
             listOf(stringResource(R.string.hc_oven_mode_oven), stringResource(R.string.hc_oven_mode_microwave)), if (microwaveMode) 1 else 0,
-            Modifier.fillMaxWidth().padding(bottom = 12.dp), enabled = !running && !busy,
+            Modifier.fillMaxWidth().padding(bottom = 8.dp), enabled = !running && !busy,
         ) { microwaveMode = it == 1 }
     })
     if (microwaveMode && modeSwitch != null) { MicrowaveView(a, microwave, vm, busy, now, modeSwitch); return }
@@ -97,7 +133,7 @@ fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: Hous
     val durationDef = program.option(HcKeys.DURATION)
     val min = setpointDef?.min ?: 30.0
     val max = setpointDef?.max ?: 275.0
-    // Läuft der Ofen, zeigt der Ring den Sollwert des Geräts
+    // Läuft der Ofen, zählt der Sollwert des Geräts
     val target = if (running) a.number(HcKeys.OVEN_SETPOINT) ?: setpointDef?.let { value(it)?.doubleOrNull } ?: 180.0
     else setpointDef?.let { value(it)?.doubleOrNull } ?: 180.0
     // Die Innentemperatur meldet der Ofen nur, solange er heizt – im Standby bliebe der letzte Wert vom letzten
@@ -107,57 +143,67 @@ fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: Hous
     val cavity = if (running && heating) a.number(HcKeys.OVEN_CAVITY) ?: 21.0 else null
     val reached = running && heating && (HcKeys.OVEN_PREHEAT_DONE in a.events || (cavity ?: 0.0) >= target - 0.5)
     val runRemaining = if (running) a.remainingSeconds(now) else null
-    val idleLabel = when {
-        running && !heating -> runRemaining?.let { stringResource(R.string.hc_status_remaining, hmDuration(it)) } ?: stringResource(R.string.hc_status_running)
-        a.operation == app.raum.homeconnect.OperationState.FINISHED -> stringResource(R.string.hc_status_finished)
-        else -> stringResource(if (!a.poweredOn) (if (a.power == "Standby") R.string.hc_status_standby else R.string.hc_status_off) else R.string.hc_status_ready)
+    val status = when {
+        // Im Standby steht die Heizart schon in der gewählten Pille
+        !running -> ""
+        !heating -> runRemaining?.let { stringResource(R.string.hc_status_remaining, hmDuration(it)) } ?: stringResource(R.string.hc_status_running)
+        else -> {
+            val remaining = runRemaining?.takeIf { (a.number(HcKeys.DURATION) ?: 0.0) > 0 }
+            when {
+                reached && remaining != null -> stringResource(R.string.hc_oven_cooking, hmDuration(remaining))
+                reached -> stringResource(R.string.hc_oven_reached)
+                else -> stringResource(R.string.hc_oven_preheating, (cavity ?: 21.0).roundToInt(), target.roundToInt())
+            }
+        }
+    }
+    val idle = when {
+        running && !heating -> runRemaining?.let { hmDuration(it) } ?: stringResource(R.string.hc_status_running)
+        else -> idleLabel(a)
     }
 
-    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-        Column(Modifier.width(340.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        // Links: Umschalter und Illustration (Ring stellt auch die Temperatur)
+        Column(Modifier.width(340.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            modeSwitch?.invoke()
+            Spacer(Modifier.weight(1f))
             OvenDial(
-                target = if (heating) target else min, cavity = cavity, idleLabel = idleLabel, showTarget = heating, min = min, max = max, step = setpointDef?.step ?: 5.0,
+                target = if (heating) target else min, cavity = cavity, idleLabel = idle, showTarget = heating, min = min, max = max, step = (setpointDef?.step ?: 5.0).coerceAtLeast(5.0),
                 running = running, enabled = !running && !busy && setpointDef != null,
             ) { v -> setpointDef?.let { set(it, JsonPrimitive(v.roundToInt())) } }
-            Text(stringResource(if (running) R.string.hc_oven_dial_running else R.string.hc_oven_dial_hint), color = g.soft, fontSize = 14.sp, modifier = Modifier.padding(top = 12.dp))
+            Text(status, color = g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
+            Spacer(Modifier.weight(1f))
         }
+        // Rechts: Betriebsart, Einstellungen, Start
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            if (modeSwitch != null) modeSwitch() else SectionLabel(stringResource(R.string.hc_oven_mode))
-            // Viele Betriebsarten (z. B. mit Mikrowelle 16) – drei Reihen sichtbar, Rest scrollt
-            Box(Modifier.heightIn(max = 244.dp).verticalScroll(rememberScrollState())) {
-                TileGrid(programs, columns = 3) { p ->
-                    ProgramTile(p.name, p.key == program.key, Modifier.weight(1f).height(76.dp), enabled = !running && !busy, icon = ovenIcon(p.key), available = p.available) { selKey = p.key }
+            SectionLabel(stringResource(R.string.hc_oven_mode))
+            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                ChipFlow {
+                    programs.forEach { p ->
+                        ModeChip(p.name, ovenIcon(p.key), p.key == program.key, p.available, enabled = !running && !busy) { selKey = p.key }
+                    }
                 }
             }
-            if (durationDef != null) {
-                SectionLabel(stringResource(R.string.hc_duration), Modifier.padding(top = 14.dp))
-                val maxMin = ((durationDef.max ?: 3600.0) / 60).toInt()
-                val steps = listOf(0, 15, 30, 45, 60).filter { it <= maxMin }
-                // Nicht der Standardwert des Geräts (z. B. 60 s) – ohne Wahl läuft der Ofen ohne Dauer
-                val current = (if (running) a.number(HcKeys.DURATION) else choices[program.key]?.get(durationDef.key)?.doubleOrNull)?.let { (it / 60).roundToInt() } ?: 0
-                Segmented(steps.map { if (it == 0) stringResource(R.string.hc_duration_none) else if (it == 60) stringResource(R.string.hc_duration_hour) else stringResource(R.string.hc_duration_min, it) },
-                    steps.indexOf(current).coerceAtLeast(0), enabled = !running && !busy) { set(durationDef, JsonPrimitive(steps[it] * 60)) }
-            }
-            Spacer(Modifier.weight(1f))
-            if (running) {
-                val remaining = if (heating) runRemaining?.takeIf { (a.number(HcKeys.DURATION) ?: 0.0) > 0 } else runRemaining
-                val pre = if (heating) (((cavity ?: 21.0) - 21) / (target - 21).coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f) else (a.progressPercent ?: 0) / 100f
-                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(g.chip)) {
-                        Box(Modifier.fillMaxHeight().fillMaxWidth(if (reached && heating) 1f else pre).clip(RoundedCornerShape(5.dp))
-                            .background(Brush.horizontalGradient(listOf(Color(0xFFFFC870), Color(0xFFFF7A3D)))))
-                    }
-                    Text(
-                        when {
-                            !heating -> remaining?.let { stringResource(R.string.hc_status_remaining, hmDuration(it)) } ?: stringResource(R.string.hc_status_running)
-                            reached && remaining != null -> stringResource(R.string.hc_oven_cooking, hmDuration(remaining))
-                            reached -> stringResource(R.string.hc_oven_reached)
-                            else -> stringResource(R.string.hc_oven_preheating, (cavity ?: 21.0).roundToInt(), target.roundToInt())
-                        },
-                        color = g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            // Temperatur stellt der Ring links – hier nur noch die Dauer
+            Box(Modifier.padding(top = 12.dp).alpha(if (running) 0.45f else 1f)) {
+                val editable = !running && !busy
+                if (durationDef != null) {
+                    val maxMin = ((durationDef.max ?: 3600.0) / 60).toInt()
+                    val steps = OVEN_DURATIONS.filter { it <= maxMin }
+                    // Nicht der Standardwert des Geräts (z. B. 60 s) – ohne Wahl läuft der Ofen ohne Dauer
+                    val current = (if (running) a.number(HcKeys.DURATION) else choices[program.key]?.get(durationDef.key)?.doubleOrNull)?.let { (it / 60).roundToInt() } ?: 0
+                    val i = steps.indexOfFirst { it >= current }.let { if (it < 0) steps.lastIndex else it }
+                    Stepper(
+                        stringResource(R.string.hc_duration), minutesLabel(if (running) current else steps[i]), null,
+                        canDown = i > 0, canUp = i < steps.lastIndex, enabled = editable,
+                        onDown = { set(durationDef, JsonPrimitive(steps[(i - 1).coerceAtLeast(0)] * 60)) },
+                        onUp = { set(durationDef, JsonPrimitive(steps[(i + 1).coerceAtMost(steps.lastIndex)] * 60)) },
+                        compact = true,
                     )
                 }
-                ActionButton(stringResource(R.string.hc_oven_off), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.fillMaxWidth(), height = 68.dp, enabled = !busy) {
+            }
+            Spacer(Modifier.height(14.dp))
+            if (running) {
+                ActionButton(stringResource(R.string.hc_oven_off), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.fillMaxWidth(), height = 64.dp, enabled = !busy) {
                     vm.stop(a.haId)
                 }
             } else {
@@ -169,14 +215,35 @@ fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: Hous
                     durationDef?.let { d -> choices[program.key]?.get(d.key)?.takeIf { (it.doubleOrNull ?: 0.0) > 0 }?.let { put(d.key, it) } }
                 }
                 ActionButton(
-                    if (setpointDef != null) stringResource(R.string.hc_oven_start, program.name, target.roundToInt()) else stringResource(R.string.hc_start, program.name),
-                    Icons.Outlined.PlayArrow,
-                    if (ok) HcColors.Oven else g.chip, if (ok) Color(0xFF2A1204) else g.soft, Modifier.fillMaxWidth(), height = 68.dp,
+                    stringResource(R.string.hc_start, program.name), Icons.Outlined.PlayArrow,
+                    if (ok) HcColors.Oven else g.chip, if (ok) Color(0xFF2A1204) else g.soft, Modifier.fillMaxWidth(), height = 64.dp,
                     enabled = ok && !busy && program.detailed,
                 ) { vm.start(a.haId, program.key, options) }
                 FootNote(ok, hint)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipFlow(content: @Composable () -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+}
+
+/** Kompakte Wahl für Betriebsart bzw. Leistung: Pille mit Symbol und Name, so breit wie nötig. */
+@Composable
+private fun ModeChip(label: String, icon: ImageVector, selected: Boolean, available: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    val fg = if (selected) inverseInk() else g.ink
+    Row(
+        Modifier.height(44.dp).alpha(if (available || selected) 1f else 0.5f).clip(RoundedCornerShape(22.dp)).background(if (selected) g.ink else g.chip)
+            .clickable(enabled = enabled, onClick = onClick).padding(start = 14.dp, end = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(20.dp), tint = fg)
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -201,8 +268,15 @@ private fun OvenDial(target: Double, cavity: Double?, idleLabel: String, showTar
     val cf = cavity?.let { ((it - min) / (max - min)).toFloat().coerceIn(0f, 1f) } ?: 0f
     // Glühen nur im Betrieb – im Standby ist das Fenster dunkel
     val glow by animateFloatAsState(if (running && cavity != null) 0.25f + (cavity / 230.0).toFloat().coerceIn(0f, 1f) * 0.75f else 0f, tween(400), label = "glow")
+    fun nudge(dir: Int) {
+        val (lo, hi, st) = range
+        val v = stepTo(valueOf(local), dir, st, lo, hi)
+        local = ((v - lo) / (hi - lo)).toFloat().coerceIn(0f, 1f)
+        commit(v)
+    }
+    Box(Modifier.size(330.dp), contentAlignment = Alignment.Center) {
     Box(
-        Modifier.size(330.dp)
+        Modifier.matchParentSize()
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures { p -> local = at(p, size); commit(valueOf(local)) }
@@ -215,8 +289,7 @@ private fun OvenDial(target: Double, cavity: Double?, idleLabel: String, showTar
                     onDragCancel = { dragging = false },
                 ) { change, _ -> change.consume(); local = at(change.position, size) }
             },
-        contentAlignment = Alignment.Center,
-    ) {
+    )
         Canvas(Modifier.size(330.dp)) {
             val ring = 26.dp.toPx()
             val r = size.minDimension / 2 - ring / 2
@@ -256,8 +329,19 @@ private fun OvenDial(target: Double, cavity: Double?, idleLabel: String, showTar
                     modifier = Modifier.padding(top = if (cavity == null) 18.dp else 0.dp))
             }
         }
+        // − / + in der Lücke unten im Ring – für genaue Schritte ohne Ziehen
+        if (!running && showTarget) RingButtons(enabled, canDown = valueOf(local) > min, canUp = valueOf(local) < max, Modifier.align(Alignment.BottomCenter)) { nudge(it) }
     }
 }
+
+@Composable
+private fun RingButtons(enabled: Boolean, canDown: Boolean, canUp: Boolean, modifier: Modifier, onStep: (Int) -> Unit) {
+    Row(modifier.padding(bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(64.dp)) {
+        StepButton(Icons.Outlined.Remove, enabled && canDown, 48.dp) { onStep(-1) }
+        StepButton(Icons.Outlined.Add, enabled && canUp, 48.dp) { onStep(1) }
+    }
+}
+
 
 private fun isMicrowave(key: String?) = key != null && ".Program.Microwave." in key
 
@@ -270,8 +354,9 @@ private fun shortPower(name: String) = name.replace(" Watt", " W")
 
 private fun mmss(seconds: Int) = "%d:%02d".format(seconds / 60, seconds % 60)
 
+
 /**
- * Mikrowelle: Leistung als Kacheln, Dauer am Ring (Stufen von 15 s bis 30 min) oder per Schnellwahl.
+ * Mikrowelle: Umschalter und Ring links (Ring stellt auch die Dauer), rechts Leistung, Dauer mit − / + und Start.
  * Die Grenzen meldet der Ofen im Standby nicht – deshalb feste Stufen, auf gemeldete Grenzen eingepasst.
  */
 @Composable
@@ -286,44 +371,35 @@ private fun ColumnScope.MicrowaveView(a: HcAppliance, programs: List<HcProgram>,
     val steps = MW_DURATIONS.filter { s -> (durDef?.min == null || s >= durDef.min!!) && (durDef?.max == null || s <= durDef.max!!) }.ifEmpty { MW_DURATIONS }
     var seconds by remember(a.haId) { mutableStateOf(120) }
     val shown = if (running) (a.number(HcKeys.DURATION)?.toInt() ?: seconds) else seconds
+    val i = steps.indexOfFirst { it >= shown }.let { if (it < 0) steps.lastIndex else it }
     val remaining = if (running) a.remainingSeconds(now)?.toInt() else null
+    val power = shortPower(program.name)
 
-    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-        Column(Modifier.width(340.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            MicrowaveDial(
-                index = steps.indexOfFirst { it >= shown }.let { if (it < 0) steps.lastIndex else it }, steps = steps,
-                remaining = remaining, power = shortPower(program.name), running = running, enabled = !running && !busy,
-            ) { seconds = steps[it] }
-            Text(stringResource(if (running) R.string.hc_mw_running_hint else R.string.hc_mw_dial_hint), color = g.soft, fontSize = 14.sp, modifier = Modifier.padding(top = 12.dp))
+    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        Column(Modifier.width(340.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            modeSwitch()
+            Spacer(Modifier.weight(1f))
+            MicrowaveDial(index = i, steps = steps, remaining = remaining, power = power, running = running, enabled = !running && !busy) { seconds = steps[it] }
+            Text(if (running) stringResource(R.string.hc_mw_running_hint) else "", color = g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, modifier = Modifier.padding(top = 10.dp))
+            Spacer(Modifier.weight(1f))
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            modeSwitch()
             SectionLabel(stringResource(R.string.hc_mw_power))
-            TileGrid(programs, columns = 3) { p ->
-                ProgramTile(shortPower(p.name), p.key == program.key, Modifier.weight(1f).height(72.dp), enabled = !running && !busy,
-                    icon = androidx.compose.material.icons.Icons.Outlined.Microwave, available = p.available) { selKey = p.key }
-            }
-            SectionLabel(stringResource(R.string.hc_duration), Modifier.padding(top = 14.dp))
-            val quick = listOf(30, 60, 120, 300).filter { it in steps }
-            Segmented(quick.map { if (it < 60) stringResource(R.string.hc_seconds, it) else stringResource(R.string.hc_duration_min, it / 60) },
-                quick.indexOf(shown), enabled = !running && !busy) { seconds = quick[it] }
-            Spacer(Modifier.weight(1f))
-            if (running) {
-                val total = (a.number(HcKeys.DURATION) ?: 0.0).coerceAtLeast(1.0)
-                val pr = (a.progressPercent?.div(100f)) ?: remaining?.let { (1f - it / total.toFloat()).coerceIn(0f, 1f) } ?: 0f
-                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(g.chip)) {
-                        Box(Modifier.fillMaxHeight().fillMaxWidth(pr).clip(RoundedCornerShape(5.dp)).background(MicrowaveAccent))
+            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                ChipFlow {
+                    programs.forEach { p ->
+                        ModeChip(shortPower(p.name), Icons.Outlined.Microwave, p.key == program.key, p.available, enabled = !running && !busy) { selKey = p.key }
                     }
-                    Text(remaining?.let { stringResource(R.string.hc_status_remaining, mmss(it)) } ?: stringResource(R.string.hc_status_running),
-                        color = g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
-                ActionButton(stringResource(R.string.hc_mw_off), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.fillMaxWidth(), height = 68.dp, enabled = !busy) { vm.stop(a.haId) }
+            }
+            if (running) {
+                ActionButton(stringResource(R.string.hc_mw_off), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.fillMaxWidth(), height = 64.dp, enabled = !busy) { vm.stop(a.haId) }
             } else {
                 val (ok, hint) = startHint(a)
                 ActionButton(
-                    stringResource(R.string.hc_mw_start, shortPower(program.name), mmss(seconds)), Icons.Outlined.PlayArrow,
-                    if (ok) MicrowaveAccent else g.chip, if (ok) Color(0xFF2A1F04) else g.soft, Modifier.fillMaxWidth(), height = 68.dp,
+                    stringResource(R.string.hc_mw_start, power, mmss(seconds)), Icons.Outlined.PlayArrow,
+                    if (ok) MicrowaveAccent else g.chip, if (ok) Color(0xFF2A1F04) else g.soft, Modifier.fillMaxWidth(), height = 64.dp,
                     enabled = ok && !busy && program.detailed,
                 ) {
                     val value = durDef?.fit(JsonPrimitive(seconds)) ?: JsonPrimitive(seconds)
@@ -350,8 +426,14 @@ private fun MicrowaveDial(index: Int, steps: List<Int>, remaining: Int?, power: 
     }
     fun idx(f: Float) = (f * (count - 1)).roundToInt().coerceIn(0, count - 1)
     val glow by animateFloatAsState(if (running) 0.8f else 0f, tween(600), label = "mwglow")
+    fun nudge(dir: Int) {
+        val n = (idx(local) + dir).coerceIn(0, count - 1)
+        local = n / (count - 1).coerceAtLeast(1).toFloat()
+        pick(n)
+    }
+    Box(Modifier.size(330.dp), contentAlignment = Alignment.Center) {
     Box(
-        Modifier.size(330.dp)
+        Modifier.matchParentSize()
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures { p -> local = at(p, size); pick(idx(local)) }
@@ -364,8 +446,7 @@ private fun MicrowaveDial(index: Int, steps: List<Int>, remaining: Int?, power: 
                     onDragCancel = { dragging = false },
                 ) { change, _ -> change.consume(); local = at(change.position, size); pick(idx(local)) }
             },
-        contentAlignment = Alignment.Center,
-    ) {
+    )
         Canvas(Modifier.size(330.dp)) {
             val ring = 26.dp.toPx()
             val r = size.minDimension / 2 - ring / 2
@@ -392,6 +473,16 @@ private fun MicrowaveDial(index: Int, steps: List<Int>, remaining: Int?, power: 
                 Text(power, color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
             }
         }
+        if (!running) RingButtons(enabled, canDown = idx(local) > 0, canUp = idx(local) < count - 1, Modifier.align(Alignment.BottomCenter)) { nudge(it) }
     }
+}
+
+
+/** 30 → „30 s“, 90 → „1:30 Min“, 120 → „2 Min“. */
+@Composable
+private fun secondsLabel(s: Int): String = when {
+    s < 60 -> stringResource(R.string.hc_seconds, s)
+    s % 60 == 0 -> stringResource(R.string.hc_duration_min, s / 60)
+    else -> stringResource(R.string.hc_mw_minsec, mmss(s))
 }
 
