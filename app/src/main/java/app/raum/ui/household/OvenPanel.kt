@@ -176,13 +176,11 @@ fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: Hous
         // Rechts: Betriebsart, Einstellungen, Start
         Column(Modifier.weight(1f).fillMaxHeight()) {
             SectionLabel(stringResource(R.string.hc_oven_mode))
-            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                ChipFlow {
-                    programs.forEach { p ->
-                        ModeChip(p.name, ovenIcon(p.key), p.key == program.key, p.available, enabled = !running && !busy) { selKey = p.key }
-                    }
-                }
-            }
+            // Heizarten als illustrierte Karten zum Durchwischen
+            ProgramCarousel(
+                programs.map { ProgramCardSpec(it.key, it.name, it.available, ovenArt(it.key)) }, program.key, enabled = !running && !busy,
+                Modifier.weight(1f).fillMaxWidth(),
+            ) { selKey = it }
             // Temperatur stellt der Ring links – hier nur noch die Dauer
             Box(Modifier.padding(top = 12.dp).alpha(if (running) 0.45f else 1f)) {
                 val editable = !running && !busy
@@ -364,13 +362,10 @@ private fun ColumnScope.MicrowaveView(a: HcAppliance, programs: List<HcProgram>,
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
             SectionLabel(stringResource(R.string.hc_mw_power))
-            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                ChipFlow {
-                    programs.forEach { p ->
-                        ModeChip(shortPower(p.name), Icons.Outlined.Microwave, p.key == program.key, p.available, enabled = !running && !busy) { selKey = p.key }
-                    }
-                }
-            }
+            ProgramCarousel(
+                programs.map { ProgramCardSpec(it.key, shortPower(it.name), it.available, microwaveArt(it.key)) }, program.key, enabled = !running && !busy,
+                Modifier.weight(1f).fillMaxWidth().padding(bottom = 14.dp),
+            ) { selKey = it }
             if (running) {
                 ActionButton(stringResource(R.string.hc_mw_off), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.fillMaxWidth(), height = 64.dp, enabled = !busy) { vm.stop(a.haId) }
             } else {
