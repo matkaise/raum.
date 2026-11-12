@@ -1,5 +1,18 @@
 package app.raum.ui.household
 
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.atan2
+import kotlin.math.roundToInt
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,6 +28,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -89,15 +104,6 @@ private fun phases(type: HcType): List<Phase> = when (type) {
     else -> listOf(Phase(R.string.hc_phase_dry, 0f, .85f), Phase(R.string.hc_phase_cool, .85f, 1f))
 }
 
-/** Sekunden bis zur nächsten 01:00 – „Nachts“ im Entwurf. */
-private fun secondsUntilNight(now: Instant): Long {
-    val zone = ZoneId.systemDefault()
-    val t = now.atZone(zone)
-    var at = t.toLocalDate().atTime(LocalTime.of(1, 0)).atZone(zone)
-    if (!at.isAfter(t)) at = at.plusDays(1)
-    return java.time.Duration.between(t, at).seconds / 60 * 60
-}
-
 @Composable
 fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: HouseholdViewModel, busy: Boolean, now: Instant) {
     val g = LocalGlass.current
@@ -116,6 +122,8 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
     val choices = remember(a.haId) { mutableStateMapOf<String, Map<String, JsonPrimitive>>() }
     fun value(o: HcOptionDef): JsonPrimitive? = program?.let { choices[it.key]?.get(o.key) } ?: o.default
     fun set(o: HcOptionDef, v: JsonPrimitive) { program?.let { choices[it.key] = choices[it.key].orEmpty() + (o.key to v) } }
+    // Startzeit als Uhrzeit statt als Abstand – „23:30“ bleibt 23:30, auch wenn man erst später auf Start tippt
+    var startAt by remember(a.haId) { mutableStateOf<Instant?>(null) }
 
     val remaining = a.remainingSeconds(now)
     val p = when {
@@ -129,16 +137,27 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
 
     val offline = !a.connected
     val editable = !active && !offline
-    val visual = if (editable || offline) 180.dp else 260.dp
+    val ringColor = if (finished) HcColors.Done else accent
 
-    Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(32.dp), verticalAlignment = Alignment.CenterVertically) {
-        val ringColor = if (finished) HcColors.Done else accent
-        Box(Modifier.alpha(if (offline) 0.4f else 1f)) {
-            if (a.type == HcType.DISHWASHER) DishVisual(p, ringColor, spraying = running && cur.labelRes != R.string.hc_phase_dry, steaming = running && cur.labelRes == R.string.hc_phase_dry, diameter = visual)
-            else DrumVisual(p, ringColor, running = running, fast = running && cur.labelRes == R.string.hc_phase_spin, water = running && a.type != HcType.DRYER && cur.labelRes != R.string.hc_phase_spin && cur.labelRes != R.string.hc_phase_dry, dryer = a.type == HcType.DRYER, diameter = visual)
-        }
-
-        Column(Modifier.weight(1f)) {
+    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        // Links: das Gerät als Illustration, darunter Zustand und – im Betrieb – die Restzeit
+        Column(Modifier.width(340.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.weight(1f))
+            // Drehring um das Gerät: im Leerlauf Programmwahl (Rasten je Programm), im Betrieb Fortschritt
+            val idx = programs.indexOfFirst { it.key == program?.key }.coerceAtLeast(0)
+            Box(Modifier.alpha(if (offline) 0.4f else 1f)) {
+                ProgramDial(
+                    count = programs.size, index = idx, progress = if (editable) null else p, ring = ringColor, dashed = waiting,
+                    enabled = editable && !busy && programs.isNotEmpty(), onPick = { i -> programs.getOrNull(i)?.let { selKey = it.key } },
+                ) {
+                    if (a.type == HcType.DISHWASHER) DishVisual(p, ringColor, spraying = running && cur.labelRes != R.string.hc_phase_dry, steaming = running && cur.labelRes == R.string.hc_phase_dry, diameter = 196.dp, frame = false)
+                    else DrumVisual(p, ringColor, running = running, fast = running && cur.labelRes == R.string.hc_phase_spin, water = running && a.type != HcType.DRYER && cur.labelRes != R.string.hc_phase_spin && cur.labelRes != R.string.hc_phase_dry, dryer = a.type == HcType.DRYER, diameter = 218.dp, frame = false)
+                }
+            }
+            if (editable && program != null) {
+                Text(program.name, color = g.ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 14.dp))
+                if (!program.available) Text(stringResource(R.string.hc_program_unavailable_short), color = g.warn, fontSize = 13.sp, maxLines = 1)
+            }
             val stateLabel = when {
                 offline -> stringResource(R.string.hc_status_offline)
                 waiting -> stringResource(R.string.hc_state_delayed)
@@ -149,35 +168,58 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
                 !a.poweredOn -> stringResource(if (a.power == "Standby") R.string.hc_status_standby else R.string.hc_status_off)
                 else -> stringResource(R.string.hc_status_ready)
             }
-            Text(stateLabel.uppercase(), color = if (finished) (if (g.dark) HcColors.Done else HcColors.DoneInk) else g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp)
-            when {
-                offline -> Text(stringResource(R.string.hc_offline_explain), color = g.soft, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
-                editable -> {
-                    // Leerlauf: das gewählte Programm groß, darunter seine Optionen – keine leere Zeitanzeige, keine Phasen
-                    Text(program?.name.orEmpty(), color = g.ink, fontSize = 44.sp, fontWeight = FontWeight.Normal, lineHeight = 48.sp, letterSpacing = (-0.5).sp,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                    val summary = program?.let { pr -> optionSummary(a, pr, pr.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap(), programs) }.orEmpty()
-                    Text(summary.joinToString(" · ").ifBlank { stringResource(R.string.hc_sub_program_duration) }, color = g.soft, fontSize = 18.sp, maxLines = 2, modifier = Modifier.padding(top = 8.dp))
+            Text(stateLabel.uppercase(), color = if (finished) (if (g.dark) HcColors.Done else HcColors.DoneInk) else g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.4.sp, maxLines = 1, modifier = Modifier.padding(top = if (editable) 4.dp else 14.dp))
+            if (active || finished) {
+                val startAt = a.delayedStartAt()
+                val big = when {
+                    waiting -> startAt?.let(::hm) ?: "–"
+                    active -> remaining?.let(::hmDuration) ?: "–"
+                    else -> a.finishedAt?.let(::hm) ?: "✓"
                 }
-                else -> {
-                    val startAt = a.delayedStartAt()
-                    val big = when {
-                        waiting -> startAt?.let(::hm) ?: "–"
-                        active -> remaining?.let(::hmDuration) ?: "–"
-                        else -> a.finishedAt?.let(::hm) ?: "✓"
+                Text(big, color = g.ink, fontSize = 48.sp, fontWeight = FontWeight.Light, letterSpacing = (-2).sp, lineHeight = 52.sp, maxLines = 1)
+                Text(
+                    when {
+                        waiting && startAt != null -> remaining?.let { stringResource(R.string.hc_sub_delayed, hm(startAt.plusSeconds(it))) } ?: stringResource(R.string.hc_sub_delayed_plain)
+                        active -> remaining?.let { stringResource(R.string.hc_sub_remaining, hm(now.plusSeconds(it))) } ?: ""
+                        else -> stringResource(if (a.type == HcType.WASHER) R.string.hc_sub_finished_take_out else R.string.hc_sub_finished)
+                    },
+                    color = g.soft, fontSize = 15.sp, maxLines = 1,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+        }
+
+        // Rechts: Programm und Optionen bzw. Ablauf, unten die Knöpfe
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            when {
+                offline -> {
+                    Text(stringResource(R.string.hc_offline_explain), color = g.soft, fontSize = 18.sp, modifier = Modifier.padding(top = 4.dp))
+                    Spacer(Modifier.weight(1f))
+                }
+                editable && program != null -> {
+                    // Scrollt, damit der Startknopf immer sichtbar bleibt; unten weich ausblenden statt hart abschneiden
+                    val scroll = rememberScrollState()
+                    Column(
+                        Modifier.weight(1f).fillMaxWidth()
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                if (scroll.canScrollForward) drawRect(Brush.verticalGradient(0.85f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                            }
+                            .verticalScroll(scroll),
+                    ) {
+                        OptionGroups(program, ::value, ::set, enabled = !busy, now = now, startAt = startAt, accent = accent) { startAt = it }
+                        Spacer(Modifier.height(12.dp))
                     }
-                    Text(big, color = g.ink, fontSize = 84.sp, fontWeight = FontWeight.Light, letterSpacing = (-3).sp, lineHeight = 86.sp, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
-                    Text(
-                        when {
-                            waiting && startAt != null -> remaining?.let { stringResource(R.string.hc_sub_delayed, hm(startAt.plusSeconds(it))) } ?: stringResource(R.string.hc_sub_delayed_plain)
-                            active -> remaining?.let { stringResource(R.string.hc_sub_remaining, hm(now.plusSeconds(it))) } ?: ""
-                            else -> stringResource(if (a.type == HcType.WASHER) R.string.hc_sub_finished_take_out else R.string.hc_sub_finished)
-                        },
-                        color = g.soft, fontSize = 18.sp, modifier = Modifier.padding(top = 6.dp),
-                    )
+                }
+                editable -> { LoadingPrograms(); Spacer(Modifier.weight(1f)) }
+                else -> {
+                    // Ablauf: Programm mit Optionen, darunter die Phasen
+                    SectionLabel(stringResource(R.string.hc_program))
                     val line = listOf(activeName) + optionSummary(a, programs.firstOrNull { it.key == a.activeProgram } ?: program, a.values, programs)
-                    Text(line.filter { it.isNotBlank() }.joinToString(" · "), color = g.ink, fontSize = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, modifier = Modifier.padding(top = 16.dp))
-                    Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(line.filter { it.isNotBlank() }.joinToString(" · "), color = g.ink, fontSize = 24.sp, fontWeight = FontWeight.Medium, maxLines = 2)
+                    Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         ph.forEach { phase ->
                             val f = ((p - phase.from) / (phase.to - phase.from)).coerceIn(0f, 1f)
                             val isCur = running && phase == cur
@@ -191,69 +233,45 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
                             }
                         }
                     }
+                    Spacer(Modifier.weight(1f))
                 }
             }
-        }
-    }
-    if (offline) { Spacer(Modifier.weight(1f)); return }
-
-    // Programmwahl, solange nichts läuft – scrollt, damit der Startknopf immer sichtbar bleibt
-    if (editable && program != null) {
-        // Unten weich ausblenden – zeigt, dass es weitergeht, statt eine Reihe hart abzuschneiden
-        val scroll = rememberScrollState()
-        Column(
-            Modifier.weight(1f).padding(top = 14.dp)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    if (scroll.canScrollForward) drawRect(Brush.verticalGradient(0.85f to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+            if (!offline) {
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    when {
+                        waiting -> {
+                            ActionButton(stringResource(R.string.hc_start_now), Icons.Outlined.PlayArrow, accent, HcColors.OnAccent, Modifier.weight(2f), height = 64.dp, enabled = !busy) { vm.startNow(a.haId) }
+                            ActionButton(stringResource(R.string.hc_clear_delay), Icons.Outlined.Schedule, g.chip, g.ink, Modifier.weight(1f), height = 64.dp, enabled = !busy) { vm.stop(a.haId) }
+                        }
+                        active -> {
+                            val canPause = a.commands == null || HcKeys.PAUSE in a.commands
+                            if (canPause) ActionButton(
+                                stringResource(if (paused) R.string.hc_resume else R.string.hc_pause), if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                                accent, HcColors.OnAccent, Modifier.weight(2f), height = 64.dp, enabled = !busy,
+                            ) { vm.pause(a.haId, !paused) }
+                            ActionButton(stringResource(R.string.hc_abort), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.weight(1f), height = 64.dp, enabled = !busy) { vm.stop(a.haId) }
+                        }
+                        program != null -> {
+                            val (ok, _) = startHint(a)
+                            // Startzeit 0 = „Jetzt“ nicht mitsenden (manche Geräte lehnen 0 ab)
+                            val delayDef = program.option(HcKeys.START_IN_RELATIVE)
+                            // Bis zur gewählten Uhrzeit, auf die Minute – ist sie schon vorbei, startet er sofort
+                            val delay = startAt?.takeIf { delayDef != null }?.let { java.time.Duration.between(now, it).seconds }?.takeIf { it >= 60 }?.let { it / 60 * 60 } ?: 0L
+                            val opts = program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()
+                                .filterKeys { it != HcKeys.START_IN_RELATIVE }
+                                .let { m -> if (delay > 0 && delayDef != null) m + (delayDef.key to (delayDef.fit(JsonPrimitive(delay)) ?: JsonPrimitive(delay))) else m }
+                            val label = if (delay > 0) stringResource(R.string.hc_start_at, program.name, hm(startAt!!))
+                            else stringResource(R.string.hc_start, program.name)
+                            ActionButton(label, if (delay > 0) Icons.Outlined.Schedule else Icons.Outlined.PlayArrow,
+                                if (ok) accent else g.chip, if (ok) HcColors.OnAccent else g.soft, Modifier.weight(1f), height = 64.dp,
+                                enabled = ok && !busy && program.detailed) { vm.start(a.haId, program.key, opts) }
+                        }
+                    }
                 }
-                .verticalScroll(scroll),
-        ) {
-            SectionLabel(stringResource(R.string.hc_program), trailing = if (!program.available) stringResource(R.string.hc_program_unavailable_short) else null)
-            TileGrid(programs, columns = 6) { pr ->
-                ProgramTile(pr.name, pr.key == program.key, Modifier.weight(1f).height(48.dp), enabled = !busy, available = pr.available) { selKey = pr.key }
-            }
-            OptionGroups(program, ::value, ::set, enabled = !busy, now = now)
-            Spacer(Modifier.height(12.dp))
-        }
-    } else if (editable) {
-        LoadingPrograms()
-        Spacer(Modifier.weight(1f))
-    } else {
-        Spacer(Modifier.weight(1f))
-    }
-
-    // Knöpfe
-    Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        when {
-            waiting -> {
-                ActionButton(stringResource(R.string.hc_start_now), Icons.Outlined.PlayArrow, accent, HcColors.OnAccent, Modifier.weight(2f), enabled = !busy) { vm.startNow(a.haId) }
-                ActionButton(stringResource(R.string.hc_clear_delay), Icons.Outlined.Schedule, g.chip, g.ink, Modifier.weight(1f), enabled = !busy) { vm.stop(a.haId) }
-            }
-            active -> {
-                val canPause = a.commands == null || HcKeys.PAUSE in a.commands
-                if (canPause) ActionButton(
-                    stringResource(if (paused) R.string.hc_resume else R.string.hc_pause), if (paused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
-                    accent, HcColors.OnAccent, Modifier.weight(2f), enabled = !busy,
-                ) { vm.pause(a.haId, !paused) }
-                ActionButton(stringResource(R.string.hc_abort), Icons.Outlined.StopCircle, g.chip, g.ink, Modifier.weight(1f), enabled = !busy) { vm.stop(a.haId) }
-            }
-            program != null -> {
-                val (ok, _) = startHint(a)
-                // Startzeit 0 = „Jetzt“ nicht mitsenden (manche Geräte lehnen 0 ab)
-                val opts = program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()
-                    .filterNot { (k, v) -> k == HcKeys.START_IN_RELATIVE && (v.doubleOrNull ?: 0.0) <= 0.0 }
-                val delay = (opts[HcKeys.START_IN_RELATIVE]?.doubleOrNull ?: 0.0).toLong()
-                val label = if (delay > 0) stringResource(R.string.hc_start_at, program.name, hm(now.plusSeconds(delay)))
-                else stringResource(R.string.hc_start, program.name)
-                ActionButton(label, if (delay > 0) Icons.Outlined.Schedule else Icons.Outlined.PlayArrow,
-                    if (ok) accent else g.chip, if (ok) HcColors.OnAccent else g.soft, Modifier.weight(1f),
-                    enabled = ok && !busy && program.detailed) { vm.start(a.haId, program.key, opts) }
+                if (editable) startHint(a).let { (ok, hint) -> FootNote(ok, hint) }
             }
         }
     }
-    if (editable) startHint(a).let { (ok, hint) -> if (!ok) FootNote(false, hint) }
 }
 
 /** Kurzbeschreibung der Optionen: „40° · 1400 U/min“, „Schranktrocken“, „Extra trocken“. */
@@ -289,7 +307,7 @@ private fun commonUnit(labels: List<String>): String {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OptionGroups(program: HcProgram, value: (HcOptionDef) -> JsonPrimitive?, set: (HcOptionDef, JsonPrimitive) -> Unit, enabled: Boolean, now: Instant) {
+private fun OptionGroups(program: HcProgram, value: (HcOptionDef) -> JsonPrimitive?, set: (HcOptionDef, JsonPrimitive) -> Unit, enabled: Boolean, now: Instant, startAt: Instant?, accent: Color, onStartAt: (Instant?) -> Unit) {
     val g = LocalGlass.current
     val enums = program.options.filter { it.isEnum }.let { list ->
         // Bekannte zuerst (Temperatur, Schleudern, Trockenziel), höchstens zwei Gruppen
@@ -308,38 +326,196 @@ private fun OptionGroups(program: HcProgram, value: (HcOptionDef) -> JsonPrimiti
             }
         }
     }
-    if (bools.isNotEmpty() || delayDef != null) Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        if (bools.isNotEmpty()) Column(Modifier.weight(1f)) {
-            SectionLabel(stringResource(R.string.hc_options))
-            // Ein/Aus-Optionen als Chips, die umbrechen – lange Namen („Halbe Beladung“) bleiben lesbar
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                bools.forEach { o ->
-                    val on = value(o)?.booleanOrNull == true
-                    Box(
-                        Modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(if (on) g.ink else g.chip)
-                            .clickable(enabled = enabled) { set(o, JsonPrimitive(!on)) }.padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(o.name, color = if (on) inverseInk() else g.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
-                }
+    if (bools.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        SectionLabel(stringResource(R.string.hc_options))
+        // Ein/Aus-Optionen als Chips, die umbrechen – lange Namen („Halbe Beladung“) bleiben lesbar
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            bools.forEach { o ->
+                val on = value(o)?.booleanOrNull == true
+                Box(
+                    Modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(if (on) g.ink else g.chip)
+                        .clickable(enabled = enabled) { set(o, JsonPrimitive(!on)) }.padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text(o.name, color = if (on) inverseInk() else g.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
             }
         }
-        if (delayDef != null) Column(Modifier.weight(1f)) {
+    }
+    if (delayDef != null) StartTimePicker(now, startAt, (delayDef.max ?: 86_340.0).toLong(), enabled, accent, onStartAt)
+}
+
+/** Raster der Startzeit: Viertelstunden auf der Uhr. */
+private const val QUARTER = 900L
+private const val DAY = 86_400L
+
+/**
+ * Startzeit am Uhr-Ring: der Ring zeigt die nächsten 24 Stunden, oben ist jetzt. Ziehen oder Tippen setzt die
+ * Uhrzeit (auf Viertelstunden), der Bogen zeigt die Wartezeit. Links: Jetzt/Uhrzeit und − / + für Feinschritte.
+ * Gespeichert wird die Uhrzeit, nicht der Abstand.
+ */
+@Composable
+private fun StartTimePicker(now: Instant, startAt: Instant?, maxSeconds: Long, enabled: Boolean, accent: Color, onStartAt: (Instant?) -> Unit) {
+    val g = LocalGlass.current
+    val at = startAt?.takeIf { it.isAfter(now.plusSeconds(59)) }
+    val limit = Instant.ofEpochSecond((now.epochSecond + maxSeconds) / QUARTER * QUARTER)
+    /** Auf die nächste Viertelstunde, nicht vor jetzt + 1 min (sonst „Jetzt“), nicht über die Grenze des Geräts. */
+    fun snap(t: Instant): Instant? {
+        val s = Instant.ofEpochSecond((t.epochSecond + QUARTER / 2) / QUARTER * QUARTER)
+        return if (!s.isAfter(now.plusSeconds(59))) null else if (s.isAfter(limit)) limit else s
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
             SectionLabel(stringResource(R.string.hc_start_time))
-            val max = delayDef.max ?: 86_340.0
-            val night = secondsUntilNight(now)
-            val choices = listOf(0L to stringResource(R.string.hc_now), 3600L to stringResource(R.string.hc_plus_hours, 1), 3 * 3600L to stringResource(R.string.hc_plus_hours, 3), night to stringResource(R.string.hc_night))
-                .filter { it.first <= max }
-            val cur = (value(delayDef)?.doubleOrNull ?: 0.0).toLong()
-            // „Nachts“ verschiebt sich mit der Uhr – nach Minuten vergleichen
-            val sel = choices.indexOfFirst { kotlin.math.abs(it.first - cur) < 120 }.coerceAtLeast(0)
-            Segmented(choices.map { it.second }, sel, enabled = enabled) { set(delayDef, JsonPrimitive(choices[it].first)) }
+            Text(
+                at?.let { stringResource(R.string.hc_starts_at, hm(it), hmDuration(java.time.Duration.between(now, it).seconds)) } ?: stringResource(R.string.hc_starts_now),
+                color = g.ink, fontSize = 18.sp, fontWeight = FontWeight.Medium,
+            )
+            Text(stringResource(R.string.hc_ring_explain), color = g.soft, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
         }
+        TimeRing(now, at, accent, enabled, onClear = { onStartAt(null) }) { t -> onStartAt(snap(t)) }
+    }
+}
+
+/** 24-Stunden-Ring ab jetzt (oben), im Uhrzeigersinn. */
+@Composable
+private fun TimeRing(now: Instant, at: Instant?, accent: Color, enabled: Boolean, onClear: () -> Unit, onPick: (Instant) -> Unit) {
+    val g = LocalGlass.current
+    val zone = ZoneId.systemDefault()
+    val measurer = rememberTextMeasurer()
+    val base by rememberUpdatedState(now)
+    val pick by rememberUpdatedState(onPick)
+    val current by rememberUpdatedState(at)
+    fun offsetAt(p: Offset, size: IntSize): Long {
+        val deg = Math.toDegrees(atan2((p.x - size.width / 2f).toDouble(), -(p.y - size.height / 2f).toDouble()))
+        return (((deg + 360) % 360) / 360 * DAY).toLong()
+    }
+    // Über „oben“ hinweg nicht von 23:59 Std auf 0 springen – am Ende festhalten
+    fun unwrap(off: Long): Long {
+        val last = current?.let { java.time.Duration.between(base, it).seconds } ?: 0L
+        return if (kotlin.math.abs(off - last) > DAY / 2) (if (last > DAY / 2) DAY - 1 else 0L) else off
+    }
+    val labelStyle = androidx.compose.ui.text.TextStyle(color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    val off = at?.let { java.time.Duration.between(now, it).seconds } ?: 0L
+    val sweep by animateFloatAsState(off / DAY.toFloat() * 360f, tween(120), label = "sweep")
+    Box(
+        Modifier.size(250.dp)
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures { p -> pick(base.plusSeconds(offsetAt(p, size))) }
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectDragGestures { change, _ -> change.consume(); pick(base.plusSeconds(unwrap(offsetAt(change.position, size)))) }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.matchParentSize()) {
+            val w = 14.dp.toPx()
+            val r = size.minDimension / 2 - 16.dp.toPx()
+            val tl = Offset(center.x - r, center.y - r)
+            val sz = Size(r * 2, r * 2)
+            drawCircle(g.track, r, style = Stroke(w))
+            // Stunden: Punkt je Stunde, Zahl alle drei Stunden
+            val local = now.atZone(zone)
+            val firstHour = local.withMinute(0).withSecond(0).withNano(0).plusHours(1)
+            repeat(24) { k ->
+                val h = firstHour.plusHours(k.toLong())
+                val f = java.time.Duration.between(local, h).seconds / DAY.toFloat()
+                val ang = Math.toRadians((-90f + 360f * f).toDouble())
+                val dir = Offset(cos(ang).toFloat(), sin(ang).toFloat())
+                drawCircle(g.soft.copy(alpha = 0.5f), 2.dp.toPx(), center + dir * r)
+                if (h.hour % 3 == 0) {
+                    val tl2 = measurer.measure("%02d".format(h.hour), labelStyle)
+                    val pos = center + dir * (r - 26.dp.toPx())
+                    drawText(tl2, topLeft = Offset(pos.x - tl2.size.width / 2f, pos.y - tl2.size.height / 2f))
+                }
+            }
+            // Jetzt-Marke oben
+            drawCircle(accent, 4.dp.toPx(), Offset(center.x, center.y - r))
+            if (at != null) {
+                drawArc(accent, -90f, sweep, false, tl, sz, style = Stroke(w, cap = StrokeCap.Round))
+                val ang = Math.toRadians((-90f + sweep).toDouble())
+                val k = center + Offset(cos(ang).toFloat(), sin(ang).toFloat()) * r
+                drawCircle(Color.Black.copy(alpha = 0.22f), 15.dp.toPx(), k + Offset(0f, 2.dp.toPx()))
+                drawCircle(Color.White, 14.dp.toPx(), k)
+                drawCircle(accent, 6.dp.toPx(), k)
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(at?.let(::hm) ?: stringResource(R.string.hc_now), color = if (at != null) g.ink else g.soft, fontSize = 34.sp, fontWeight = FontWeight.Light, maxLines = 1)
+            Text(
+                at?.let { stringResource(R.string.hc_start_in, hmDuration(java.time.Duration.between(now, it).seconds)) } ?: stringResource(R.string.hc_ring_hint),
+                color = g.soft, fontSize = 12.sp, maxLines = 1,
+            )
+            // Zurück auf sofort – ohne den Knopf bis ganz nach oben zu ziehen
+            if (at != null) Box(
+                Modifier.padding(top = 8.dp).height(30.dp).clip(RoundedCornerShape(15.dp)).background(g.chip)
+                    .clickable(enabled = enabled, onClick = onClear).padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(stringResource(R.string.hc_now), color = g.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+/**
+ * Drehring (270°) um die Illustration. Leerlauf: eine Raste je Programm, Ziehen oder Tippen wählt,
+ * − / + in der Lücke unten blättern. Im Betrieb zeigt derselbe Ring den Fortschritt.
+ */
+@Composable
+private fun ProgramDial(count: Int, index: Int, progress: Float?, ring: Color, dashed: Boolean = false, enabled: Boolean, onPick: (Int) -> Unit, content: @Composable () -> Unit) {
+    val g = LocalGlass.current
+    val n by rememberUpdatedState(count)
+    val pick by rememberUpdatedState(onPick)
+    val cur by rememberUpdatedState(index)
+    fun frac(i: Int) = if (count <= 1) 0f else i / (count - 1).toFloat()
+    fun at(p: Offset, size: IntSize): Int {
+        val a = Math.toDegrees(atan2((p.x - size.width / 2f).toDouble(), -(p.y - size.height / 2f).toDouble())).toFloat()
+        val f = ((a + 135f) / 270f).coerceIn(0f, 1f)
+        return (f * (n - 1)).roundToInt().coerceIn(0, (n - 1).coerceAtLeast(0))
+    }
+    val knob by animateFloatAsState(frac(index), tween(220), label = "knob")
+    Box(Modifier.size(330.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.matchParentSize()
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    detectTapGestures { p -> pick(at(p, size)) }
+                }
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    detectDragGestures { change, _ -> change.consume(); at(change.position, size).let { if (it != cur) pick(it) } }
+                },
+        )
+        Canvas(Modifier.matchParentSize()) {
+            val w = 16.dp.toPx()
+            val r = size.minDimension / 2 - 14.dp.toPx()
+            val tl = Offset(center.x - r, center.y - r)
+            val sz = Size(r * 2, r * 2)
+            drawArc(g.track, 135f, 270f, false, tl, sz, style = Stroke(w, cap = StrokeCap.Round))
+            if (progress != null) {
+                // Startzeitvorwahl: gestrichelt wie in der Geräteleiste
+                if (dashed) drawArc(ring, 135f, 270f, false, tl, sz, style = Stroke(w * 0.5f, cap = StrokeCap.Round, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 12.dp.toPx()))))
+                else if (progress > 0f) drawArc(ring, 135f, 270f * progress, false, tl, sz, style = Stroke(w, cap = StrokeCap.Round))
+            } else {
+                // Rasten je Programm, die gewählte trägt den Knopf
+                repeat(count) { i ->
+                    val ang = Math.toRadians((135f + 270f * frac(i)).toDouble())
+                    drawCircle(g.soft.copy(alpha = 0.6f), 3.dp.toPx(), Offset(center.x + r * cos(ang).toFloat(), center.y + r * sin(ang).toFloat()))
+                }
+                val ang = Math.toRadians((135f + 270f * knob).toDouble())
+                val k = Offset(center.x + r * cos(ang).toFloat(), center.y + r * sin(ang).toFloat())
+                drawCircle(Color.Black.copy(alpha = 0.22f), 15.dp.toPx(), k + Offset(0f, 2.dp.toPx()))
+                drawCircle(Color.White, 14.dp.toPx(), k)
+                drawCircle(ring, 6.dp.toPx(), k)
+            }
+        }
+        content()
+        if (progress == null && count > 1) RingButtons(enabled, canDown = index > 0, canUp = index < count - 1, Modifier.align(Alignment.BottomCenter)) { pick((index + it).coerceIn(0, count - 1)) }
     }
 }
 
 /** Trommel: dreht sich beim Waschen/Trocknen, schneller beim Schleudern; Wasserstand beim Waschen. */
 @Composable
-private fun DrumVisual(progress: Float, ring: Color, running: Boolean, fast: Boolean, water: Boolean, dryer: Boolean, diameter: androidx.compose.ui.unit.Dp = 280.dp) {
+private fun DrumVisual(progress: Float, ring: Color, running: Boolean, fast: Boolean, water: Boolean, dryer: Boolean, diameter: androidx.compose.ui.unit.Dp = 280.dp, frame: Boolean = true) {
     val g = LocalGlass.current
     val period = if (fast) 700 else if (dryer) 1800 else 2600
     // Animation nur, solange die Trommel läuft – sonst kostet sie auf dem Panel jedes Bild Rechenzeit
@@ -349,8 +525,8 @@ private fun DrumVisual(progress: Float, ring: Color, running: Boolean, fast: Boo
     Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = 12.dp.toPx()
-            drawArc(g.track, 0f, 360f, false, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), style = Stroke(w))
-            if (progress > 0f) drawArc(ring, -90f, 360f * progress, false, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), style = Stroke(w))
+            if (frame) drawArc(g.track, 0f, 360f, false, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), style = Stroke(w))
+            if (frame && progress > 0f) drawArc(ring, -90f, 360f * progress, false, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), style = Stroke(w))
             val body = size.minDimension / 2 - w
             drawCircle(Brush.radialGradient(listOf(Color.White, Color(0xFFDCE1E7), Color(0xFFBCC4CE)), center + Offset(-body * .3f, -body * .44f), body * 1.6f), body)
             val door = body - 24.dp.toPx()
@@ -381,7 +557,7 @@ private fun DrawScope.blob(color: Color, c: Offset, w: Float, h: Float, deg: Flo
 
 /** Geschirrspüler von innen: Tassen oben, Teller unten; Sprühstrahlen beim Spülen, Dampf beim Trocknen. */
 @Composable
-private fun DishVisual(progress: Float, ring: Color, spraying: Boolean, steaming: Boolean, diameter: androidx.compose.ui.unit.Dp = 280.dp) {
+private fun DishVisual(progress: Float, ring: Color, spraying: Boolean, steaming: Boolean, diameter: androidx.compose.ui.unit.Dp = 280.dp, frame: Boolean = true) {
     val g = LocalGlass.current
     val phase = if (spraying) rememberInfiniteTransition(label = "spray")
         .animateFloat(0f, 1f, infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "p") else null
@@ -391,8 +567,8 @@ private fun DishVisual(progress: Float, ring: Color, spraying: Boolean, steaming
         Canvas(Modifier.fillMaxSize()) {
             // Fortschritt als Rahmen um das Gerät (von oben im Uhrzeigersinn)
             val w = 10.dp.toPx()
-            drawRoundRect(g.track, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), CornerRadius(34.dp.toPx()), style = Stroke(w))
-            if (progress > 0f) rotate(-90f) {
+            if (frame) drawRoundRect(g.track, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), CornerRadius(34.dp.toPx()), style = Stroke(w))
+            if (frame && progress > 0f) rotate(-90f) {
                 drawRoundRect(
                     Brush.sweepGradient(0f to ring, progress to ring, progress to Color.Transparent, 1f to Color.Transparent, center = center),
                     Offset(w / 2, w / 2), Size(size.width - w, size.height - w), CornerRadius(34.dp.toPx()), style = Stroke(w),

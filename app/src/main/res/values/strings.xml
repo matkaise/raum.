@@ -1377,6 +1377,13 @@
     <string name="hc_start_at">Start %1$s at %2$s</string>
     <string name="hc_start_now">Start now</string>
     <string name="hc_start_time">Start time</string>
+    <string name="hc_start_in">in %1$s h</string>
+    <string name="hc_pick_time">Pick a time</string>
+    <string name="hc_starts_now">Starts as soon as you tap start</string>
+    <string name="hc_starts_at">Starts at %1$s · in %2$s h</string>
+    <string name="hc_quarter_steps">15 minutes</string>
+    <string name="hc_ring_hint">drag the ring</string>
+    <string name="hc_ring_explain">Drag or tap the ring to set the time. The top is now.</string>
     <string name="hc_state_delayed">Delayed start</string>
     <string name="hc_state_running">Running · %1$s</string>
     <string name="hc_status_action">Action required</string>

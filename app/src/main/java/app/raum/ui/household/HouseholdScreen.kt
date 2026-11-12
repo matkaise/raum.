@@ -469,7 +469,8 @@ fun StepButton(icon: ImageVector, enabled: Boolean, size: Dp, onClick: () -> Uni
                         awaitFirstDown()
                         pressed = true
                         step()
-                        val repeat = launch { delay(450); while (true) { step(); delay(90) } }
+                        // Nach gut einer Sekunde Halten schneller – lange Wege (Startzeit, 250°) ohne Daumenkrampf
+                        val repeat = launch { delay(450); var n = 0; while (true) { step(); delay(if (n++ < 12) 90L else 35L) } }
                         waitForUpOrCancellation()
                         repeat.cancel()
                         pressed = false
@@ -478,6 +479,29 @@ fun StepButton(icon: ImageVector, enabled: Boolean, size: Dp, onClick: () -> Uni
             },
         contentAlignment = Alignment.Center,
     ) { Icon(icon, null, Modifier.size(26.dp), tint = g.ink) }
+}
+
+/** Pillen, die zeilenweise umbrechen (Betriebsart, Programm, Leistung). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun ChipFlow(content: @Composable () -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+}
+
+/** Kompakte Wahl: Pille mit optionalem Symbol und Name, so breit wie nötig. */
+@Composable
+fun ModeChip(label: String, icon: ImageVector?, selected: Boolean, available: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val g = LocalGlass.current
+    val fg = if (selected) inverseInk() else g.ink
+    Row(
+        // Gerade nicht verfügbare Programme blasser – wählbar bleiben sie, das Gerät entscheidet beim Start
+        Modifier.height(44.dp).alpha(if (available || selected) 1f else 0.5f).clip(RoundedCornerShape(22.dp)).background(if (selected) g.ink else g.chip)
+            .clickable(enabled = enabled, onClick = onClick).padding(start = if (icon != null) 14.dp else 18.dp, end = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) { Icon(icon, null, Modifier.size(20.dp), tint = fg); Spacer(Modifier.width(8.dp)) }
+        Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
 }
 
 @Composable

@@ -225,28 +225,6 @@ fun ColumnScope.OvenPanel(a: HcAppliance, allPrograms: List<HcProgram>, vm: Hous
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ChipFlow(content: @Composable () -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
-}
-
-/** Kompakte Wahl für Betriebsart bzw. Leistung: Pille mit Symbol und Name, so breit wie nötig. */
-@Composable
-private fun ModeChip(label: String, icon: ImageVector, selected: Boolean, available: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val g = LocalGlass.current
-    val fg = if (selected) inverseInk() else g.ink
-    Row(
-        Modifier.height(44.dp).alpha(if (available || selected) 1f else 0.5f).clip(RoundedCornerShape(22.dp)).background(if (selected) g.ink else g.chip)
-            .clickable(enabled = enabled, onClick = onClick).padding(start = 14.dp, end = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, Modifier.size(20.dp), tint = fg)
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-    }
-}
-
 /**
  * Drehring 270°: äußerer Ring = Solltemperatur (zum Ziehen), innerer Ring = Temperatur im Ofen,
  * Mitte = Sichtfenster, das mit der Ofentemperatur glüht.
@@ -335,7 +313,7 @@ private fun OvenDial(target: Double, cavity: Double?, idleLabel: String, showTar
 }
 
 @Composable
-private fun RingButtons(enabled: Boolean, canDown: Boolean, canUp: Boolean, modifier: Modifier, onStep: (Int) -> Unit) {
+internal fun RingButtons(enabled: Boolean, canDown: Boolean, canUp: Boolean, modifier: Modifier, onStep: (Int) -> Unit) {
     Row(modifier.padding(bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(64.dp)) {
         StepButton(Icons.Outlined.Remove, enabled && canDown, 48.dp) { onStep(-1) }
         StepButton(Icons.Outlined.Add, enabled && canUp, 48.dp) { onStep(1) }
