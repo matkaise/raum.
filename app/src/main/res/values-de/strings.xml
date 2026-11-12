@@ -1460,6 +1460,9 @@
     <string name="grohe_medium">Medium</string>
     <string name="grohe_sparkling">Sprudelnd</string>
     <string name="grohe_water">Wasser</string>
+    <string name="grohe_desc_still">Gefiltert, ohne Kohlensäure</string>
+    <string name="grohe_desc_medium">Leicht prickelnd</string>
+    <string name="grohe_desc_sparkling">Kräftig sprudelnd</string>
     <string name="grohe_filter">Filter</string>
     <string name="grohe_co2">CO₂</string>
     <string name="grohe_liters">%1$d l</string>

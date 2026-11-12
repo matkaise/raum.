@@ -146,7 +146,7 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
             // Drehring um das Gerät: im Leerlauf Programmwahl (Rasten je Programm), im Betrieb Fortschritt
             val idx = programs.indexOfFirst { it.key == program?.key }.coerceAtLeast(0)
             Box(Modifier.alpha(if (offline) 0.4f else 1f)) {
-                ProgramDial(
+                DetentDial(
                     count = programs.size, index = idx, progress = if (editable) null else p, ring = ringColor, dashed = waiting,
                     enabled = editable && !busy && programs.isNotEmpty(), onPick = { i -> programs.getOrNull(i)?.let { selKey = it.key } },
                 ) {
@@ -461,7 +461,7 @@ private fun TimeRing(now: Instant, at: Instant?, accent: Color, enabled: Boolean
  * − / + in der Lücke unten blättern. Im Betrieb zeigt derselbe Ring den Fortschritt.
  */
 @Composable
-private fun ProgramDial(count: Int, index: Int, progress: Float?, ring: Color, dashed: Boolean = false, enabled: Boolean, onPick: (Int) -> Unit, content: @Composable () -> Unit) {
+internal fun DetentDial(count: Int, index: Int, progress: Float?, ring: Color, dashed: Boolean = false, enabled: Boolean, onPick: (Int) -> Unit, content: @Composable () -> Unit) {
     val g = LocalGlass.current
     val n by rememberUpdatedState(count)
     val pick by rememberUpdatedState(onPick)

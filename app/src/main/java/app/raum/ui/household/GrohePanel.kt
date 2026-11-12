@@ -1,5 +1,8 @@
 package app.raum.ui.household
 
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.ui.draw.alpha
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BubbleChart
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -119,66 +123,103 @@ fun ColumnScope.GrohePanel(d: GroheDevice, pouring: Pouring?, vm: HouseholdViewM
         return
     }
 
-    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-        Column(Modifier.width(300.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            WaterGlass(if (active) pouring!!.type else type, if (active) progress else 0.8f, animate = active, modifier = Modifier.size(220.dp, 300.dp))
-            if (active) Text(
-                stringResource(R.string.grohe_amount_type, pouring!!.ml, stringResource(pouring.type.labelRes).lowercase()),
-                color = g.soft, fontSize = 14.sp, modifier = Modifier.padding(top = 12.dp),
+    // Menge am Drehring: fein bei Gläsern, gröber bei Karaffen
+    val i = GROHE_AMOUNTS.indexOfFirst { it >= ml }.let { if (it < 0) GROHE_AMOUNTS.lastIndex else it }
+    val shownType = if (active) pouring!!.type else type
+    val shownMl = if (active) pouring!!.ml else GROHE_AMOUNTS[i]
+
+    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        // Links: Glas im Drehring – der Ring stellt die Menge, im Betrieb zeigt er den Fortschritt
+        Column(Modifier.width(340.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.weight(1f))
+            DetentDial(
+                count = GROHE_AMOUNTS.size, index = i, progress = if (active) progress else null, ring = GroheColors.Water,
+                enabled = !active && !busy, onPick = { ml = GROHE_AMOUNTS[it] },
+            ) {
+                // Füllhöhe zeigt die gewählte Menge – beim Zapfen steigt das Wasser
+                WaterGlass(shownType, if (active) progress else 0.25f + 0.7f * i / GROHE_AMOUNTS.lastIndex, animate = active, modifier = Modifier.size(150.dp, 196.dp))
+            }
+            Text(amountLabel(shownMl), color = g.ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 14.dp))
+            Text(
+                ((if (active) stringResource(R.string.grohe_pouring) + " · " else "") + stringResource(shownType.labelRes)).uppercase(),
+                color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, maxLines = 1,
+                modifier = Modifier.padding(top = 4.dp),
             )
+            Spacer(Modifier.weight(1f))
         }
+        // Rechts: Wasserart, Füllstände, Zapfen
         Column(Modifier.weight(1f).fillMaxHeight()) {
             SectionLabel(stringResource(R.string.grohe_water))
-            Segmented(WaterType.entries.map { stringResource(it.labelRes) }, WaterType.entries.indexOf(type), enabled = !active && !busy) { type = WaterType.entries[it] }
-            SectionLabel(stringResource(R.string.hc_amount), Modifier.padding(top = 18.dp), trailing = "50–2000")
-            AmountSlider(ml.toDouble(), 50.0, 2000.0, 50.0, enabled = !active && !busy) { ml = it.roundToInt() }
-            val quick = listOf(150, 250, 500, 1000)
-            Segmented(quick.map { if (it >= 1000) "${it / 1000} l" else "$it ml" }, quick.indexOf(ml), Modifier.padding(top = 10.dp), enabled = !active && !busy) { ml = quick[it] }
-            Spacer(Modifier.height(20.dp))
-            Level(stringResource(R.string.grohe_filter), d.filterPercent, d.filterLiters, low = d.filterLow)
-            Level(stringResource(R.string.grohe_co2), d.co2Percent, d.co2Liters, low = d.co2Low)
-            Spacer(Modifier.weight(1f))
+            Row(Modifier.weight(1f).fillMaxWidth().padding(bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                WaterType.entries.forEach { t ->
+                    WaterCard(t, selected = t == shownType, available = t == WaterType.STILL || !d.co2Empty, enabled = !active && !busy, Modifier.weight(1f).fillMaxHeight()) { type = t }
+                }
+            }
             if (active) {
                 ActionButton(stringResource(R.string.grohe_pouring_amount, pouring!!.ml), Icons.Outlined.HourglassTop, GroheColors.Water, GroheColors.OnWater,
-                    Modifier.fillMaxWidth(), height = 68.dp, enabled = false, progress = progress) {}
+                    Modifier.fillMaxWidth(), height = 64.dp, enabled = false, progress = progress) {}
             } else {
                 val blocked = d.filterEmpty || (type != WaterType.STILL && d.co2Empty)
                 ActionButton(
                     // im Satz klein: „250 ml sprudelnd zapfen“
-                    stringResource(R.string.grohe_dispense, ml, stringResource(type.labelRes).lowercase()), GroheIcon,
+                    stringResource(R.string.grohe_dispense, shownMl, stringResource(type.labelRes).lowercase()), GroheIcon,
                     if (blocked) g.chip else GroheColors.Water, if (blocked) g.soft else GroheColors.OnWater,
-                    Modifier.fillMaxWidth(), height = 68.dp, enabled = !busy && !blocked,
-                ) { vm.dispense(d.id, type, ml) }
+                    Modifier.fillMaxWidth(), height = 64.dp, enabled = !busy && !blocked,
+                ) { vm.dispense(d.id, type, shownMl) }
                 FootNote(!blocked, stringResource(if (blocked) R.string.grohe_blocked else R.string.grohe_glass_hint))
             }
         }
     }
 }
 
+/** Zapfmengen am Ring (ml): Glas, Becher, Flasche, Karaffe. */
+private val GROHE_AMOUNTS = listOf(50, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000)
+
+private fun amountLabel(ml: Int) = if (ml >= 1000) (if (ml % 1000 == 0) "${ml / 1000} l" else "%.1f l".format(ml / 1000.0)) else "$ml ml"
+
 @Composable
 private fun groheChips(d: GroheDevice): List<ChipSpec> = buildList {
     if (!d.online) add(ChipSpec(Icons.Outlined.CloudOff, stringResource(R.string.hc_status_offline), warn = true))
-    if (d.filterEmpty) add(ChipSpec(Icons.Outlined.WaterDrop, stringResource(R.string.grohe_filter_empty), warn = true))
-    if (d.co2Empty) add(ChipSpec(Icons.Outlined.NotificationsActive, stringResource(R.string.grohe_co2_empty), warn = true))
+    // Füllstände als Tags: leer bzw. bald leer in Warnfarbe
+    if (d.filterEmpty) add(ChipSpec(Icons.Outlined.FilterAlt, stringResource(R.string.grohe_filter_empty), warn = true))
+    else d.filterPercent?.let { add(ChipSpec(Icons.Outlined.FilterAlt, stringResource(R.string.grohe_filter_short, it.roundToInt()), warn = d.filterLow)) }
+    if (d.co2Empty) add(ChipSpec(Icons.Outlined.BubbleChart, stringResource(R.string.grohe_co2_empty), warn = true))
+    else d.co2Percent?.let { add(ChipSpec(Icons.Outlined.BubbleChart, stringResource(R.string.grohe_co2_short, it.roundToInt()), warn = d.co2Low)) }
     if (d.cleaningNeeded) add(ChipSpec(Icons.Outlined.NotificationsActive, stringResource(R.string.grohe_cleaning_needed), warn = true))
 }
 
-/** Füllstand Filter bzw. CO₂ als Balken mit Prozent und Litern. */
+/** Große Karte je Wasserart: Blase mit Perlen (still: keine), Name und kurze Beschreibung. */
 @Composable
-private fun Level(label: String, percent: Double?, liters: Double?, low: Boolean) {
+private fun WaterCard(type: WaterType, selected: Boolean, available: Boolean, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val g = LocalGlass.current
-    if (percent == null && liters == null) return
-    val f = ((percent ?: 0.0) / 100).toFloat().coerceIn(0f, 1f)
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(label, color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, modifier = Modifier.width(64.dp))
-        Box(Modifier.weight(1f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(g.chip)) {
-            Box(Modifier.fillMaxHeight().fillMaxWidth(f).clip(RoundedCornerShape(5.dp)).background(if (low) g.warn else GroheColors.Water))
+    val fg = if (selected) inverseInk() else g.ink
+    Column(
+        modifier.alpha(if (available || selected) 1f else 0.45f).clip(RoundedCornerShape(28.dp)).background(if (selected) g.ink else g.chip)
+            .clickable(enabled = enabled && available, onClick = onClick).padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+    ) {
+        val bubbles = when (type) { WaterType.STILL -> 0; WaterType.MEDIUM -> 7; WaterType.SPARKLING -> 16 }
+        Canvas(Modifier.size(104.dp)) {
+            val r = size.minDimension / 2
+            drawCircle(Brush.verticalGradient(listOf(GroheColors.Water.copy(alpha = 0.55f), Color(0xFF3E9BE0).copy(alpha = 0.85f))), r)
+            // Lichtkante oben links
+            drawCircle(Color.White.copy(alpha = 0.35f), r * 0.22f, center + Offset(-r * 0.38f, -r * 0.4f))
+            repeat(bubbles) { i ->
+                val a = i * 2.39996f
+                val rr = r * 0.78f * kotlin.math.sqrt((i + 0.5f) / bubbles)
+                drawCircle(Color.White.copy(alpha = 0.8f), (2.5f + i % 3 * 1.5f).dp.toPx(), center + Offset(kotlin.math.cos(a) * rr, kotlin.math.sin(a) * rr + r * 0.08f))
+            }
+            drawCircle(Color.White.copy(alpha = 0.7f), r - 1.5.dp.toPx(), style = Stroke(3.dp.toPx()))
         }
-        Text(
-            listOfNotNull(percent?.let { "${it.roundToInt()} %" }, liters?.let { stringResource(R.string.grohe_liters, it.roundToInt()) }).joinToString(" · "),
-            color = if (low) g.warn else g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-        )
+        Text(stringResource(type.labelRes), color = fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 16.dp))
+        Text(stringResource(type.descRes()), color = if (selected) fg.copy(alpha = 0.7f) else g.soft, fontSize = 14.sp, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
     }
+}
+
+private fun WaterType.descRes() = when (this) {
+    WaterType.STILL -> R.string.grohe_desc_still
+    WaterType.MEDIUM -> R.string.grohe_desc_medium
+    WaterType.SPARKLING -> R.string.grohe_desc_sparkling
 }
 
 /** Trinkglas: Wasser steigt beim Zapfen, Bläschen je nach Wasserart (still: keine). */

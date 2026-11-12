@@ -292,41 +292,6 @@ private fun Bean(on: Boolean, small: Boolean = false) {
     }
 }
 
-/** Menge als Schieber: tippen oder ziehen, auf die Schrittweite der Maschine gerundet. */
-@Composable
-internal fun AmountSlider(value: Double, min: Double, max: Double, step: Double, enabled: Boolean, onChange: (Double) -> Unit) {
-    val g = LocalGlass.current
-    var width by remember { mutableFloatStateOf(1f) }
-    // Die Gesten laufen über Getränkewechsel hinweg weiter – immer die aktuellen Grenzen und das aktuelle Getränk
-    // verwenden, sonst landet die Menge beim zuvor gezeigten Getränk
-    val range by rememberUpdatedState(Triple(min, max, step))
-    val change by rememberUpdatedState(onChange)
-    fun at(x: Float): Double {
-        val (lo, hi, st) = range
-        val f = (x / width).coerceIn(0f, 1f)
-        return (Math.round((lo + f * (hi - lo)) / st) * st).coerceIn(lo, hi)
-    }
-    val frac = ((value - min) / (max - min).coerceAtLeast(1.0)).toFloat().coerceIn(0f, 1f)
-    Box(
-        Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(g.chip)
-            .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                detectTapGestures { change(at(it.x)) }
-            }
-            .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
-                detectHorizontalDragGestures { c, _ -> c.consume(); change(at(c.position.x)) }
-            },
-    ) {
-        Box(Modifier.fillMaxHeight().fillMaxWidth(frac.coerceAtLeast(0.2f)).clip(RoundedCornerShape(26.dp)).background(Color(0xFFE8C9A0)))
-        Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${value.toInt()} ml", color = if (g.dark && frac > 0.3f) Color(0xFF10131F) else g.ink, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Icon(Icons.Outlined.WaterDrop, null, Modifier.size(20.dp), tint = g.soft)
-        }
-    }
-}
-
 private val SLOT = 150.dp
 
 /**
