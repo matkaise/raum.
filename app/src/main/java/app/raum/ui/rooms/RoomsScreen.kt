@@ -1,5 +1,17 @@
 package app.raum.ui.rooms
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import app.raum.ui.lightsStatus
+import app.raum.ui.theme.SkyTextStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -123,8 +135,8 @@ fun RoomsScreen(
             editing -> EditRooms(state, onDone = { editing = false }, onAdd = { creating = true }, onEdit = { dialogRoom = it }, onDelete = { deleting = it }, onMove = onMoveRoom)
             selected == null -> NoRooms { creating = true }
             else -> {
-                RoomStrip(state.rooms, selected.room.id) { selectedId = it.toString() }
-                RoomHeader(selected, onGroupAction, onEdit = { editing = true })
+                RoomsHeader(state.rooms, selected.room.id, state.lightsOn) { selectedId = it.toString() }
+                RoomRow(selected, onGroupAction, onEdit = { editing = true })
                 if (selected.devices.isEmpty()) {
                     Text(stringResource(R.string.room_devices_empty_text), color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(start = 20.dp))
                 } else {
@@ -157,57 +169,110 @@ fun RoomsScreen(
     }
 }
 
-/** Horizontale Raumleiste: bis sechs Räume füllen die Breite, mehr lassen sich wischen. */
+/**
+ * Kopf wie im Haushalt (Entwurf „raum. Übersicht Redesign“, Reihe „Räume“): Titel links, rechts die Raumleiste –
+ * jede Taste wie ein Haushaltsgerät aufgebaut (Ring oben, Name und Zustand darunter), die gewählte weiß.
+ */
 @Composable
-private fun RoomStrip(rooms: List<RoomSummary>, selected: UUID, onPick: (UUID) -> Unit) {
-    val g = LocalGlass.current
+private fun RoomsHeader(rooms: List<RoomSummary>, selected: UUID, lightsOn: Int, onPick: (UUID) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 12.dp),
+        verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Column(Modifier.widthIn(min = 200.dp, max = 300.dp)) {
+            Text(stringResource(R.string.nav_rooms), style = SkyTextStyle, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, letterSpacing = (-1.5).sp, lineHeight = 58.sp)
+            Text(
+                listOf(pluralStringResource(R.plurals.rooms_count, rooms.size, rooms.size), lightsStatus(lightsOn)).joinToString(" · "),
+                style = SkyTextStyle, color = SkyTextSoft, fontSize = 17.sp, lineHeight = 22.sp, maxLines = 2, modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { RoomTabs(rooms, selected, onPick) }
+    }
+}
+
+/** Raumleiste: Glasschiene mit Tasten; passen nicht alle, wischt sie waagrecht und Pfeile springen weiter. */
+@Composable
+private fun RoomTabs(rooms: List<RoomSummary>, selected: UUID, onPick: (UUID) -> Unit) {
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val many = rooms.size > 6
-        val cardW: Dp = if (many) 162.dp else (maxWidth - 50.dp) / 6
-        LazyRow(state = list, horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
-            items(rooms, key = { it.room.id }) { r ->
-                val on = r.room.id == selected
-                val lit = r.lightsOn > 0
-                val shape = RoundedCornerShape(24.dp)
-                Column(
-                    Modifier.width(cardW).height(104.dp)
-                        .then(if (on) Modifier.shadow(12.dp, shape, ambientColor = Color.Black.copy(alpha = 0.14f), spotColor = Color.Black.copy(alpha = 0.14f)) else Modifier)
-                        .clip(shape).background(if (on) g.glassSolid else g.glass)
-                        .border(1.dp, if (on) Color.White.copy(alpha = 0.9f) else g.edge, shape)
-                        .clickable { onPick(r.room.id) }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(RaumIcons.room(r.room.icon), null, Modifier.size(26.dp), tint = if (lit) (if (g.dark) Accent.Light else Accent.LightDeep) else g.soft)
-                        Spacer(Modifier.weight(1f))
-                        r.temperatureCelsius?.let { Text(formatDegrees(it), color = g.ink, fontSize = 17.sp, fontWeight = FontWeight.Light) }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text(r.room.name, color = g.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(7.dp).clip(CircleShape).background(if (lit) Accent.Light else g.track))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (r.lightsTotal == 0) pluralStringResource(R.plurals.devices_count, r.devices.size, r.devices.size)
-                            else if (lit) stringResource(R.string.lights_short_of, r.lightsOn, r.lightsTotal) else stringResource(R.string.lights_off),
-                            color = g.soft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-                        )
-                        if (r.offlineCount > 0) Icon(Icons.Outlined.CloudOff, stringResource(R.string.offline_count, r.offlineCount), Modifier.size(16.dp), tint = g.warn)
-                    }
-                }
-            }
+    val index = rooms.indexOfFirst { it.room.id == selected }
+    // Aus der Übersicht geöffnet: gewählten Raum ins Bild holen, falls er außerhalb liegt
+    LaunchedEffect(index) {
+        if (index < 0) return@LaunchedEffect
+        val info = list.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+        if (item == null || item.offset < 0 || item.offset + item.size > info.viewportEndOffset) list.animateScrollToItem(index)
+    }
+    val desc = stringResource(R.string.room_choose)
+    Box {
+        LazyRow(
+            state = list,
+            modifier = Modifier.semantics { contentDescription = desc }.clip(RoundedCornerShape(36.dp)).background(Color.White.copy(alpha = 0.14f))
+                .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(36.dp)),
+            contentPadding = PaddingValues(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(rooms, key = { it.room.id }) { r -> RoomTab(r, r.room.id == selected) { onPick(r.room.id) } }
         }
         if (list.canScrollBackward) {
-            StripArrow(Icons.Outlined.ChevronLeft, Modifier.align(Alignment.CenterStart).offset(x = (-20).dp)) {
+            StripArrow(Icons.Outlined.ChevronLeft, Modifier.align(Alignment.CenterStart).offset(x = (-12).dp)) {
                 scope.launch { list.animateScrollToItem((list.firstVisibleItemIndex - 3).coerceAtLeast(0)) }
             }
         }
         if (list.canScrollForward) {
-            StripArrow(Icons.Outlined.ChevronRight, Modifier.align(Alignment.CenterEnd).offset(x = 8.dp)) {
+            StripArrow(Icons.Outlined.ChevronRight, Modifier.align(Alignment.CenterEnd).offset(x = (-6).dp)) {
                 scope.launch { list.animateScrollToItem((list.firstVisibleItemIndex + 3).coerceAtMost(rooms.lastIndex)) }
             }
+        }
+    }
+}
+
+private val TabInk = Color(0xFF10131F)
+private val LampAmber = Color(0xFFFFC24F)
+
+@Composable
+private fun RoomTab(r: RoomSummary, on: Boolean, onClick: () -> Unit) {
+    val lit = r.lightsOn > 0
+    val bg by animateColorAsState(if (on) Color.White else Color.Transparent, label = "roomTab")
+    val (status, color, strong) = when {
+        r.offlineCount > 0 -> Triple(stringResource(R.string.offline_count, r.offlineCount), if (on) Color(0xFFB3261E) else Color(0xFFFFB4A8), false)
+        lit -> Triple(pluralStringResource(R.plurals.lights_on, r.lightsOn, r.lightsOn), if (on) Color(0xFF9A6424) else Color(0xFFFFE1A3), true)
+        r.temperatureCelsius != null -> Triple(formatDegrees(r.temperatureCelsius), if (on) TabInk.copy(alpha = 0.62f) else Color.White.copy(alpha = 0.75f), false)
+        r.lightsTotal > 0 -> Triple(stringResource(R.string.lights_off), if (on) TabInk.copy(alpha = 0.62f) else Color.White.copy(alpha = 0.75f), false)
+        else -> Triple(pluralStringResource(R.plurals.devices_count, r.devices.size, r.devices.size), if (on) TabInk.copy(alpha = 0.62f) else Color.White.copy(alpha = 0.75f), false)
+    }
+    Column(
+        Modifier.width(120.dp).height(124.dp)
+            .then(if (on) Modifier.shadow(14.dp, RoundedCornerShape(30.dp), ambientColor = Color(0xFF0A081E), spotColor = Color(0xFF0A081E)) else Modifier)
+            .clip(RoundedCornerShape(30.dp)).background(bg).clickable(onClick = onClick).padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+    ) {
+        RoomRing(r, on)
+        Text(r.room.name, color = if (on) TabInk else Color.White, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+        Text(status, color = color, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Ring um das Raumsymbol: Anteil der eingeschalteten Lichter; roter Punkt, wenn etwas offline ist. */
+@Composable
+private fun RoomRing(r: RoomSummary, on: Boolean) {
+    val lit = r.lightsOn > 0
+    Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 4.dp.toPx()
+            val inset = Offset(stroke / 2, stroke / 2)
+            val arc = Size(size.width - stroke, size.height - stroke)
+            drawArc(if (on) TabInk.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.28f), 0f, 360f, false, inset, arc, style = Stroke(stroke))
+            if (lit && r.lightsTotal > 0) {
+                drawArc(LampAmber, -90f, 360f * (r.lightsOn.toFloat() / r.lightsTotal).coerceIn(0f, 1f), false, inset, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+        }
+        Box(
+            Modifier.size(42.dp).clip(CircleShape).background(if (lit) Color(0xFFFFF3DC) else Color.White.copy(alpha = 0.94f)),
+            contentAlignment = Alignment.Center,
+        ) { Icon(RaumIcons.room(r.room.icon), null, Modifier.size(22.dp), tint = if (lit) Color(0xFF9A6424) else TabInk.copy(alpha = 0.62f)) }
+        if (r.offlineCount > 0) {
+            Box(Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp).size(14.dp).clip(CircleShape).background(Color.White).padding(2.dp).clip(CircleShape).background(Color(0xFFE5484D)))
         }
     }
 }
@@ -221,32 +286,43 @@ private fun StripArrow(icon: ImageVector, modifier: Modifier, onClick: () -> Uni
     ) { Icon(icon, null, Modifier.size(28.dp), tint = g.ink) }
 }
 
-/** Name, Zustand als Chips und Gruppenaktionen des gewählten Raums. */
+/**
+ * Gewählter Raum als kompakte Zeile: Name und Zustand links, Gruppenaktionen rechts – damit die Kacheln hoch beginnen.
+ * Brennt Licht, ist „Alle aus“ betont, sonst „Alle an“.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun RoomHeader(s: RoomSummary, onGroupAction: (List<Device>, DeviceCommand, String) -> Unit, onEdit: () -> Unit) {
+private fun RoomRow(s: RoomSummary, onGroupAction: (List<Device>, DeviceCommand, String) -> Unit, onEdit: () -> Unit) {
     val g = LocalGlass.current
     val lights = s.devices.filter { it.capabilities.find<LightCapability>() != null }
     val hasCovers = s.devices.any { it.capabilities.find<CoverCapability>() != null }
-    Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 28.dp, bottom = 18.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(Modifier.weight(1f)) {
-            Text(s.room.name, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, lineHeight = 58.sp, letterSpacing = (-1.5).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                s.temperatureCelsius?.let { SkyChip(Icons.Outlined.Thermostat, SkyText, formatDegrees(it), height = 36) }
-                s.humidityPercent?.let { SkyChip(Icons.Outlined.WaterDrop, SkyText, formatPercent(it), height = 36) }
-                if (s.lightsTotal > 0) SkyChip(Icons.Outlined.Lightbulb, Accent.Light, stringResource(R.string.lights_n_of_m_on, s.lightsOn, s.lightsTotal), height = 36)
-                if (s.occupied == true) SkyChip(Icons.AutoMirrored.Outlined.DirectionsWalk, SkyText, stringResource(R.string.room_occupied_chip), height = 36)
-                if (s.offlineCount > 0) SkyChip(Icons.Outlined.CloudOff, Accent.Warn, stringResource(R.string.offline_count, s.offlineCount), warning = true, height = 36)
-            }
+    val anyOn = s.lightsOn > 0
+    Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 22.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(s.room.name, style = SkyTextStyle, color = SkyText, fontSize = 34.sp, letterSpacing = (-0.5).sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 360.dp))
+        FlowRow(Modifier.weight(1f).padding(start = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            s.temperatureCelsius?.let { SkyChip(Icons.Outlined.Thermostat, SkyText, formatDegrees(it), height = 36) }
+            s.humidityPercent?.let { SkyChip(Icons.Outlined.WaterDrop, SkyText, formatPercent(it), height = 36) }
+            if (s.lightsTotal > 0) SkyChip(Icons.Outlined.Lightbulb, Accent.Light, stringResource(R.string.lights_n_of_m_on, s.lightsOn, s.lightsTotal), height = 36)
+            if (s.occupied == true) SkyChip(Icons.AutoMirrored.Outlined.DirectionsWalk, SkyText, stringResource(R.string.room_occupied_chip), height = 36)
+            if (s.offlineCount > 0) SkyChip(Icons.Outlined.CloudOff, Accent.Warn, stringResource(R.string.offline_count, s.offlineCount), warning = true, height = 36)
         }
         if (lights.isNotEmpty()) {
             val on = stringResource(R.string.group_lights_on)
             val off = stringResource(R.string.group_lights_off)
-            PillButton(Icons.Outlined.Lightbulb, stringResource(R.string.group_all_on), Accent.Light, Accent.OnLight) {
-                onGroupAction(lights, DeviceCommand.SetOn(true), on)
-            }
-            PillButton(Icons.Outlined.LightbulbCircle, stringResource(R.string.group_all_off), g.glassStrong, g.ink, border = g.edge) {
-                onGroupAction(lights, DeviceCommand.SetOn(false), off)
+            if (anyOn) {
+                PillButton(Icons.Outlined.Lightbulb, stringResource(R.string.group_all_on), Color.White.copy(alpha = 0.3f), SkyText, border = Color.White.copy(alpha = 0.4f)) {
+                    onGroupAction(lights, DeviceCommand.SetOn(true), on)
+                }
+                PillButton(Icons.Outlined.LightbulbCircle, stringResource(R.string.group_all_off), TabInk, Color.White) {
+                    onGroupAction(lights, DeviceCommand.SetOn(false), off)
+                }
+            } else {
+                PillButton(Icons.Outlined.Lightbulb, stringResource(R.string.group_all_on), Accent.Light, Accent.OnLight) {
+                    onGroupAction(lights, DeviceCommand.SetOn(true), on)
+                }
+                PillButton(Icons.Outlined.LightbulbCircle, stringResource(R.string.group_all_off), g.glassStrong, g.ink, border = g.edge) {
+                    onGroupAction(lights, DeviceCommand.SetOn(false), off)
+                }
             }
         }
         if (hasCovers) {

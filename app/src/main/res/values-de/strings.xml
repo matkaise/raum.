@@ -1645,4 +1645,5 @@
     <string name="thermostat_ring_hint">Soll · Punkt am Ring = Ist</string>
     <string name="settings_tile">Kachel</string>
     <string name="settings_device">Gerät</string>
+    <string name="room_choose">Raum wählen</string>
 </resources>

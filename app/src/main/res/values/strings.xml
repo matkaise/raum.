@@ -1646,4 +1646,5 @@
     <string name="thermostat_ring_hint">Target · dot on ring = current</string>
     <string name="settings_tile">Tile</string>
     <string name="settings_device">Device</string>
+    <string name="room_choose">Choose a room</string>
 </resources>
