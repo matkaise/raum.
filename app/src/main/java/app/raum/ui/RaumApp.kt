@@ -277,6 +277,8 @@ fun RaumApp(
                             cardActions = cardActions,
                             openAddDialog = openCommissioning,
                             onAddDialogOpened = { requests.openCommissioning.value = false },
+                            onGroupAction = viewModel::roomAction,
+                            onOpenRoom = { navController.openRoomFromOverview(it) },
                         )
                     }
                     composable(TopLevel.SCENES.route) {

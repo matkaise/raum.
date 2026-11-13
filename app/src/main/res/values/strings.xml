@@ -1647,4 +1647,17 @@
     <string name="settings_tile">Tile</string>
     <string name="settings_device">Device</string>
     <string name="room_choose">Choose a room</string>
+    <string name="devices_all_reachable">all reachable</string>
+    <string name="devices_n_of_m_on">%1$d of %2$d on</string>
+    <string name="devices_n_of_m_open">%1$d of %2$d open</string>
+    <string name="climate_avg">Avg %1$s</string>
+    <string name="device_add_short">Add</string>
+    <string name="devices_open_room">Open room</string>
+    <string name="filter_offline">Offline</string>
+    <string name="devices_choose_category">Choose a category</string>
+    <string name="devices_all_lights">All lights</string>
+    <plurals name="devices_in_rooms">
+        <item quantity="one">in %1$d room</item>
+        <item quantity="other">in %1$d rooms</item>
+    </plurals>
 </resources>

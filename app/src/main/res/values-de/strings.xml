@@ -1646,4 +1646,17 @@
     <string name="settings_tile">Kachel</string>
     <string name="settings_device">Gerät</string>
     <string name="room_choose">Raum wählen</string>
+    <string name="devices_all_reachable">alle erreichbar</string>
+    <string name="devices_n_of_m_on">%1$d von %2$d an</string>
+    <string name="devices_n_of_m_open">%1$d von %2$d offen</string>
+    <string name="climate_avg">Ø %1$s</string>
+    <string name="device_add_short">Hinzufügen</string>
+    <string name="devices_open_room">Zum Raum</string>
+    <string name="filter_offline">Offline</string>
+    <string name="devices_choose_category">Kategorie wählen</string>
+    <string name="devices_all_lights">Alle Lichter</string>
+    <plurals name="devices_in_rooms">
+        <item quantity="one">in %1$d Raum</item>
+        <item quantity="other">in %1$d Räumen</item>
+    </plurals>
 </resources>
