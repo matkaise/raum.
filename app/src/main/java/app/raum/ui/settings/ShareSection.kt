@@ -111,12 +111,9 @@ fun ShareSection(roomName: (Device) -> String?, vm: ShareViewModel = koinViewMod
     }
 
     // --- Alles auf einmal: Bridge ---------------------------------------------------------
-    Group(stringResource(R.string.bridge_title)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.bridge_explain), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(24.dp))
-            Switch(checked = bridgeOn, onCheckedChange = { on -> if (on) guarded { vm.setBridgeEnabled(true) } else vm.setBridgeEnabled(false) })
-        }
+    Group(stringResource(R.string.bridge_title), info = stringResource(R.string.bridge_explain), trailing = {
+        GlassSwitch(bridgeOn) { on -> if (on) guarded { vm.setBridgeEnabled(true) } else vm.setBridgeEnabled(false) }
+    }) {
         // Echtheitsnachweis der Bridge (Inbetriebnahme: je Panel eigenes Zertifikat)
         if (vm.canImportAttestation && bridgeOn) {
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -210,8 +207,7 @@ fun ShareSection(roomName: (Device) -> String?, vm: ShareViewModel = koinViewMod
     }
 
     // --- Einzelne Geräte direkt ------------------------------------------------------------
-    Group(stringResource(R.string.share_direct_title)) {
-        Text(stringResource(R.string.share_direct_explain), style = MaterialTheme.typography.bodyLarge)
+    Group(stringResource(R.string.share_direct_title), info = stringResource(R.string.share_direct_explain)) {
         // Multi-Admin gilt für den ganzen Node (alle Kanäle) – daher nur Hauptkanäle
         val nodes = devices.filter { it.isPrimaryChannel }
         val online = nodes.filter { it.isOnline }.sortedBy { it.displayName }

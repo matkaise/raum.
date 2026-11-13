@@ -21,7 +21,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Clock
 import java.time.Instant
 
-enum class GroheMode { OFF, DEMO, CLOUD }
+enum class GroheMode { OFF, CLOUD }
 
 interface GroheSettings {
     val mode: StateFlow<GroheMode>
@@ -48,7 +48,7 @@ data class GroheState(
     /** Gerät → bis wann es voraussichtlich zapft (für die Füll-Animation). */
     val pouring: Map<String, Pouring> = emptyMap(),
 ) {
-    val active: Boolean get() = mode == GroheMode.DEMO || (mode == GroheMode.CLOUD && signedIn)
+    val active: Boolean get() = mode == GroheMode.CLOUD && signedIn
     fun device(id: String) = devices.firstOrNull { it.id == id }
 }
 
@@ -62,7 +62,6 @@ class GroheService(
     private val settings: GroheSettings,
     private val auth: GroheAuth,
     private val cloud: GroheBackend,
-    private val demoFactory: () -> GroheBackend,
     private val log: EventLog,
     private val strings: Strings,
     private val clock: Clock = Clock.systemUTC(),
@@ -73,7 +72,6 @@ class GroheService(
     private val authVersion = MutableStateFlow(0)
     private val nudge = MutableStateFlow(0)
     @Volatile private var backend: GroheBackend? = null
-    private var demo: GroheBackend? = null
     private var scope: CoroutineScope? = null
 
     fun start(scope: CoroutineScope) {
@@ -83,7 +81,6 @@ class GroheService(
             combine(settings.mode, authVersion) { m, _ -> m to auth.signedIn }.distinctUntilChanged().collectLatest { (mode, signedIn) ->
                 _state.update { it.copy(mode = mode, signedIn = signedIn, needsReauth = auth.needsReauth, devices = emptyList(), error = null) }
                 val b = when (mode) {
-                    GroheMode.DEMO -> demo ?: demoFactory().also { demo = it }
                     GroheMode.CLOUD -> if (signedIn) cloud else null
                     GroheMode.OFF -> null
                 }
@@ -180,7 +177,6 @@ class GroheService(
     fun clearAll() {
         auth.signOut()
         settings.clearAll()
-        demo = null
         authVersion.value++
     }
 
@@ -202,6 +198,5 @@ val WaterType.labelRes: Int
 val GroheMode.labelRes: Int
     get() = when (this) {
         GroheMode.OFF -> R.string.hc_mode_off
-        GroheMode.DEMO -> R.string.hc_mode_demo
         GroheMode.CLOUD -> R.string.grohe_mode_cloud
     }

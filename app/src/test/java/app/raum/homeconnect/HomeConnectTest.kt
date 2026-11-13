@@ -193,6 +193,11 @@ class HomeConnectTest {
 
     // --- Dienst ---------------------------------------------------------------------------------
 
+    /** Angemeldet: gespeicherte Tokens, damit der Dienst das Backend benutzt. */
+    private fun signedInStore() = InMemorySecretStore().apply {
+        put("homeconnect_tokens", """{"clientId":"c","access":"a","refresh":"r","expiresAtMs":${Long.MAX_VALUE}}""".toByteArray())
+    }
+
     private class MemSettings(mode: HcMode) : HcSettings {
         override val mode = MutableStateFlow(mode)
         override fun setMode(mode: HcMode) { this.mode.value = mode }
@@ -241,8 +246,8 @@ class HomeConnectTest {
     private fun op(s: String) = HcItem(HcKeys.OPERATION_STATE, JsonPrimitive("BSH.Common.EnumType.OperationState.$s"))
 
     private fun service(backend: FakeBackend, log: EventLog = EventLog()) = HomeConnectService(
-        settings = MemSettings(HcMode.DEMO), auth = HcAuth(InMemorySecretStore(), FakeHttp()), budget = HcBudget(MemBudget()),
-        cloud = backend, demoFactory = { backend }, language = { "de-DE" }, log = log, strings = XmlStrings("de"),
+        settings = MemSettings(HcMode.CLOUD), auth = HcAuth(signedInStore(), FakeHttp()), budget = HcBudget(MemBudget()),
+        cloud = backend, language = { "de-DE" }, log = log, strings = XmlStrings("de"),
     )
 
     @OptIn(ExperimentalCoroutinesApi::class)

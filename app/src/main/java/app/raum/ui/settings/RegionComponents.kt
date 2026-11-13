@@ -1,6 +1,19 @@
 package app.raum.ui.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material.icons.outlined.WbTwilight
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import app.raum.ui.theme.LocalGlass
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -52,6 +65,7 @@ import app.raum.automation.triggers.GeoLocation
 import app.raum.automation.triggers.SunCalculator
 import app.raum.data.geo.City
 import app.raum.data.geo.CityIndex
+import app.raum.data.geo.PlaceSearch
 import app.raum.domain.models.SunEvent
 import app.raum.ui.components.currentLocale
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +92,11 @@ fun zoneLabel(id: String): String {
     val offset = ZonedDateTime.now(ZoneId.of(id)).offset.id.let { if (it == "Z") "±00:00" else it }
     return "${id.substringAfterLast('/').replace('_', ' ')} (UTC$offset)"
 }
+
+/** Ort der Zeitzone in der App-Sprache („Zürich“ statt „Zurich“), sonst der Teil der Kennung. */
+fun zoneCity(id: String, locale: Locale): String =
+    runCatching { android.icu.text.TimeZoneNames.getInstance(locale).getExemplarLocationName(id) }.getOrNull()?.takeIf { it.isNotBlank() }
+        ?: id.substringAfterLast('/').replace('_', ' ')
 
 /** Ausgeschriebener Name inkl. Sommerzeit, z. B. „Mitteleuropäische Sommerzeit“. */
 fun zoneName(id: String, locale: Locale): String {
@@ -111,8 +130,8 @@ fun TimeZonePicker(selected: String, canSet: Boolean, onSelect: (String) -> Unit
 private fun parse(s: String) = s.trim().replace(',', '.').toDoubleOrNull()
 
 /**
- * Standort über die Offline-Ortssuche (Spez. 7.8) – keine Ortung, kein Netz.
- * Vor der Eingabe werden die größten Orte der eingestellten Zeitzone vorgeschlagen.
+ * Standort über die Ortssuche (Spez. 7.8) – keine Ortung. Gesucht wird online (nur der Suchbegriff), ohne Netz in
+ * der eingebauten Ortsliste. Vor der Eingabe werden die größten Orte der eingestellten Zeitzone vorgeschlagen.
  *
  * @param onUseZone wird angeboten, wenn der gewählte Ort in einer anderen Zeitzone liegt (null = nicht anbieten)
  */
@@ -126,11 +145,15 @@ fun LocationPicker(
     onClear: (() -> Unit)?,
     onUseZone: ((String) -> Unit)? = null,
     index: CityIndex = koinInject(),
+    places: PlaceSearch = koinInject(),
 ) {
+    val g = LocalGlass.current
     val locale = currentLocale()
     val focus = LocalFocusManager.current
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<City>>(emptyList()) }
+    var online by remember { mutableStateOf<Boolean?>(null) }
+    var searching by remember { mutableStateOf(false) }
     var suggestions by remember { mutableStateOf<List<City>>(emptyList()) }
     var manual by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf<City?>(null) }
@@ -141,9 +164,11 @@ fun LocationPicker(
 
     LaunchedEffect(zone) { suggestions = withContext(Dispatchers.Default) { runCatching { index.largestIn(zone) }.getOrDefault(emptyList()) } }
     LaunchedEffect(query) {
-        if (query.isBlank()) { results = emptyList(); return@LaunchedEffect }
-        delay(200) // tippen abwarten
-        results = withContext(Dispatchers.Default) { runCatching { index.search(query, zone, limit = 8) }.getOrDefault(emptyList()) }
+        if (query.isBlank()) { results = emptyList(); online = null; return@LaunchedEffect }
+        delay(350) // tippen abwarten – online nicht bei jedem Buchstaben fragen
+        searching = true
+        val r = places.search(query, zone, locale.language)
+        results = r.cities; online = r.online; searching = false
     }
 
     fun choose(city: City) {
@@ -155,28 +180,26 @@ fun LocationPicker(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Aktueller Standort mit Sonnenzeiten
         if (location != null) {
-            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
-                Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Place, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            locationName ?: "%.3f°, %.3f°".format(Locale.ROOT, location.latitude, location.longitude),
-                            style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                        val z = runCatching { ZoneId.of(zone) }.getOrDefault(ZoneId.systemDefault())
-                        val today = LocalDate.now(z)
-                        val rise = SunCalculator.time(SunEvent.SUNRISE, today, location, z)
-                        val set = SunCalculator.time(SunEvent.SUNSET, today, location, z)
-                        Text(
-                            stringResource(R.string.location_sun_today, rise?.let(HH_MM::format) ?: "–", set?.let(HH_MM::format) ?: "–"),
-                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                    if (onClear != null) {
-                        IconButton(onClick = { picked = null; onClear() }, modifier = Modifier.size(56.dp)) {
-                            Icon(Icons.Outlined.Close, stringResource(R.string.location_remove), tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                        }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color(0xFFFFE1A3)).padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val ink = Color(0xFF2E1D05)
+                Icon(Icons.Outlined.Place, null, tint = ink)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        locationName ?: "%.3f°, %.3f°".format(Locale.ROOT, location.latitude, location.longitude),
+                        color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    picked?.let { p -> cityDetail(p, locale).takeIf { it.isNotBlank() }?.let { Text(it, color = ink.copy(alpha = 0.75f), fontSize = 13.sp, maxLines = 1) } }
+                }
+                val z = runCatching { ZoneId.of(zone) }.getOrDefault(ZoneId.systemDefault())
+                val today = LocalDate.now(z)
+                SunChip(Icons.Outlined.WbSunny, SunCalculator.time(SunEvent.SUNRISE, today, location, z)?.let(HH_MM::format) ?: "–", stringResource(R.string.sunrise))
+                SunChip(Icons.Outlined.WbTwilight, SunCalculator.time(SunEvent.SUNSET, today, location, z)?.let(HH_MM::format) ?: "–", stringResource(R.string.sunset))
+                if (onClear != null) {
+                    IconButton(onClick = { picked = null; onClear() }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Outlined.Close, stringResource(R.string.location_remove), tint = ink)
                     }
                 }
             }
@@ -184,59 +207,59 @@ fun LocationPicker(
         // Zeitzone passt nicht zum gewählten Ort?
         val p = picked
         if (p != null && onUseZone != null && p.timeZone != zone) {
-            FilledTonalButton(onClick = { onUseZone(p.timeZone) }, modifier = Modifier.height(48.dp)) {
-                Icon(Icons.Outlined.Schedule, null); Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.location_use_zone, zoneLabel(p.timeZone)))
-            }
+            ActionPill(stringResource(R.string.location_use_zone, zoneLabel(p.timeZone)), Icons.Outlined.Schedule) { onUseZone(p.timeZone) }
         }
 
-        Column(Modifier.bringIntoViewRequester(searchArea), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedTextField(
-            query, { query = it },
-            leadingIcon = { Icon(Icons.Outlined.Search, null) },
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Outlined.Close, stringResource(R.string.action_clear)) } },
-            placeholder = { Text(stringResource(R.string.location_search_hint)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            // „Suchen“ schließt die Tastatur – dann sind alle Treffer sichtbar
-            keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
-            modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().onFocusChanged { focused = it.isFocused },
-        )
+        Column(Modifier.bringIntoViewRequester(searchArea), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            PillField(
+                query, { query = it }, Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
+                placeholder = stringResource(R.string.location_search_hint),
+                leading = { Icon(Icons.Outlined.Search, null, tint = g.ink) },
+                trailing = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (searching) CircularProgressIndicator(Modifier.size(18.dp), color = g.ink, strokeWidth = 2.dp)
+                        online?.let { SourceTag(it) }
+                        if (query.isNotEmpty()) IconButton(onClick = { query = "" }, modifier = Modifier.size(40.dp)) { Icon(Icons.Outlined.Close, stringResource(R.string.action_clear), tint = g.ink) }
+                    }
+                },
+            )
 
-        if (query.isBlank()) {
-            if (suggestions.isNotEmpty()) {
-                Text(stringResource(R.string.location_suggestions), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    suggestions.forEach { c ->
-                        FilterChip(selected = locationName == c.name && location == c.location, onClick = { choose(c) }, label = { Text(c.name) }, modifier = Modifier.height(48.dp))
+            if (query.isBlank()) {
+                if (suggestions.isNotEmpty()) {
+                    Text(stringResource(R.string.location_suggestions), color = g.soft, fontSize = 13.sp)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        suggestions.forEach { c -> ChoicePill(c.name, locationName == c.name && location == c.location) { choose(c) } }
                     }
                 }
-            }
-        } else if (results.isEmpty()) {
-            Text(stringResource(R.string.location_no_results), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
-                Column {
-                    results.forEachIndexed { i, c ->
-                        if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Row(Modifier.fillMaxWidth().clickable { choose(c) }.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Place, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(16.dp))
-                            Column {
-                                Text(c.name, style = MaterialTheme.typography.titleMedium)
-                                Text(cityDetail(c, locale), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (results.isEmpty() && !searching) {
+                Text(stringResource(R.string.location_no_results), color = g.soft)
+            } else {
+                // Treffer zweispaltig: Name groß, Region und Land darunter
+                results.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        pair.forEach { c ->
+                            Row(
+                                Modifier.weight(1f).height(60.dp).clip(RoundedCornerShape(18.dp)).background(g.ink.copy(alpha = 0.05f))
+                                    .clickable { choose(c) }.padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Outlined.Place, null, Modifier.size(20.dp), tint = g.soft)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(c.name, color = g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(cityDetail(c, locale), color = g.soft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
-        }
-
         }
 
         // Rückfall: Koordinaten von Hand
         TextButton(onClick = { manual = !manual }) {
-            Icon(Icons.Outlined.EditLocationAlt, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.location_manual))
+            Icon(Icons.Outlined.EditLocationAlt, null, tint = g.soft); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.location_manual), color = g.soft)
         }
         if (manual) {
             var lat by remember(location) { mutableStateOf(location?.latitude?.toString() ?: "") }
@@ -247,9 +270,35 @@ fun LocationPicker(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f))
                 OutlinedTextField(lon, { lon = it }, label = { Text(stringResource(R.string.longitude)) }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f))
-                FilledTonalButton(onClick = { parsed?.let { picked = null; onSelect(it, null); manual = false; focus.clearFocus() } },
-                    enabled = parsed != null && parsed != location, modifier = Modifier.height(56.dp)) { Text(stringResource(R.string.action_apply)) }
+                ActionPill(stringResource(R.string.action_apply), primary = true, enabled = parsed != null && parsed != location) {
+                    parsed?.let { picked = null; onSelect(it, null); manual = false; focus.clearFocus() }
+                }
             }
         }
+    }
+}
+
+/** Sonnenzeit als kleiner Chip im Standortbanner. */
+@Composable
+private fun SunChip(icon: androidx.compose.ui.graphics.vector.ImageVector, time: String, label: String) {
+    Row(
+        Modifier.height(34.dp).clip(RoundedCornerShape(17.dp)).background(Color.White.copy(alpha = 0.55f)).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, label, Modifier.size(16.dp), tint = Color(0xFF2E1D05))
+        Spacer(Modifier.width(6.dp))
+        Text(time, color = Color(0xFF2E1D05), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Woher die Treffer kommen: online oder aus der eingebauten Liste. */
+@Composable
+private fun SourceTag(online: Boolean) {
+    val bg = if (online) Color(0xFFE9FBEF) else LocalGlass.current.ink.copy(alpha = 0.07f)
+    val fg = if (online) Color(0xFF2F6B45) else LocalGlass.current.soft
+    Row(Modifier.height(28.dp).clip(RoundedCornerShape(14.dp)).background(bg).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(if (online) Icons.Outlined.Language else Icons.Outlined.CloudOff, null, Modifier.size(14.dp), tint = fg)
+        Spacer(Modifier.width(5.dp))
+        Text(stringResource(if (online) R.string.location_online else R.string.location_offline_list), color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }

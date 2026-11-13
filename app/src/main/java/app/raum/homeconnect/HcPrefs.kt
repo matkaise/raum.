@@ -12,8 +12,6 @@ import kotlinx.serialization.json.JsonPrimitive
 enum class HcMode {
     /** Ab Werk: keine Verbindung, keine Seite „Haushalt“. */
     OFF,
-    /** Simulierte Geräte zum Ausprobieren – ohne Internet. */
-    DEMO,
     /** Echte Geräte über die Home-Connect-Cloud. */
     CLOUD,
 }

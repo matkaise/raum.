@@ -79,11 +79,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.R
 import app.raum.homeconnect.HcAppliance
 import app.raum.grohe.GroheDevice
-import app.raum.grohe.GroheMode
 import app.raum.grohe.GroheState
 import app.raum.homeconnect.HcKeys
 import app.raum.homeconnect.HcLink
-import app.raum.homeconnect.HcMode
 import app.raum.homeconnect.HcType
 import app.raum.homeconnect.HomeConnectState
 import app.raum.homeconnect.OperationState
@@ -159,8 +157,7 @@ private fun headline(st: HomeConnectState, gs: GroheState, entries: List<Househo
         st.link == HcLink.NEEDS_SIGN_IN || gs.needsReauth -> stringResource(R.string.hc_link_reauth)
         else -> listOf(activityLine(entries), pluralStringResource(R.plurals.hc_count_appliances, n, n)).filter { it.isNotBlank() }.joinToString(" · ")
     }
-    val demo = st.mode == HcMode.DEMO || gs.mode == GroheMode.DEMO
-    return listOfNotNull(if (demo) stringResource(R.string.hc_mode_demo) else null, base).joinToString(" · ")
+    return base
 }
 
 /** Detailbereich für den Grohe Blue. */

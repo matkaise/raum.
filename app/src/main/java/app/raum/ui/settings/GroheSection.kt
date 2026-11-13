@@ -18,6 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import app.raum.ui.theme.LocalGlass
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Login
 import androidx.compose.material.icons.outlined.Logout
@@ -61,7 +67,6 @@ fun groheSummary(service: GroheService = koinInject()): String {
     val st by service.state.collectAsStateWithLifecycle()
     return when {
         st.mode == GroheMode.OFF -> stringResource(R.string.hc_mode_off)
-        st.mode == GroheMode.DEMO -> stringResource(R.string.hc_mode_demo)
         !st.signedIn -> stringResource(R.string.hc_not_signed_in)
         st.needsReauth -> stringResource(R.string.hc_link_reauth)
         else -> st.devices.joinToString(", ") { it.name }.ifBlank { stringResource(R.string.grohe_signed_in) }
@@ -73,34 +78,35 @@ fun GroheSection(service: GroheService = koinInject()) {
     val st by service.state.collectAsStateWithLifecycle()
     var login by remember { mutableStateOf(false) }
 
-    Group {
-        Text(stringResource(R.string.grohe_settings_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
-            GroheMode.entries.forEachIndexed { i, m ->
-                SegmentedButton(selected = st.mode == m, onClick = { service.setMode(m) }, shape = SegmentedButtonDefaults.itemShape(i, GroheMode.entries.size)) {
-                    Text(stringResource(m.labelRes), maxLines = 1)
-                }
-            }
-        }
-        if (st.mode == GroheMode.DEMO) Text(stringResource(R.string.grohe_demo_explain), style = MaterialTheme.typography.bodyMedium)
+    val g = LocalGlass.current
+    ServiceHero(
+        Icons.Outlined.WaterDrop, Color(0xFFE3F4FC), Color(0xFF1D6F99),
+        stringResource(R.string.settings_grohe), stringResource(R.string.grohe_hero_sub),
+        info = stringResource(R.string.grohe_settings_explain),
+    ) {
+        Seg(listOf(GroheMode.OFF to stringResource(R.string.state_off), GroheMode.CLOUD to stringResource(R.string.state_on)), st.mode, Modifier.width(240.dp)) { service.setMode(it) }
     }
     if (st.mode != GroheMode.CLOUD) return
 
-    Group(stringResource(R.string.hc_account_title)) {
-        if (st.signedIn && !st.needsReauth) {
-            Text(stringResource(R.string.grohe_signed_in), style = MaterialTheme.typography.titleMedium)
-            Info(stringResource(R.string.hc_appliances), st.devices.joinToString(", ") { it.name }.ifBlank { "–" })
-            st.updatedAt?.let { Info(stringResource(R.string.grohe_updated), hm(it)) }
-            st.error?.let { Text(stringResource(R.string.grohe_error, it.detail ?: it.kind.name), color = MaterialTheme.colorScheme.error) }
-            OutlinedButton(onClick = service::signOut, modifier = Modifier.height(48.dp)) {
-                Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.hc_sign_out))
+    if (st.signedIn && !st.needsReauth) {
+        Group(stringResource(R.string.hc_account)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                IconDisk(Icons.Outlined.AccountCircle, g.ink.copy(alpha = 0.07f), g.ink, 48)
+                Column(Modifier.weight(1f)) {
+                    Text(st.devices.joinToString(", ") { it.name }.ifBlank { stringResource(R.string.grohe_signed_in) }, color = g.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        listOfNotNull(stringResource(R.string.grohe_signed_in), st.updatedAt?.let { stringResource(R.string.grohe_updated) + " " + hm(it) }).joinToString(" · "),
+                        color = g.soft, fontSize = 13.sp,
+                    )
+                }
+                ActionPill(stringResource(R.string.hc_sign_out), onClick = service::signOut)
             }
-        } else {
-            Text(stringResource(if (st.needsReauth) R.string.grohe_reauth_explain else R.string.grohe_signin_explain),
-                style = MaterialTheme.typography.bodyMedium, color = if (st.needsReauth) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = { login = true }, modifier = Modifier.height(52.dp)) {
-                Icon(Icons.Outlined.Login, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.grohe_sign_in))
-            }
+            st.error?.let { Text(stringResource(R.string.grohe_error, it.detail ?: it.kind.name), color = Color(0xFFB3261E)) }
+        }
+    } else {
+        Group(stringResource(R.string.hc_account), info = stringResource(R.string.grohe_signin_explain)) {
+            if (st.needsReauth) Text(stringResource(R.string.grohe_reauth_explain), color = Color(0xFFB3261E))
+            ActionPill(stringResource(R.string.grohe_sign_in), Icons.Outlined.Login, primary = true) { login = true }
         }
     }
     if (login) GroheLoginDialog(service) { login = false }

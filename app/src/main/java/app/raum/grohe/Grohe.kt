@@ -232,26 +232,3 @@ class GroheCloudBackend(private val auth: GroheAuth, private val http: HcHttp) :
 
     private companion object { const val BASE = "https://idp2-apigw.cloud.grohe.com/v3/iot" }
 }
-
-/** Ein simulierter Grohe Blue Home zum Ausprobieren ohne Konto. */
-class DemoGrohe : GroheBackend {
-    private var filterLiters = 1500.0
-    private var co2Liters = 56.0
-
-    override suspend fun devices() = listOf(
-        GroheDevice(
-            "demo-blue-1", "loc", "room", "Grohe Blue", 104,
-            filterPercent = (filterLiters / 2000 * 100).toInt().toDouble(), filterLiters = filterLiters,
-            co2Percent = (co2Liters / 60 * 100).coerceAtMost(100.0).toInt().toDouble(), co2Liters = co2Liters,
-        ),
-    )
-
-    override suspend fun dispense(device: GroheDevice, type: WaterType, ml: Int) {
-        if (!validAmount(ml)) throw GroheException(GroheException.Kind.INVALID, "$ml ml")
-        kotlinx.coroutines.delay(400)
-        filterLiters = (filterLiters - ml / 1000.0).coerceAtLeast(0.0)
-        if (type != WaterType.STILL) co2Liters = (co2Liters - ml / 1000.0 * if (type == WaterType.SPARKLING) 1.0 else 0.5).coerceAtLeast(0.0)
-    }
-
-    override suspend fun requestMeasurement(device: GroheDevice) = Unit
-}

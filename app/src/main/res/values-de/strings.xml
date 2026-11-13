@@ -505,7 +505,7 @@
     <string name="settings_database">Datenbank</string>
     <string name="settings_database_value">SQLite (Room), Schema v%1$d</string>
     <string name="settings_internet">Internet</string>
-    <string name="settings_internet_value">nicht erforderlich</string>
+    <string name="settings_internet_value">nur für Wetter, Ortssuche und verbundene Dienste</string>
     <string name="location_title">Standort</string>
     <string name="latitude">Breite</string>
     <string name="longitude">Länge</string>
@@ -1279,7 +1279,6 @@
     <string name="hc_code_step2">2. Mit der SingleKey ID anmelden und diesen Code bestätigen:</string>
     <string name="hc_code_waiting">Warte auf Bestätigung … noch %1$d:%2$02d</string>
     <string name="hc_connecting">Verbinde …</string>
-    <string name="hc_demo_explain">Fünf simulierte Geräte (Kaffee, Backofen, Waschmaschine, Geschirrspüler, Trockner) zum Ausprobieren – ohne Konto und ohne Internet.</string>
     <string name="hc_door_closed">Tür geschlossen</string>
     <string name="hc_door_locked">Tür verriegelt</string>
     <string name="hc_door_open">Tür offen</string>
@@ -1324,7 +1323,6 @@
     <string name="hc_log_stopped">Programm abgebrochen</string>
     <string name="hc_log_stream_lost">Home Connect: Verbindung unterbrochen (%1$s)</string>
     <string name="hc_mode_cloud">Eigene Geräte</string>
-    <string name="hc_mode_demo">Demo</string>
     <string name="hc_mode_off">Aus</string>
     <string name="hc_my_drinks">Meine Getränke</string>
     <string name="hc_night">Nachts 01:00</string>
@@ -1453,7 +1451,6 @@
     <string name="settings_grohe">Grohe Blue</string>
     <string name="grohe_mode_cloud">Eigenes Gerät</string>
     <string name="grohe_settings_explain">Grohe Blue (Wasser still, medium, sprudelnd) über die Grohe-Cloud, die auch die Grohe-App nutzt. Die Schnittstelle ist inoffiziell – Grohe kann sie jederzeit ändern. raum. verbindet sich nur, wenn du es hier einschaltest; die Zugangsdaten liegen verschlüsselt auf dem Panel.</string>
-    <string name="grohe_demo_explain">Ein simulierter Grohe Blue zum Ausprobieren – ohne Konto und ohne Internet.</string>
     <string name="grohe_sign_in">Bei Grohe anmelden</string>
     <string name="grohe_signin_explain">Die Anmeldung läuft auf Grohes eigener Seite mit deinem Grohe-Konto (wie in der Grohe-App). raum. sieht dein Passwort nicht und speichert nur die Zugangs-Tokens.</string>
     <string name="grohe_reauth_explain">Die Anmeldung bei Grohe ist abgelaufen. Bitte neu anmelden.</string>
@@ -1636,8 +1633,8 @@
     <string name="cover_pos_half">Halb</string>
     <string name="cover_pos_gap">Fast zu</string>
     <string name="cover_pos_closed">Zu</string>
-    <string name="cover_step_open">10 % weiter auf</string>
-    <string name="cover_step_close">10 % weiter zu</string>
+    <string name="cover_step_open" formatted="false">10 % weiter auf</string>
+    <string name="cover_step_close" formatted="false">10 % weiter zu</string>
     <string name="tilt_closed">Zu</string>
     <string name="tilt_half">Halb</string>
     <string name="tilt_open">Waagrecht</string>
@@ -1721,4 +1718,36 @@
         <item quantity="other">%1$d mit Fehler</item>
     </plurals>
     <string name="action_other_device">Anderes Gerät</string>
+    <string name="settings_group_home">Zuhause &amp; Panel</string>
+    <string name="settings_group_services">Dienste</string>
+    <string name="settings_group_system">System</string>
+    <string name="settings_more_info">Mehr erfahren</string>
+    <string name="settings_advanced">Erweitert</string>
+    <string name="settings_sleep_title">Ruhezustand</string>
+    <string name="settings_sleep_after_short">Nach</string>
+    <string name="settings_sleep_then">Dann</string>
+    <string name="settings_sleep_now_short">Jetzt ruhen</string>
+    <string name="settings_min_brightness">Mindesthelligkeit</string>
+    <string name="settings_ambient_tag">Umgebungslicht %1$s</string>
+    <string name="settings_unit">Einheit</string>
+    <string name="settings_zone_title">Zeitzone %1$s</string>
+    <string name="settings_change">Ändern</string>
+    <string name="location_for">für Sonnenzeiten und Wetter</string>
+    <string name="location_online">Online</string>
+    <string name="location_offline_list">Offline-Liste</string>
+    <string name="settings_matter_controller">Controller</string>
+    <string name="settings_license_open_meteo">Ortssuche online: Open-Meteo (open-meteo.com), Lizenz CC BY 4.0.</string>
+    <string name="hc_hero_title">Bosch, Siemens, Neff, Gaggenau</string>
+    <string name="hc_hero_sub">über die Home-Connect-Cloud</string>
+    <string name="grohe_hero_sub">über die Grohe-Cloud</string>
+    <string name="hc_account">Konto</string>
+    <string name="thread_tile_network">Thread-Netz</string>
+    <string name="thread_tile_routers">Border Router</string>
+    <string name="thread_tile_bluetooth">Bluetooth</string>
+    <string name="thread_not_set">Nicht hinterlegt</string>
+    <string name="thread_search_again_short">Neu suchen</string>
+    <string name="matter_ecosystems_title">Apple, Google, Amazon</string>
+    <string name="matter_ecosystems_sub">Dort koppeln, dann per Code mit raum. teilen</string>
+    <string name="thread_details">Thread-Netz im Detail</string>
+    <string name="sonos_hero_sub">im Heimnetz, ohne Cloud</string>
 </resources>

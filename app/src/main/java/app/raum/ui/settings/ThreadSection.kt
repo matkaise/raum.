@@ -22,6 +22,12 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Wifi
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import app.raum.ui.theme.LocalGlass
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
@@ -58,7 +64,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.R
 import app.raum.platform.bluetooth.BluetoothState
@@ -79,15 +84,23 @@ import java.time.format.FormatStyle
 
 /** Kurzfassung für die Kategorienliste. */
 @Composable
-internal fun threadSummary(vm: ThreadViewModel = koinViewModel()): String {
+internal fun threadSummary(vm: ThreadViewModel = koinViewModel()): String = threadStatus(vm).first
+
+/** Kurzfassung und ob etwas nicht stimmt (Border Router fehlt oder ist inaktiv). */
+@Composable
+internal fun threadStatus(vm: ThreadViewModel = koinViewModel()): Pair<String, Boolean> {
     val status by vm.status.collectAsStateWithLifecycle()
-    return status.network?.let { stringResource(R.string.thread_summary_network, it.summary.networkName) }
+    val text = status.network?.let { stringResource(R.string.thread_summary_network, it.summary.networkName) }
         ?: stringResource(R.string.thread_summary_none)
+    return text to (status.health == ThreadHealth.NO_BORDER_ROUTER || status.health == ThreadHealth.BORDER_ROUTER_INACTIVE)
 }
 
-/** Thread-Netz, Border Router, Diagnose und Zugangsdaten für neue Geräte (Spez. 8.3, COM-002 – COM-004). */
+/**
+ * Matter und Thread (Spez. 8.3, COM-002 – COM-004): oben drei Statuskacheln (Thread-Netz, Border Router, Bluetooth),
+ * darunter die Prüfliste und das WLAN für neue Geräte; Netzdetails, Routerliste und Controller unter „Erweitert“.
+ */
 @Composable
-fun ThreadSection(vm: ThreadViewModel = koinViewModel()) {
+fun ThreadSection(vm: ThreadViewModel = koinViewModel(), advanced: @Composable () -> Unit = {}) {
     val status by vm.status.collectAsStateWithLifecycle()
     val scanning by vm.scanning.collectAsStateWithLifecycle()
     val adopting by vm.adopting.collectAsStateWithLifecycle()
@@ -105,10 +118,22 @@ fun ThreadSection(vm: ThreadViewModel = koinViewModel()) {
         onDispose { vm.stopScan() }
     }
 
-    NetworkGroup(status, onImport = { guarded { importing = true } }, onRemove = { guarded { confirmRemove = true } })
-    RoutersGroup(status, scanning, adopting, onRescan = vm::rescan, onAdopt = { r -> guarded { vm.adopt(r) } })
+    StatusTiles(vm, status, scanning, adopting, onImport = { guarded { importing = true } }, onAdopt = { r -> guarded { vm.adopt(r) } })
     DiagnosisGroup(status)
-    NewDevicesGroup(vm, ::guarded)
+    WifiGroup(vm, ::guarded)
+    // Apple/Google/Amazon: Zugangsdaten gibt es dort nicht – Weg über Teilen nur auf Nachfrage erklären
+    if (status.network == null && status.routers.any { it.closedEcosystem } && status.routers.none { it.restAvailable }) {
+        val g = LocalGlass.current
+        Group(info = stringResource(R.string.thread_closed_ecosystem) + " " + stringResource(R.string.thread_closed_ecosystem_detail)) {
+            Text(stringResource(R.string.matter_ecosystems_title), color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.matter_ecosystems_sub), color = g.soft, fontSize = 13.sp)
+        }
+    }
+    Advanced {
+        if (status.network != null) NetworkGroup(status, onImport = { guarded { importing = true } }, onRemove = { guarded { confirmRemove = true } })
+        RoutersGroup(status, scanning, adopting, onRescan = vm::rescan, onAdopt = { r -> guarded { vm.adopt(r) } })
+        advanced()
+    }
 
     pending?.let { action ->
         PinEntryDialog(
@@ -237,8 +262,8 @@ private fun StatusRow(icon: ImageVector, color: Color, text: String, detail: Str
         Icon(icon, null, tint = color, modifier = Modifier.padding(top = 2.dp))
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(text, style = MaterialTheme.typography.bodyLarge)
-            detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(text, color = LocalGlass.current.ink, fontSize = 15.sp)
+            detail?.let { Text(it, color = LocalGlass.current.soft, fontSize = 13.sp) }
         }
     }
 }
@@ -309,113 +334,153 @@ private fun RoutersGroup(
                 }
             }
         }
-        // Apple/Google/Amazon: Zugangsdaten gibt es dort nicht – Weg über Teilen erklären
-        if (status.network == null && status.routers.any { it.closedEcosystem } && status.routers.none { it.restAvailable }) {
-            StatusRow(Icons.Outlined.Info, MaterialTheme.colorScheme.onSurfaceVariant, stringResource(R.string.thread_closed_ecosystem),
-                stringResource(R.string.thread_closed_ecosystem_detail))
-        }
     }
 }
 
 // --- Diagnose ------------------------------------------------------------------------------
 
+private data class Check(val icon: ImageVector, val color: Color, val text: String, val detail: String? = null)
+
+private val Ok = Color(0xFF2F6B45)
+private val Warn = Color(0xFF9A6424)
+private val Bad = Color(0xFFB3261E)
+
 @Composable
 private fun DiagnosisGroup(status: ThreadStatus) {
-    Group(stringResource(R.string.thread_diagnosis)) {
-        val ok = MaterialTheme.colorScheme.secondary
-        val warn = MaterialTheme.colorScheme.tertiary
-        val bad = MaterialTheme.colorScheme.error
-        val neutral = MaterialTheme.colorScheme.onSurfaceVariant
-
+    val neutral = LocalGlass.current.soft
+    val checks = buildList {
         // Border Router
         val activeRouters = status.routers.count { it.active || it.state == ThreadInterfaceState.UNKNOWN }
         if (status.routers.isEmpty()) {
-            StatusRow(Icons.Outlined.ErrorOutline, if (status.threadDevices > 0) bad else neutral,
-                stringResource(R.string.thread_diag_no_router), stringResource(R.string.thread_diag_no_router_detail))
+            add(Check(Icons.Outlined.ErrorOutline, if (status.threadDevices > 0) Bad else neutral,
+                stringResource(R.string.thread_diag_no_router), stringResource(R.string.thread_diag_no_router_detail)))
         } else {
-            StatusRow(Icons.Outlined.CheckCircle, if (activeRouters > 0) ok else warn,
-                stringResource(R.string.thread_diag_routers, status.routers.size, activeRouters))
+            add(Check(Icons.Outlined.CheckCircle, if (activeRouters > 0) Ok else Warn, stringResource(R.string.thread_diag_routers, status.routers.size, activeRouters)))
         }
-
         // Thread-Geräte
         if (status.threadDevices > 0) {
             val all = status.threadDevicesOnline == status.threadDevices
-            StatusRow(
+            add(Check(
                 if (all) Icons.Outlined.CheckCircle else Icons.Outlined.WarningAmber,
-                if (all) ok else if (status.threadDevicesOnline == 0) bad else warn,
+                if (all) Ok else if (status.threadDevicesOnline == 0) Bad else Warn,
                 stringResource(R.string.thread_diag_devices, status.threadDevicesOnline, status.threadDevices),
                 if (status.borderRouterUnreachable) stringResource(R.string.thread_diag_devices_unreachable) else null,
-            )
+            ))
             // Geräte hängen in einem anderen Netz als dem hinterlegten (z. B. Apple-Netz, Dataset von anderswo)
             val net = status.network?.summary?.networkName
             val foreign = status.deviceNetworks.filter { it != net }
             if (foreign.isNotEmpty()) {
-                StatusRow(Icons.Outlined.Info, neutral, stringResource(R.string.thread_diag_device_networks, foreign.joinToString { "„$it“" }),
-                    if (net != null) stringResource(R.string.thread_diag_device_networks_other, net) else null)
+                add(Check(Icons.Outlined.Info, neutral, stringResource(R.string.thread_diag_device_networks, foreign.joinToString { "„$it“" }),
+                    if (net != null) stringResource(R.string.thread_diag_device_networks_other, net) else null))
             }
         } else {
-            StatusRow(Icons.Outlined.Info, neutral, stringResource(R.string.thread_diag_no_devices))
+            add(Check(Icons.Outlined.Info, neutral, stringResource(R.string.thread_diag_no_devices)))
         }
-
         // IPv6 – ohne gibt es keinen Weg zu Thread-Geräten
         status.ipv6?.let { v6 ->
-            if (v6.hasRoutableAddress) StatusRow(Icons.Outlined.CheckCircle, ok, stringResource(R.string.thread_diag_ipv6_ok))
-            else StatusRow(Icons.Outlined.WarningAmber, warn, stringResource(R.string.thread_diag_ipv6_missing), stringResource(R.string.thread_diag_ipv6_detail))
+            if (v6.hasRoutableAddress) add(Check(Icons.Outlined.CheckCircle, Ok, stringResource(R.string.thread_diag_ipv6_ok)))
+            else add(Check(Icons.Outlined.WarningAmber, Warn, stringResource(R.string.thread_diag_ipv6_missing), stringResource(R.string.thread_diag_ipv6_detail)))
         }
+    }
+    Group {
+        checks.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                row.forEach { c -> Row(Modifier.weight(1f)) { StatusRow(c.icon, c.color, c.text, c.detail) } }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+// --- Statuskacheln ---------------------------------------------------------------------------
+
+@Composable
+private fun StatusTiles(
+    vm: ThreadViewModel,
+    status: ThreadStatus,
+    scanning: Boolean,
+    adopting: String?,
+    onImport: () -> Unit,
+    onAdopt: (BorderRouter) -> Unit,
+) {
+    val bt by vm.bluetooth.collectAsStateWithLifecycle()
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refreshBluetooth() }
+    val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshBluetooth() }
+
+    Row(Modifier.padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Thread-Netz
+        val net = status.network
+        StatusTile(
+            Icons.Outlined.Hub, if (net == null) Color(0xFFFDE2DF) else Color(0xFFE9FBEF), if (net == null) Bad else Ok,
+            stringResource(R.string.thread_tile_network),
+            net?.let { "„${it.summary.networkName}“ · " + stringResource(R.string.thread_channel) + " " + it.summary.channel } ?: stringResource(R.string.thread_not_set),
+            Modifier.weight(1f), problem = net == null,
+            action = if (net == null) stringResource(R.string.thread_import) to onImport else null,
+        )
+        // Border Router: unserer bzw. der erste aktive
+        val router = status.matching.firstOrNull() ?: status.routers.firstOrNull { it.active } ?: status.routers.firstOrNull()
+        val adoptable = status.routers.firstOrNull { it.restAvailable && it !in status.matching }
+        StatusTile(
+            Icons.Outlined.Router, if (router?.active == true) Color(0xFFE9FBEF) else Color(0xFFFFF1C4), if (router?.active == true) Ok else Warn,
+            stringResource(R.string.thread_tile_routers),
+            when {
+                router != null -> listOfNotNull(
+                    router.displayName, router.vendor,
+                    stringResource(if (router.active) R.string.thread_router_active else R.string.thread_router_inactive),
+                ).joinToString(" · ")
+                scanning -> stringResource(R.string.thread_routers_searching)
+                else -> stringResource(R.string.thread_routers_none)
+            },
+            Modifier.weight(1f),
+            action = when {
+                adoptable != null && adopting == null && net == null -> stringResource(R.string.thread_adopt) to { onAdopt(adoptable) }
+                else -> stringResource(R.string.thread_search_again_short) to vm::rescan
+            },
+        )
+        // Bluetooth (Koppeln neuer Geräte)
+        val (btText, btProblem) = when (bt) {
+            BluetoothState.READY -> R.string.bt_ready to false
+            BluetoothState.OFF -> R.string.bt_off to true
+            BluetoothState.NO_PERMISSION -> R.string.bt_no_permission to true
+            BluetoothState.NO_LOCATION_SERVICE -> R.string.bt_no_location to true
+            BluetoothState.UNAVAILABLE -> R.string.bt_unavailable to true
+        }
+        StatusTile(
+            Icons.Outlined.Bluetooth, if (btProblem) Color(0xFFFFF1C4) else Color(0xFFE3F4FC), if (btProblem) Warn else Color(0xFF1D6F99),
+            stringResource(R.string.thread_tile_bluetooth), stringResource(btText), Modifier.weight(1f),
+            action = when (bt) {
+                BluetoothState.OFF, BluetoothState.NO_LOCATION_SERVICE -> stringResource(R.string.bt_enable) to {
+                    if (!vm.enableBluetooth() && bt == BluetoothState.OFF) enableLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                }
+                BluetoothState.NO_PERMISSION -> stringResource(R.string.bt_allow) to { permissionLauncher.launch(vm.bluetoothPermissions) }
+                else -> null
+            },
+        )
     }
 }
 
 // --- Neue Geräte ---------------------------------------------------------------------------
 
 @Composable
-private fun NewDevicesGroup(vm: ThreadViewModel, guarded: (() -> Unit) -> Unit) {
-    val bt by vm.bluetooth.collectAsStateWithLifecycle()
+private fun WifiGroup(vm: ThreadViewModel, guarded: (() -> Unit) -> Unit) {
+    val g = LocalGlass.current
     val ssid by vm.wifiSsid.collectAsStateWithLifecycle()
     var editWifi by remember { mutableStateOf(false) }
     var confirmWifiRemove by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.refreshBluetooth() }
-    val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { vm.refreshBluetooth() }
-
-    Group(stringResource(R.string.thread_new_devices)) {
-        // Bluetooth
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val (icon, color, text) = when (bt) {
-                BluetoothState.READY -> Triple(Icons.Outlined.CheckCircle, MaterialTheme.colorScheme.secondary, R.string.bt_ready)
-                BluetoothState.OFF -> Triple(Icons.Outlined.WarningAmber, MaterialTheme.colorScheme.tertiary, R.string.bt_off)
-                BluetoothState.NO_PERMISSION -> Triple(Icons.Outlined.WarningAmber, MaterialTheme.colorScheme.tertiary, R.string.bt_no_permission)
-                BluetoothState.NO_LOCATION_SERVICE -> Triple(Icons.Outlined.WarningAmber, MaterialTheme.colorScheme.tertiary, R.string.bt_no_location)
-                BluetoothState.UNAVAILABLE -> Triple(Icons.Outlined.ErrorOutline, MaterialTheme.colorScheme.error, R.string.bt_unavailable)
-            }
-            Row(Modifier.weight(1f)) { StatusRow(icon, color, stringResource(text)) }
-            when (bt) {
-                BluetoothState.OFF, BluetoothState.NO_LOCATION_SERVICE -> OutlinedButton(onClick = {
-                    if (!vm.enableBluetooth() && bt == BluetoothState.OFF) enableLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-                }, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.bt_enable)) }
-                BluetoothState.NO_PERMISSION -> OutlinedButton(onClick = { permissionLauncher.launch(vm.bluetoothPermissions) },
-                    modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.bt_allow)) }
-                else -> Unit
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        // WLAN für Matter-over-Wi-Fi-Geräte (COM-003)
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // WLAN für Matter-over-Wi-Fi-Geräte (COM-003)
+    Group {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            IconDisk(Icons.Outlined.Wifi, Color(0xFFE3F4FC), Color(0xFF1D6F99), 44)
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.commissioning_wifi), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.commissioning_wifi), color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     ssid?.let { stringResource(R.string.commissioning_wifi_set, it) } ?: stringResource(R.string.commissioning_wifi_none),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = g.soft, fontSize = 13.sp,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = { guarded { editWifi = true } }, modifier = Modifier.height(48.dp)) {
-                    Text(stringResource(if (ssid == null) R.string.commissioning_wifi_define else R.string.commissioning_wifi_change))
-                }
-                if (ssid != null) OutlinedButton(onClick = { guarded { confirmWifiRemove = true } }, modifier = Modifier.height(48.dp)) {
-                    Text(stringResource(R.string.thread_remove))
-                }
-            }
+            ActionPill(stringResource(if (ssid == null) R.string.commissioning_wifi_define else R.string.commissioning_wifi_change)) { guarded { editWifi = true } }
+            if (ssid != null) ActionPill(stringResource(R.string.thread_remove)) { guarded { confirmWifiRemove = true } }
         }
     }
 

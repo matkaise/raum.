@@ -1,6 +1,19 @@
 package app.raum.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Kitchen
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import app.raum.ui.household.iconFor
+import app.raum.ui.theme.LocalGlass
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,82 +78,116 @@ fun homeConnectSummary(service: HomeConnectService = koinInject()): String {
     val st by service.state.collectAsStateWithLifecycle()
     return when {
         st.mode == HcMode.OFF -> stringResource(R.string.hc_mode_off)
-        st.mode == HcMode.DEMO -> stringResource(R.string.hc_mode_demo)
         !st.signedIn -> stringResource(R.string.hc_not_signed_in)
         st.link == HcLink.NEEDS_SIGN_IN -> stringResource(R.string.hc_link_reauth)
         else -> pluralStringResource(R.plurals.hc_connected_count, st.appliances.count { it.connected }, st.appliances.count { it.connected })
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeConnectSection(service: HomeConnectService = koinInject()) {
+    val g = LocalGlass.current
     val st by service.state.collectAsStateWithLifecycle()
     val clientId by service.clientId.collectAsStateWithLifecycle()
 
-    Group {
-        Text(stringResource(R.string.hc_settings_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        SingleChoiceSegmentedButtonRow(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
-            HcMode.entries.forEachIndexed { i, m ->
-                SegmentedButton(selected = st.mode == m, onClick = { service.setMode(m) }, shape = SegmentedButtonDefaults.itemShape(i, HcMode.entries.size)) {
-                    Text(stringResource(m.labelRes), maxLines = 1)
-                }
-            }
-        }
-        if (st.mode == HcMode.DEMO) Text(stringResource(R.string.hc_demo_explain), style = MaterialTheme.typography.bodyMedium)
+    ServiceHero(
+        Icons.Outlined.Kitchen, Color(0xFFFFF3DC), Color(0xFF9A6424),
+        stringResource(R.string.hc_hero_title), stringResource(R.string.hc_hero_sub),
+        info = stringResource(R.string.hc_settings_explain),
+    ) {
+        Seg(listOf(HcMode.OFF to stringResource(R.string.state_off), HcMode.CLOUD to stringResource(R.string.state_on)), st.mode, Modifier.width(240.dp)) { service.setMode(it) }
     }
 
     if (st.mode != HcMode.CLOUD) return
 
-    // Zugang (Client-ID der eigenen Home-Connect-Anwendung). Ist eine fest eingebaut, bleibt das ausgeblendet –
-    // dann genügt die Anmeldung mit dem normalen Home-Connect-Konto.
+    // Eigene Client-ID: nur nötig, wenn keine fest eingebaut ist – sonst unter „Erweitert“
     var id by remember(clientId) { mutableStateOf(clientId) }
     var secret by remember { mutableStateOf("") }
-    var showClient by remember { mutableStateOf(false) }
-    val clientVisible = !service.hasBuiltInClient || clientId.isNotBlank() || showClient
-    if (clientVisible) Group(stringResource(R.string.hc_client_title)) {
-        Text(stringResource(R.string.hc_client_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(id, { id = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.hc_client_id)) },
-            modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(), textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
-        OutlinedTextField(secret, { secret = it.trim() }, singleLine = true,
-            label = { Text(stringResource(if (service.hasClientSecret) R.string.hc_client_secret_set else R.string.hc_client_secret)) },
-            visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FilledTonalButton(
-                onClick = { service.setClient(id, secret.ifBlank { null }); secret = "" },
-                enabled = id.isNotBlank() && (id != clientId || secret.isNotBlank()), modifier = Modifier.height(48.dp),
-            ) { Text(stringResource(R.string.action_save)) }
-        }
-    }
-
-    Group(stringResource(R.string.hc_account_title)) {
-        val code = st.signIn
-        when {
-            code != null -> SignInCode(code.userCode, code.verificationUriComplete ?: code.verificationUri, code.verificationUri, code.expiresAt, onCancel = service::cancelSignIn)
-            st.signedIn && !st.needsReauth -> {
-                Text(stringResource(R.string.hc_signed_in), style = MaterialTheme.typography.titleMedium)
-                Text(linkText(st.link, st.linkError?.let { stringResource(it.failure.labelRes) }, st.retryAt), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = service::signOut, modifier = Modifier.height(48.dp)) {
-                    Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.hc_sign_out))
-                }
-            }
-            else -> {
-                if (st.needsReauth) Text(stringResource(R.string.hc_reauth_explain), color = MaterialTheme.colorScheme.error)
-                else Text(stringResource(R.string.hc_signin_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = service::beginSignIn, enabled = service.canSignIn(clientId), modifier = Modifier.height(52.dp)) {
-                    Icon(Icons.Outlined.Login, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.hc_sign_in))
-                }
-                if (!service.canSignIn(clientId)) Text(stringResource(R.string.hc_signin_no_client), color = MaterialTheme.colorScheme.error)
+    val clientGroup: @Composable () -> Unit = {
+        Group(stringResource(R.string.hc_client_title), info = stringResource(R.string.hc_client_explain)) {
+            OutlinedTextField(id, { id = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.hc_client_id)) },
+                modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(), textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
+            OutlinedTextField(secret, { secret = it.trim() }, singleLine = true,
+                label = { Text(stringResource(if (service.hasClientSecret) R.string.hc_client_secret_set else R.string.hc_client_secret)) },
+                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth())
+            ActionPill(stringResource(R.string.action_save), primary = true, enabled = id.isNotBlank() && (id != clientId || secret.isNotBlank())) {
+                service.setClient(id, secret.ifBlank { null }); secret = ""
             }
         }
-        st.signInError?.let { Text(stringResource(R.string.hc_signin_failed, it), color = MaterialTheme.colorScheme.error) }
-        if (!clientVisible) TextButton(onClick = { showClient = true }) { Text(stringResource(R.string.hc_use_own_client)) }
     }
+    val needsClient = !service.hasBuiltInClient && clientId.isBlank()
+    if (needsClient) clientGroup()
 
-    if (st.signedIn) Group(stringResource(R.string.hc_usage_title)) {
-        Info(stringResource(R.string.hc_requests_today), stringResource(R.string.hc_requests_value, st.requestsToday, HcBudget.DAILY))
-        Info(stringResource(R.string.hc_appliances), st.appliances.joinToString(", ") { it.name }.ifBlank { "–" })
-        Text(stringResource(R.string.hc_usage_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val code = st.signIn
+    when {
+        code != null -> Group(stringResource(R.string.hc_account)) {
+            SignInCode(code.userCode, code.verificationUriComplete ?: code.verificationUri, code.verificationUri, code.expiresAt, onCancel = service::cancelSignIn)
+        }
+        st.signedIn && !st.needsReauth -> {
+            if (st.appliances.isNotEmpty()) Group(stringResource(R.string.hc_appliances)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    st.appliances.forEach { a ->
+                        Row(
+                            Modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(g.ink.copy(alpha = 0.06f)).padding(start = 6.dp, end = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(32.dp).clip(CircleShape).background(g.glassSolid), contentAlignment = Alignment.Center) {
+                                Icon(iconFor(a.type), null, Modifier.size(18.dp), tint = if (a.connected) g.ink else g.soft)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(a.name, color = if (a.connected) g.ink else g.soft, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                // Tageskontingent als Ring
+                Group(modifier = Modifier.weight(1f), info = stringResource(R.string.hc_usage_explain)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        UsageRing(st.requestsToday, HcBudget.DAILY)
+                        Column {
+                            Text(stringResource(R.string.hc_requests_today), color = g.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.hc_requests_value, st.requestsToday, HcBudget.DAILY), color = g.soft, fontSize = 14.sp)
+                        }
+                    }
+                }
+                Group(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        IconDisk(Icons.Outlined.AccountCircle, g.ink.copy(alpha = 0.07f), g.ink, 48)
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.hc_signed_in), color = g.ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text(linkText(st.link, st.linkError?.let { stringResource(it.failure.labelRes) }, st.retryAt), color = g.soft, fontSize = 13.sp, maxLines = 2)
+                        }
+                        ActionPill(stringResource(R.string.hc_sign_out), onClick = service::signOut)
+                    }
+                }
+            }
+        }
+        else -> Group(stringResource(R.string.hc_account), info = stringResource(R.string.hc_signin_explain)) {
+            if (st.needsReauth) Text(stringResource(R.string.hc_reauth_explain), color = Color(0xFFB3261E))
+            ActionPill(stringResource(R.string.hc_sign_in), Icons.Outlined.Login, primary = true, enabled = service.canSignIn(clientId), onClick = service::beginSignIn)
+            if (!service.canSignIn(clientId)) Text(stringResource(R.string.hc_signin_no_client), color = Color(0xFFB3261E))
+        }
+    }
+    st.signInError?.let { Text(stringResource(R.string.hc_signin_failed, it), color = Color(0xFFFFD2CC), modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)) }
+    if (!needsClient) Advanced { clientGroup() }
+}
+
+/** Anfragen heute als kleiner Ring (grün, ab 80 % gelb). */
+@Composable
+private fun UsageRing(used: Int, total: Int) {
+    val g = LocalGlass.current
+    val f = (used.toFloat() / total).coerceIn(0f, 1f)
+    Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = 9.dp.toPx()
+            drawCircle(g.ink.copy(alpha = 0.08f), size.minDimension / 2 - w / 2, style = Stroke(w))
+            if (f > 0f) drawArc(if (f < 0.8f) Color(0xFF7FD19A) else Color(0xFFFFBE6E), -90f, 360f * f, false,
+                topLeft = Offset(w / 2, w / 2), size = Size(size.width - w, size.height - w), style = Stroke(w, cap = StrokeCap.Round))
+        }
+        Text("$used", color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

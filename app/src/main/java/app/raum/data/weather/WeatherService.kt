@@ -55,12 +55,12 @@ fun interface WeatherHttp {
 }
 
 /** HTTPS über HttpURLConnection – keine zusätzliche Bibliothek. */
-class UrlConnectionHttp : WeatherHttp {
+class UrlConnectionHttp(private val timeoutMs: Int = 15_000) : WeatherHttp {
     override fun get(url: String, headers: Map<String, String>): HttpResponse {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
-            c.connectTimeout = 15_000
-            c.readTimeout = 15_000
+            c.connectTimeout = timeoutMs
+            c.readTimeout = timeoutMs
             headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
             val code = c.responseCode
             val body = if (code in 200..299) c.inputStream.bufferedReader().use { it.readText() } else null

@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Speaker
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,16 +52,16 @@ fun sonosSummary(service: SonosService = koinInject()): String {
 fun SonosSection(service: SonosService = koinInject()) {
     val st by service.state.collectAsStateWithLifecycle()
 
-    Group {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.sonos_enable), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Switch(checked = st.enabled, onCheckedChange = service::setEnabled)
-        }
-        Text(stringResource(R.string.sonos_settings_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ServiceHero(
+        Icons.Outlined.Speaker, Color(0xFFEDE7F6), Color(0xFF4A3A7A),
+        stringResource(R.string.settings_sonos), stringResource(R.string.sonos_hero_sub),
+        info = stringResource(R.string.sonos_settings_explain),
+    ) {
+        Seg(listOf(false to stringResource(R.string.state_off), true to stringResource(R.string.state_on)), st.enabled, Modifier.width(240.dp)) { service.setEnabled(it) }
     }
     if (!st.enabled) return
 
-    Group(stringResource(R.string.sonos_speakers_title)) {
+    Group(stringResource(R.string.sonos_speakers_title), trailing = { ActionPill(stringResource(R.string.sonos_rescan), Icons.Outlined.Refresh, onClick = service::rescan) }) {
         when {
             st.players.isNotEmpty() -> st.players.forEach { p ->
                 val group = st.groupOf(p.uuid)
@@ -72,47 +74,40 @@ fun SonosSection(service: SonosService = koinInject()) {
             }
             else -> Text(stringResource(R.string.sonos_none_found_text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (st.link == SonosLink.ERROR && st.players.isNotEmpty()) Text(stringResource(R.string.sonos_unreachable), color = MaterialTheme.colorScheme.error)
-        OutlinedButton(onClick = service::rescan, modifier = Modifier.height(48.dp)) {
-            Icon(Icons.Outlined.Refresh, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.sonos_rescan))
-        }
+        if (st.link == SonosLink.ERROR && st.players.isNotEmpty()) Text(stringResource(R.string.sonos_unreachable), color = Color(0xFFB3261E))
     }
 
-    Group(stringResource(R.string.sonos_manual_title)) {
-        Text(stringResource(R.string.sonos_manual_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        var manual by remember { mutableStateOf(service.manualHosts) }
-        manual.forEach { h ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(h, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                IconButton(onClick = { service.removeManualHost(h); manual = service.manualHosts }) { Icon(Icons.Outlined.Close, stringResource(R.string.action_remove)) }
-            }
-        }
-        var input by remember { mutableStateOf("") }
-        var invalid by remember { mutableStateOf(false) }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(
-                input, { input = it; invalid = false }, singleLine = true, isError = invalid,
-                placeholder = { Text("192.168.1.39") },
-                supportingText = if (invalid) { { Text(stringResource(R.string.sonos_manual_invalid)) } } else null,
-                modifier = Modifier.widthIn(max = 360.dp).weight(1f, fill = false),
-            )
-            FilledTonalButton(
-                onClick = { if (service.addManualHost(input)) { input = ""; manual = service.manualHosts } else invalid = true },
-                enabled = input.isNotBlank(), modifier = Modifier.height(56.dp),
-            ) { Text(stringResource(R.string.sonos_manual_add)) }
-        }
-    }
-
-    Group(stringResource(R.string.sonos_online_art_title)) {
-        val online by service.onlineArt.collectAsStateWithLifecycle()
+    val online by service.onlineArt.collectAsStateWithLifecycle()
+    Group(info = stringResource(R.string.sonos_online_art_explain)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.sonos_online_art), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Switch(checked = online, onCheckedChange = service::setOnlineArt)
+            GlassSwitch(online, onChange = service::setOnlineArt)
         }
-        Text(stringResource(R.string.sonos_online_art_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
-    Group(stringResource(R.string.sonos_ytm_title)) {
-        Text(stringResource(R.string.sonos_ytm_explain), style = MaterialTheme.typography.bodyMedium)
+    Advanced {
+        Group(stringResource(R.string.sonos_manual_title), info = stringResource(R.string.sonos_manual_explain)) {
+            var manual by remember { mutableStateOf(service.manualHosts) }
+            manual.forEach { h ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(h, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { service.removeManualHost(h); manual = service.manualHosts }) { Icon(Icons.Outlined.Close, stringResource(R.string.action_remove)) }
+                }
+            }
+            var input by remember { mutableStateOf("") }
+            var invalid by remember { mutableStateOf(false) }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    input, { input = it; invalid = false }, singleLine = true, isError = invalid,
+                    placeholder = { Text("192.168.1.39") },
+                    supportingText = if (invalid) { { Text(stringResource(R.string.sonos_manual_invalid)) } } else null,
+                    modifier = Modifier.widthIn(max = 360.dp).weight(1f, fill = false),
+                )
+                ActionPill(stringResource(R.string.sonos_manual_add), enabled = input.isNotBlank()) {
+                    if (service.addManualHost(input)) { input = ""; manual = service.manualHosts } else invalid = true
+                }
+            }
+        }
+        Group(stringResource(R.string.sonos_ytm_title), info = stringResource(R.string.sonos_ytm_explain)) {}
     }
 }

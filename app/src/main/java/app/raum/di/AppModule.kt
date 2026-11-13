@@ -72,8 +72,6 @@ import app.raum.thread.NetworkCredentialStore
 import app.raum.thread.NsdBorderRouterDiscovery
 import app.raum.thread.ThreadService
 import app.raum.ui.settings.ThreadViewModel
-import app.raum.homeconnect.DemoHomeConnect
-import app.raum.grohe.DemoGrohe
 import app.raum.grohe.GroheAuth
 import app.raum.grohe.GroheCloudBackend
 import app.raum.grohe.GrohePrefs
@@ -187,6 +185,8 @@ val appModule = module {
         )
     }
     single { CityIndex { androidContext().assets.open(CityIndex.ASSET) } }
+    // Ortssuche: online (Open-Meteo, nur der Suchbegriff) mit der eingebauten Liste als Rückfall
+    single { app.raum.data.geo.PlaceSearch(get(), UrlConnectionHttp(timeoutMs = 5_000), "raum-panel/${BuildConfig.VERSION_NAME}") }
     // Home Connect (Bosch/Siemens-Hausgeräte über die BSH-Cloud, freiwillig – ab Werk aus). Tokens im Keystore.
     single { HcPrefs(androidContext()) }
     single { HcAuth(KeystoreSecretStore(androidContext()), UrlConnectionHcHttp(), builtInSecret = BuildConfig.HC_CLIENT_SECRET) }
@@ -197,7 +197,7 @@ val appModule = module {
         GroheService(
             settings = GrohePrefs(androidContext()), auth = get(),
             cloud = GroheCloudBackend(get(), UrlConnectionHcHttp()),
-            demoFactory = { DemoGrohe() }, log = get(), strings = get(),
+            log = get(), strings = get(),
         )
     }
     single {
@@ -206,7 +206,6 @@ val appModule = module {
         HomeConnectService(
             settings = get<HcPrefs>(), auth = get(), budget = get(),
             cloud = HcCloudBackend(get(), UrlConnectionHcHttp(), get(), language),
-            demoFactory = { DemoHomeConnect(german = { locale.locale().language == "de" }) },
             language = language, log = get(), strings = get(), builtInClientId = BuildConfig.HC_CLIENT_ID,
         )
     }

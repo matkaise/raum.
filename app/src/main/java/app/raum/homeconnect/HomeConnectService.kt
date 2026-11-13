@@ -50,7 +50,7 @@ data class HomeConnectState(
     val requestsToday: Int = 0,
 ) {
     /** Seite „Haushalt“ zeigen? */
-    val active: Boolean get() = mode == HcMode.DEMO || (mode == HcMode.CLOUD && signedIn)
+    val active: Boolean get() = mode == HcMode.CLOUD && signedIn
     fun appliance(haId: String) = appliances.firstOrNull { it.haId == haId }
 }
 
@@ -71,7 +71,6 @@ class HomeConnectService(
     private val auth: HcAuth,
     private val budget: HcBudget,
     private val cloud: HcBackend,
-    private val demoFactory: () -> HcBackend,
     private val language: () -> String,
     private val log: EventLog,
     private val strings: Strings,
@@ -90,7 +89,6 @@ class HomeConnectService(
     private var scope: CoroutineScope? = null
     private var signInJob: Job? = null
     private var lastDiscovery: Instant? = null
-    private var demo: HcBackend? = null
 
     fun start(scope: CoroutineScope) {
         if (this.scope != null) return
@@ -101,7 +99,6 @@ class HomeConnectService(
                 .collectLatest { (mode, signedIn) ->
                     _state.update { it.copy(mode = mode, signedIn = signedIn, needsReauth = auth.needsReauth) }
                     val b = when (mode) {
-                        HcMode.DEMO -> demo ?: demoFactory().also { demo = it }
                         HcMode.CLOUD -> if (signedIn) cloud else null
                         HcMode.OFF -> null
                     }
@@ -306,8 +303,7 @@ class HomeConnectService(
 
     private fun loadCatalog() {
         val c = settings.catalogCache?.let { runCatching { HcJson.json.decodeFromString(Catalog.serializer(), it) }.getOrNull() }
-        // Demo: Programme kommen aus dem App-Code – nie aus dem Zwischenspeicher, sonst fehlen Neuerungen bis zu 24 h
-        catalog = c?.takeIf { it.language == language() && it.mode == settings.mode.value && it.mode != HcMode.DEMO }
+        catalog = c?.takeIf { it.language == language() && it.mode == settings.mode.value }
         _state.update { st -> st.copy(programs = catalog?.entries?.mapValues { it.value.programs }.orEmpty()) }
     }
 
@@ -655,7 +651,6 @@ class HomeConnectService(
         auth.clearAll()
         settings.clearAll()
         catalog = null
-        demo = null
         authVersion.value++
     }
 
@@ -686,7 +681,6 @@ class HomeConnectService(
 val HcMode.labelRes: Int
     get() = when (this) {
         HcMode.OFF -> R.string.hc_mode_off
-        HcMode.DEMO -> R.string.hc_mode_demo
         HcMode.CLOUD -> R.string.hc_mode_cloud
     }
 

@@ -94,7 +94,7 @@ class GroheTest {
     }
 
     private class MemSettings : GroheSettings {
-        override val mode = MutableStateFlow(GroheMode.DEMO)
+        override val mode = MutableStateFlow(GroheMode.CLOUD)
         override fun setMode(mode: GroheMode) { this.mode.value = mode }
         override fun clearAll() {}
     }
@@ -108,7 +108,9 @@ class GroheTest {
             override suspend fun dispense(device: GroheDevice, type: WaterType, ml: Int) { poured += type to ml }
             override suspend fun requestMeasurement(device: GroheDevice) {}
         }
-        val s = GroheService(MemSettings(), GroheAuth(InMemorySecretStore(), FakeHttp()), demo, { demo }, EventLog(), XmlStrings("de"))
+        // Angemeldet: gespeicherte Tokens, damit der Dienst das Backend benutzt
+        val store = InMemorySecretStore().apply { put("grohe_tokens", """{"access":"a","refresh":"r","expiresAtMs":${Long.MAX_VALUE}}""".toByteArray()) }
+        val s = GroheService(MemSettings(), GroheAuth(store, FakeHttp()), demo, EventLog(), XmlStrings("de"))
         s.start(backgroundScope)
         runCurrent()
         assertEquals(1, s.state.value.devices.size)

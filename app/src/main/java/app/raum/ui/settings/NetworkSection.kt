@@ -92,14 +92,8 @@ fun NetworkPanel(
                 else -> Icons.Outlined.WifiOff
             }
             val connected = status.ethernet || status.wifiConnected
-            Box(
-                Modifier.size(64.dp).clip(CircleShape)
-                    .background(if (connected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, null, Modifier.size(32.dp),
-                    tint = if (connected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onErrorContainer)
-            }
+            IconDisk(icon, if (connected) androidx.compose.ui.graphics.Color(0xFFE9FBEF) else androidx.compose.ui.graphics.Color(0xFFFDE2DF),
+                if (connected) androidx.compose.ui.graphics.Color(0xFF2F6B45) else androidx.compose.ui.graphics.Color(0xFFB3261E), 64)
             Spacer(Modifier.width(20.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -114,19 +108,14 @@ fun NetworkPanel(
             }
             val ssid = status.ssid
             if (status.wifiConnected && ssid != null && net.canManage) {
-                OutlinedButton(onClick = { forget(ssid) }, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.net_forget)) }
+                ActionPill(stringResource(R.string.net_forget)) { forget(ssid) }
             }
         }
     }
 
     // WLAN
-    Group(stringResource(R.string.net_wifi)) {
-        if (net.canManage) {
-            Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.net_wifi), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                Switch(checked = status.wifiEnabled, onCheckedChange = { net.setWifiEnabled(it); if (it) net.scan() })
-            }
-        } else {
+    Group(stringResource(R.string.net_wifi), trailing = if (net.canManage) { { GlassSwitch(status.wifiEnabled) { net.setWifiEnabled(it); if (it) net.scan() } } } else null) {
+        if (!net.canManage) {
             Text(stringResource(R.string.net_manage_requires_owner), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FilledTonalButton(onClick = {
                 activity?.startActivity(Intent(Settings.Panel.ACTION_WIFI))

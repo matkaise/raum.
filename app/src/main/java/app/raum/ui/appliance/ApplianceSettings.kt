@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.raum.platform.display.SleepAction
 import app.raum.ui.components.SectionHeader
+import app.raum.ui.theme.LocalGlass
+import app.raum.ui.theme.glass
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 private val SLEEP_OPTIONS = listOf(30, 60, 120, 300, 600, null)
 
@@ -50,9 +53,12 @@ private fun sleepLabel(seconds: Int?): String = when {
 
 @Composable
 private fun SettingsSurface(content: @Composable () -> Unit) {
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
-    }
+    // Glaskarte wie die übrigen Einstellungen
+    val g = LocalGlass.current
+    Column(
+        Modifier.fillMaxWidth().padding(bottom = 14.dp).glass(RoundedCornerShape(28.dp), g.glass, g.edge).padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) { content() }
 }
 
 @Composable

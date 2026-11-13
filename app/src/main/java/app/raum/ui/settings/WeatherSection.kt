@@ -88,12 +88,11 @@ fun WeatherSection(state: HomeUiState, vm: SettingsViewModel, onOpenRegion: () -
     val scope = rememberCoroutineScope()
     val zone = ZoneId.systemDefault()
 
-    Group {
+    Group(info = stringResource(R.string.weather_explain_short)) {
         Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.weather_show), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Switch(checked = enabled, onCheckedChange = vm::setWeatherEnabled)
+            GlassSwitch(enabled, onChange = vm::setWeatherEnabled)
         }
-        Text(stringResource(R.string.weather_explain_short), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (enabled && location == null) {
             Text(stringResource(R.string.weather_needs_location), color = MaterialTheme.colorScheme.error)
             FilledTonalButton(onClick = onOpenRegion, modifier = Modifier.height(48.dp)) {
