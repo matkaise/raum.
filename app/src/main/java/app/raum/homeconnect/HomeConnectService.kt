@@ -306,7 +306,8 @@ class HomeConnectService(
 
     private fun loadCatalog() {
         val c = settings.catalogCache?.let { runCatching { HcJson.json.decodeFromString(Catalog.serializer(), it) }.getOrNull() }
-        catalog = c?.takeIf { it.language == language() && it.mode == settings.mode.value }
+        // Demo: Programme kommen aus dem App-Code – nie aus dem Zwischenspeicher, sonst fehlen Neuerungen bis zu 24 h
+        catalog = c?.takeIf { it.language == language() && it.mode == settings.mode.value && it.mode != HcMode.DEMO }
         _state.update { st -> st.copy(programs = catalog?.entries?.mapValues { it.value.programs }.orEmpty()) }
     }
 
@@ -665,7 +666,7 @@ class HomeConnectService(
         private const val START_RETRY_MS = 1_500L
         /** Einheiten bekannter Optionen – falls das Gerät sie nicht meldet (Mikrowelle im Standby: keine Optionsdetails). */
         private val DEFAULT_UNITS = mapOf(
-            HcKeys.DURATION to "seconds", HcKeys.START_IN_RELATIVE to "seconds",
+            HcKeys.DURATION to "seconds", HcKeys.START_IN_RELATIVE to "seconds", HcKeys.FINISH_IN_RELATIVE to "seconds",
             HcKeys.OVEN_SETPOINT to "°C", HcKeys.COFFEE_FILL to "ml",
         )
         private const val MAX_DRINKS = 4

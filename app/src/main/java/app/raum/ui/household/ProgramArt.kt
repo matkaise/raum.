@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -77,7 +76,8 @@ fun ProgramCarousel(cards: List<ProgramCardSpec>, selectedKey: String, enabled: 
                     .clickable(enabled = enabled) { onPick(c.key) }.padding(14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
             ) {
-                Canvas(Modifier.fillMaxWidth().aspectRatio(1.2f).clip(RoundedCornerShape(16.dp))) { c.art(this) }
+                // Illustration nimmt die Höhe, die der Name übrig lässt – Karten passen so in jede Spaltenhöhe
+                Canvas(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(16.dp))) { c.art(this) }
                 Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) {
                     Text(c.name, color = fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, lineHeight = 19.sp,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -264,4 +264,158 @@ fun microwaveArt(programKey: String): DrawScope.() -> Unit = {
         }
         drawPath(p, accent)
     } else drawCircle(accent, 5.dp.toPx(), c)
+}
+
+// --- Wäsche ---------------------------------------------------------------------------------------
+
+private val Cloth = Color(0xFFF2F0EA)
+
+/** Bullauge-Hintergrund: dunkler Trommelraum; Waschen mit Wasser unten, Trocknen mit Wärmewellen. */
+private fun DrawScope.drumRoom(dryer: Boolean) {
+    drawRect(Brush.verticalGradient(listOf(Color(0xFF42526E), Color(0xFF151B29))))
+    if (!dryer) {
+        val y = size.height * 0.78f
+        drawRect(Brush.verticalGradient(listOf(Color(0x5A8CC8FF), Color(0x8C468CE6)), startY = y, endY = size.height), Offset(0f, y), Size(size.width, size.height - y))
+    } else {
+        listOf(0.2f, 0.8f).forEach { fx ->
+            val x = size.width * fx
+            val p = Path().apply { moveTo(x, size.height * 0.85f); cubicTo(x - 6.dp.toPx(), size.height * 0.72f, x + 6.dp.toPx(), size.height * 0.6f, x, size.height * 0.48f) }
+            drawPath(p, GlowHot.copy(alpha = 0.55f), style = Stroke(2.5f * density, cap = StrokeCap.Round))
+        }
+    }
+}
+
+private fun DrawScope.tshirt(c: Offset, s: Float, color: Color = Cloth) {
+    val p = Path().apply {
+        moveTo(c.x - s * 0.22f, c.y - s * 0.5f); lineTo(c.x - s * 0.55f, c.y - s * 0.32f); lineTo(c.x - s * 0.42f, c.y - s * 0.08f)
+        lineTo(c.x - s * 0.3f, c.y - s * 0.14f); lineTo(c.x - s * 0.3f, c.y + s * 0.5f); lineTo(c.x + s * 0.3f, c.y + s * 0.5f)
+        lineTo(c.x + s * 0.3f, c.y - s * 0.14f); lineTo(c.x + s * 0.42f, c.y - s * 0.08f); lineTo(c.x + s * 0.55f, c.y - s * 0.32f)
+        lineTo(c.x + s * 0.22f, c.y - s * 0.5f); quadraticTo(c.x, c.y - s * 0.32f, c.x - s * 0.22f, c.y - s * 0.5f); close()
+    }
+    drawPath(p, color)
+}
+
+private fun DrawScope.shirt(c: Offset, s: Float) {
+    tshirt(c, s, Color.White)
+    // Kragen und Knopfleiste
+    val dark = Color(0xFF6C93C9)
+    drawLine(dark, Offset(c.x, c.y - s * 0.36f), Offset(c.x, c.y + s * 0.48f), 2.dp.toPx())
+    repeat(3) { i -> drawCircle(dark, 2.dp.toPx(), Offset(c.x + 4.dp.toPx(), c.y - s * 0.15f + i * s * 0.2f)) }
+    drawLine(dark, Offset(c.x - s * 0.22f, c.y - s * 0.5f), Offset(c.x, c.y - s * 0.3f), 2.dp.toPx(), StrokeCap.Round)
+    drawLine(dark, Offset(c.x + s * 0.22f, c.y - s * 0.5f), Offset(c.x, c.y - s * 0.3f), 2.dp.toPx(), StrokeCap.Round)
+}
+
+private fun DrawScope.pants(c: Offset, s: Float, color: Color = Color(0xFF5B7DB8)) {
+    val p = Path().apply {
+        moveTo(c.x - s * 0.32f, c.y - s * 0.5f); lineTo(c.x + s * 0.32f, c.y - s * 0.5f); lineTo(c.x + s * 0.36f, c.y + s * 0.5f)
+        lineTo(c.x + s * 0.06f, c.y + s * 0.5f); lineTo(c.x, c.y - s * 0.12f); lineTo(c.x - s * 0.06f, c.y + s * 0.5f)
+        lineTo(c.x - s * 0.36f, c.y + s * 0.5f); close()
+    }
+    drawPath(p, color)
+    drawLine(Color.White.copy(alpha = 0.5f), Offset(c.x - s * 0.32f, c.y - s * 0.38f), Offset(c.x + s * 0.32f, c.y - s * 0.38f), 2.dp.toPx())
+}
+
+private fun DrawScope.leaf(c: Offset, s: Float) {
+    val p = Path().apply {
+        moveTo(c.x - s * 0.4f, c.y + s * 0.4f)
+        cubicTo(c.x - s * 0.45f, c.y - s * 0.3f, c.x + s * 0.1f, c.y - s * 0.5f, c.x + s * 0.45f, c.y - s * 0.45f)
+        cubicTo(c.x + s * 0.45f, c.y + s * 0.1f, c.x + s * 0.1f, c.y + s * 0.45f, c.x - s * 0.4f, c.y + s * 0.4f); close()
+    }
+    drawPath(p, Color(0xFF8FC9A3))
+    drawLine(Color(0xFF2E8B4E), Offset(c.x - s * 0.4f, c.y + s * 0.4f), Offset(c.x + s * 0.25f, c.y - s * 0.25f), 2.5f * density, StrokeCap.Round)
+}
+
+private fun DrawScope.yarn(c: Offset, s: Float) {
+    val r = s * 0.42f
+    drawCircle(Color(0xFFE8A0B4), r, c)
+    val line = Color(0xFFB85C7A)
+    listOf(-0.5f, 0f, 0.5f).forEach { k ->
+        drawArc(line, 200f, 140f, false, Offset(c.x - r + k * r * 0.5f, c.y - r), Size(r * 2, r * 2), style = Stroke(2.dp.toPx()))
+    }
+    drawLine(line, c + Offset(r * 0.7f, r * 0.7f), c + Offset(r * 1.25f, r * 1.05f), 2.5f * density, StrokeCap.Round)
+}
+
+private fun DrawScope.feather(c: Offset, s: Float) {
+    val p = Path().apply {
+        moveTo(c.x - s * 0.35f, c.y + s * 0.45f)
+        cubicTo(c.x - s * 0.3f, c.y - s * 0.2f, c.x + s * 0.1f, c.y - s * 0.5f, c.x + s * 0.4f, c.y - s * 0.5f)
+        cubicTo(c.x + s * 0.35f, c.y - s * 0.1f, c.x, c.y + s * 0.3f, c.x - s * 0.35f, c.y + s * 0.45f); close()
+    }
+    drawPath(p, Cloth.copy(alpha = 0.9f))
+    drawLine(Color(0xFFAEB7C2), Offset(c.x - s * 0.42f, c.y + s * 0.52f), Offset(c.x + s * 0.3f, c.y - s * 0.4f), 2.dp.toPx(), StrokeCap.Round)
+}
+
+private fun DrawScope.towels(c: Offset, s: Float) {
+    listOf(Color(0xFFF4C04E), Color(0xFF8FC9A3), Color(0xFF6C93C9)).forEachIndexed { i, col ->
+        val y = c.y + s * 0.3f - i * s * 0.26f
+        drawRoundRect(col, Offset(c.x - s * 0.45f, y - s * 0.12f), Size(s * 0.9f, s * 0.24f), androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()))
+    }
+}
+
+private fun DrawScope.stopwatch(c: Offset, s: Float) {
+    val r = s * 0.4f
+    drawCircle(Cloth, r, c, style = Stroke(4.dp.toPx()))
+    drawLine(Cloth, Offset(c.x, c.y - r), Offset(c.x, c.y - r - 6.dp.toPx()), 4.dp.toPx(), StrokeCap.Round)
+    drawLine(GlowHot, c, c + Offset(r * 0.45f, -r * 0.45f), 3.dp.toPx(), StrokeCap.Round)
+    drawCircle(GlowHot, 3.dp.toPx(), c)
+}
+
+private fun DrawScope.drops(c: Offset, s: Float) {
+    listOf(Offset(-0.25f, 0.1f), Offset(0.2f, -0.15f), Offset(0.25f, 0.3f)).forEach { o ->
+        val p0 = c + Offset(o.x * s, o.y * s)
+        val r = s * 0.14f
+        val p = Path().apply {
+            moveTo(p0.x, p0.y - r * 1.8f); cubicTo(p0.x + r * 1.2f, p0.y - r * 0.2f, p0.x + r, p0.y + r, p0.x, p0.y + r)
+            cubicTo(p0.x - r, p0.y + r, p0.x - r * 1.2f, p0.y - r * 0.2f, p0.x, p0.y - r * 1.8f); close()
+        }
+        drawPath(p, Cold)
+    }
+}
+
+private fun DrawScope.spiral(c: Offset, s: Float) {
+    val p = Path()
+    var first = true
+    for (i in 0..60) {
+        val t = i / 60f * 4 * Math.PI.toFloat()
+        val r = s * 0.06f + s * 0.36f * i / 60f
+        val pt = c + Offset(kotlin.math.cos(t) * r, kotlin.math.sin(t) * r)
+        if (first) { p.moveTo(pt.x, pt.y); first = false } else p.lineTo(pt.x, pt.y)
+    }
+    drawPath(p, Cloth, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+}
+
+private fun DrawScope.sparkle(c: Offset, s: Float) {
+    listOf(Triple(0f, 0f, 0.36f), Triple(-0.32f, 0.28f, 0.16f), Triple(0.34f, -0.3f, 0.14f)).forEach { (dx, dy, k) ->
+        val p0 = c + Offset(dx * s, dy * s); val r = k * s
+        val p = Path().apply {
+            moveTo(p0.x, p0.y - r); quadraticTo(p0.x, p0.y, p0.x + r, p0.y); quadraticTo(p0.x, p0.y, p0.x, p0.y + r)
+            quadraticTo(p0.x, p0.y, p0.x - r, p0.y); quadraticTo(p0.x, p0.y, p0.x, p0.y - r); close()
+        }
+        drawPath(p, Color(0xFFFFF3C4))
+    }
+}
+
+/** Illustration je Wasch- bzw. Trockenprogramm (nach Stichworten im Schlüssel, z. B. „Cotton“, „Wool“, „Super15“). */
+fun laundryArt(programKey: String, dryer: Boolean): DrawScope.() -> Unit = {
+    val t = (enumTail(programKey) ?: programKey).lowercase()
+    drumRoom(dryer)
+    val c = Offset(size.width / 2, size.height * 0.46f)
+    val s = size.minDimension * 0.62f
+    when {
+        "eco" in t -> leaf(c, s)
+        "wool" in t -> yarn(c, s)
+        "jeans" in t || "dark" in t -> pants(c, s)
+        "shirt" in t || "blouse" in t || "business" in t -> shirt(c, s)
+        "towel" in t -> towels(c, s)
+        "delicate" in t || "silk" in t || "dessous" in t || "down" in t || "feather" in t || "sensitive" in t || "chiffon" in t -> feather(c, s)
+        "super" in t || "speed" in t || "quick" in t || "express" in t || "time" in t || "15" in t -> stopwatch(c, s)
+        "rinse" in t -> drops(c, s)
+        "spin" in t || "drain" in t -> spiral(c, s)
+        "drumclean" in t || "hygiene" in t || "clean" in t || "refresh" in t || "allergy" in t -> sparkle(c, s)
+        "sport" in t || "outdoor" in t || "waterproof" in t -> tshirt(c, s, Color(0xFF8FC9A3))
+        "synthetic" in t || "easycare" in t -> tshirt(c, s, Color(0xFF6C93C9))
+        "mix" in t -> { tshirt(c + Offset(-s * 0.18f, s * 0.05f), s * 0.8f, Color(0xFFE86A5B)); tshirt(c + Offset(s * 0.18f, -s * 0.05f), s * 0.8f) }
+        "blanket" in t || "duvet" in t || "pillow" in t || "curtain" in t || "plush" in t -> towels(c, s)
+        else -> tshirt(c, s)
+    }
 }

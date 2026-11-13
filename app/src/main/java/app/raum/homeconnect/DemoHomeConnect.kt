@@ -79,6 +79,8 @@ class DemoHomeConnect(private val german: () -> Boolean, private val clock: Cloc
         "LaundryCare.Washer.Program.$key", t(de, en), listOf(
             enumOpt(HcKeys.WASHER_TEMP, "Temperatur", "Temperature", "LaundryCare.Washer.EnumType.Temperature", washerTemps.take(temps), temp),
             enumOpt(HcKeys.WASHER_SPIN, "Schleudern", "Spin speed", "LaundryCare.Washer.EnumType.SpinSpeed", spins, spin),
+            // Wie echte Geräte: „fertig in“, frühestens nach der Programmdauer
+            HcOptionDef(HcKeys.FINISH_IN_RELATIVE, t("Fertig in", "Finish in"), "Int", "seconds", 2.5 * 3600, 86_340.0, 60.0, default = n(9000)),
         ), detailed = true,
     )
 
@@ -87,6 +89,7 @@ class DemoHomeConnect(private val german: () -> Boolean, private val clock: Cloc
             enumOpt(HcKeys.DRYER_TARGET, "Trockenziel", "Drying target", "LaundryCare.Dryer.EnumType.DryingTarget",
                 listOf("IronDry" to ("Bügeltrocken" to "Iron dry"), "CupboardDry" to ("Schranktrocken" to "Cupboard dry"),
                     "CupboardDryPlus" to ("Schrank +" to "Cupboard +"), "ExtraDry" to ("Extratrocken" to "Extra dry")), "CupboardDry"),
+            HcOptionDef(HcKeys.FINISH_IN_RELATIVE, t("Fertig in", "Finish in"), "Int", "seconds", 2.0 * 3600, 86_340.0, 60.0, default = n(7200)),
         ), detailed = true,
     )
 

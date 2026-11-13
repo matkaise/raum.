@@ -124,6 +124,13 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
     fun set(o: HcOptionDef, v: JsonPrimitive) { program?.let { choices[it.key] = choices[it.key].orEmpty() + (o.key to v) } }
     // Startzeit als Uhrzeit statt als Abstand – „23:30“ bleibt 23:30, auch wenn man erst später auf Start tippt
     var startAt by remember(a.haId) { mutableStateOf<Instant?>(null) }
+    // Waschen/Trocknen: Wunschzeit fürs Ende („fertig um“), ebenfalls als Uhrzeit
+    var finishAt by remember(a.haId) { mutableStateOf<Instant?>(null) }
+    val laundry = a.type != HcType.DISHWASHER
+    val finishDef = program?.option(HcKeys.FINISH_IN_RELATIVE)?.takeIf { laundry }
+    // Frühestes Ende = Programmdauer (Grenze bzw. Standardwert des Geräts)
+    val finishMin = finishDef?.let { maxOf(it.min ?: 0.0, it.default?.doubleOrNull ?: 0.0).toLong() } ?: 0L
+    val finishMax = finishDef?.max?.toLong() ?: 86_340L
 
     val remaining = a.remainingSeconds(now)
     val p = when {
@@ -145,7 +152,22 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
             Spacer(Modifier.weight(1f))
             // Drehring um das Gerät: im Leerlauf Programmwahl (Rasten je Programm), im Betrieb Fortschritt
             val idx = programs.indexOfFirst { it.key == program?.key }.coerceAtLeast(0)
-            Box(Modifier.alpha(if (offline) 0.4f else 1f)) {
+            if (laundry && editable) {
+                val drum: @Composable () -> Unit = {
+                    DrumVisual(0f, ringColor, running = false, fast = false, water = false, dryer = a.type == HcType.DRYER, diameter = 190.dp, frame = false)
+                }
+                if (finishDef != null) {
+                    TimeRing(
+                        now, finishAt?.takeIf { it.isAfter(now.plusSeconds(finishMin + 59)) }, accent, enabled = !busy, onClear = { finishAt = null },
+                        ringSize = 330.dp, minSeconds = finishMin, centerContent = drum,
+                    ) { t -> finishAt = snapFinish(t, now, finishMin, finishMax) }
+                } else {
+                    // Gerät meldet kein „fertig in“ (z. B. ohne Fernstart) – dann nur die Trommel, kein leerer Ring
+                    Box(Modifier.size(330.dp), contentAlignment = Alignment.Center) {
+                        DrumVisual(0f, ringColor, running = false, fast = false, water = false, dryer = a.type == HcType.DRYER, diameter = 250.dp, frame = false)
+                    }
+                }
+            } else Box(Modifier.alpha(if (offline) 0.4f else 1f)) {
                 DetentDial(
                     count = programs.size, index = idx, progress = if (editable) null else p, ring = ringColor, dashed = waiting,
                     enabled = editable && !busy && programs.isNotEmpty(), onPick = { i -> programs.getOrNull(i)?.let { selKey = it.key } },
@@ -158,6 +180,20 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
                 Text(program.name, color = g.ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.padding(top = 14.dp))
                 if (!program.available) Text(stringResource(R.string.hc_program_unavailable_short), color = g.warn, fontSize = 13.sp, maxLines = 1)
             }
+            if (laundry && editable && finishDef != null) {
+                // Ende: gewählte Uhrzeit oder – ohne Wahl – jetzt plus Programmdauer
+                val at = finishAt?.takeIf { it.isAfter(now.plusSeconds(finishMin + 59)) }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.hc_finish_at, hm(at ?: now.plusSeconds(finishMin))).uppercase(),
+                        color = if (at != null) g.ink else g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp, maxLines = 1,
+                    )
+                    if (at != null) Box(
+                        Modifier.height(30.dp).clip(RoundedCornerShape(15.dp)).background(g.chip).clickable(enabled = !busy) { finishAt = null }.padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(stringResource(R.string.hc_asap), color = g.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                }
+            }
             val stateLabel = when {
                 offline -> stringResource(R.string.hc_status_offline)
                 waiting -> stringResource(R.string.hc_state_delayed)
@@ -168,9 +204,11 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
                 !a.poweredOn -> stringResource(if (a.power == "Standby") R.string.hc_status_standby else R.string.hc_status_off)
                 else -> stringResource(R.string.hc_status_ready)
             }
-            Text(stateLabel.uppercase(), color = if (finished) (if (g.dark) HcColors.Done else HcColors.DoneInk) else g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            val planning = laundry && editable && finishDef != null
+            // Beim Planen nur „fertig seit …“ zeigen, sonst steht der Zustand ohnehin oben im Tab
+            if (!planning || finished) Text(stateLabel.uppercase(), color = if (finished) (if (g.dark) HcColors.Done else HcColors.DoneInk) else g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.4.sp, maxLines = 1, modifier = Modifier.padding(top = if (editable) 4.dp else 14.dp))
-            if (active || finished) {
+            if (active || (finished && !planning)) {
                 val startAt = a.delayedStartAt()
                 val big = when {
                     waiting -> startAt?.let(::hm) ?: "–"
@@ -209,6 +247,14 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
                             }
                             .verticalScroll(scroll),
                     ) {
+                        if (laundry) {
+                            // Programme als illustrierte Karten – bei 15+ Programmen findet man so, was man sucht
+                            SectionLabel(stringResource(R.string.hc_program))
+                            ProgramCarousel(
+                                programs.map { ProgramCardSpec(it.key, it.name, it.available, laundryArt(it.key, dryer = a.type == HcType.DRYER)) }, program.key,
+                                enabled = !busy, Modifier.fillMaxWidth().height(214.dp),
+                            ) { selKey = it }
+                        }
                         OptionGroups(program, ::value, ::set, enabled = !busy, now = now, startAt = startAt, accent = accent) { startAt = it }
                         Spacer(Modifier.height(12.dp))
                     }
@@ -260,9 +306,17 @@ fun ColumnScope.LaundryPanel(a: HcAppliance, programs: List<HcProgram>, vm: Hous
                             val opts = program.options.mapNotNull { o -> value(o)?.let { o.key to it } }.toMap()
                                 .filterKeys { it != HcKeys.START_IN_RELATIVE }
                                 .let { m -> if (delay > 0 && delayDef != null) m + (delayDef.key to (delayDef.fit(JsonPrimitive(delay)) ?: JsonPrimitive(delay))) else m }
-                            val label = if (delay > 0) stringResource(R.string.hc_start_at, program.name, hm(startAt!!))
+                                // „Fertig um“ nur senden, wenn gewählt – sonst startet das Gerät sofort
+                                .filterKeys { it != HcKeys.FINISH_IN_RELATIVE }
+                                .let { m ->
+                                    val f = finishAt?.let { java.time.Duration.between(now, it).seconds }?.takeIf { finishDef != null && it > finishMin + 59 }
+                                    if (f != null) m + (finishDef!!.key to (finishDef.fit(JsonPrimitive(f)) ?: JsonPrimitive(f))) else m
+                                }
+                            val finishSel = finishAt?.takeIf { finishDef != null && it.isAfter(now.plusSeconds(finishMin + 59)) }
+                            val label = if (finishSel != null) stringResource(R.string.hc_start_finish, program.name, hm(finishSel))
+                            else if (delay > 0) stringResource(R.string.hc_start_at, program.name, hm(startAt!!))
                             else stringResource(R.string.hc_start, program.name)
-                            ActionButton(label, if (delay > 0) Icons.Outlined.Schedule else Icons.Outlined.PlayArrow,
+                            ActionButton(label, if (delay > 0 || finishSel != null) Icons.Outlined.Schedule else Icons.Outlined.PlayArrow,
                                 if (ok) accent else g.chip, if (ok) HcColors.OnAccent else g.soft, Modifier.weight(1f), height = 64.dp,
                                 enabled = ok && !busy && program.detailed) { vm.start(a.haId, program.key, opts) }
                         }
@@ -343,6 +397,15 @@ private fun OptionGroups(program: HcProgram, value: (HcOptionDef) -> JsonPrimiti
     if (delayDef != null) StartTimePicker(now, startAt, (delayDef.max ?: 86_340.0).toLong(), enabled, accent, onStartAt)
 }
 
+/** „Fertig um“: auf Viertelstunden, nicht vor Ende der Programmdauer (sonst sofort), nicht über die Grenze. */
+private fun snapFinish(t: Instant, now: Instant, minSeconds: Long, maxSeconds: Long): Instant? {
+    val earliest = now.plusSeconds(minSeconds)
+    if (t.isBefore(earliest.plusSeconds(QUARTER / 2))) return null
+    val s = Instant.ofEpochSecond((t.epochSecond + QUARTER / 2) / QUARTER * QUARTER)
+    val limit = Instant.ofEpochSecond((now.epochSecond + maxSeconds) / QUARTER * QUARTER)
+    return if (s.isAfter(limit)) limit else if (!s.isAfter(earliest.plusSeconds(59))) null else s
+}
+
 /** Raster der Startzeit: Viertelstunden auf der Uhr. */
 private const val QUARTER = 900L
 private const val DAY = 86_400L
@@ -377,7 +440,10 @@ private fun StartTimePicker(now: Instant, startAt: Instant?, maxSeconds: Long, e
 
 /** 24-Stunden-Ring ab jetzt (oben), im Uhrzeigersinn. */
 @Composable
-private fun TimeRing(now: Instant, at: Instant?, accent: Color, enabled: Boolean, onClear: () -> Unit, onPick: (Instant) -> Unit) {
+private fun TimeRing(
+    now: Instant, at: Instant?, accent: Color, enabled: Boolean, onClear: () -> Unit,
+    ringSize: androidx.compose.ui.unit.Dp = 250.dp, minSeconds: Long = 0, centerContent: (@Composable () -> Unit)? = null, onPick: (Instant) -> Unit,
+) {
     val g = LocalGlass.current
     val zone = ZoneId.systemDefault()
     val measurer = rememberTextMeasurer()
@@ -397,7 +463,7 @@ private fun TimeRing(now: Instant, at: Instant?, accent: Color, enabled: Boolean
     val off = at?.let { java.time.Duration.between(now, it).seconds } ?: 0L
     val sweep by animateFloatAsState(off / DAY.toFloat() * 360f, tween(120), label = "sweep")
     Box(
-        Modifier.size(250.dp)
+        Modifier.size(ringSize)
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures { p -> pick(base.plusSeconds(offsetAt(p, size))) }
@@ -431,16 +497,19 @@ private fun TimeRing(now: Instant, at: Instant?, accent: Color, enabled: Boolean
             }
             // Jetzt-Marke oben
             drawCircle(accent, 4.dp.toPx(), Offset(center.x, center.y - r))
-            if (at != null) {
-                drawArc(accent, -90f, sweep, false, tl, sz, style = Stroke(w, cap = StrokeCap.Round))
-                val ang = Math.toRadians((-90f + sweep).toDouble())
+            // Programmdauer ab jetzt: so früh kann es frühestens fertig sein
+            if (minSeconds > 0) drawArc(accent.copy(alpha = 0.35f), -90f, minSeconds / DAY.toFloat() * 360f, false, tl, sz, style = Stroke(w, cap = StrokeCap.Round))
+            if (at != null || minSeconds > 0) {
+                if (at != null) drawArc(accent, -90f, sweep, false, tl, sz, style = Stroke(w, cap = StrokeCap.Round))
+                val knobSweep = if (at != null) sweep else minSeconds / DAY.toFloat() * 360f
+                val ang = Math.toRadians((-90f + knobSweep).toDouble())
                 val k = center + Offset(cos(ang).toFloat(), sin(ang).toFloat()) * r
                 drawCircle(Color.Black.copy(alpha = 0.22f), 15.dp.toPx(), k + Offset(0f, 2.dp.toPx()))
                 drawCircle(Color.White, 14.dp.toPx(), k)
                 drawCircle(accent, 6.dp.toPx(), k)
             }
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (centerContent != null) centerContent() else Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(at?.let(::hm) ?: stringResource(R.string.hc_now), color = if (at != null) g.ink else g.soft, fontSize = 34.sp, fontWeight = FontWeight.Light, maxLines = 1)
             Text(
                 at?.let { stringResource(R.string.hc_start_in, hmDuration(java.time.Duration.between(now, it).seconds)) } ?: stringResource(R.string.hc_ring_hint),

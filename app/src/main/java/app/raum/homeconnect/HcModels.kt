@@ -26,6 +26,8 @@ object HcKeys {
     const val ELAPSED = "BSH.Common.Option.ElapsedProgramTime"
     const val DURATION = "BSH.Common.Option.Duration"
     const val START_IN_RELATIVE = "BSH.Common.Option.StartInRelative"
+    /** Waschen/Trocknen: „fertig in“ statt „Start in“ – Mindestwert ist die Programmdauer. */
+    const val FINISH_IN_RELATIVE = "BSH.Common.Option.FinishInRelative"
     const val PROGRAM_FINISHED = "BSH.Common.Event.ProgramFinished"
     const val PROGRAM_ABORTED = "BSH.Common.Event.ProgramAborted"
     const val PAUSE = "BSH.Common.Command.PauseProgram"

@@ -1382,6 +1382,9 @@
     <string name="hc_starts_at">Startet um %1$s · in %2$s Std</string>
     <string name="hc_quarter_steps">15 Minuten</string>
     <string name="hc_ring_hint">am Ring ziehen</string>
+    <string name="hc_finish_at">Fertig um %1$s</string>
+    <string name="hc_asap">Sofort</string>
+    <string name="hc_start_finish">%1$s starten · fertig um %2$s</string>
     <string name="hc_ring_explain">Am Ring die Uhrzeit ziehen oder antippen. Ganz oben ist jetzt.</string>
     <string name="hc_state_delayed">Startzeitvorwahl</string>
     <string name="hc_state_running">Läuft · %1$s</string>
