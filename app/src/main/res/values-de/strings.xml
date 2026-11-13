@@ -1602,4 +1602,47 @@
     </plurals>
     <string name="hc_all_quiet">Alles ruhig</string>
     <string name="hc_choose_appliance">Gerät wählen</string>
+    <string name="history_title">Verlauf</string>
+    <string name="quick_select">Schnellwahl</string>
+    <string name="detail_state">Zustand</string>
+    <string name="light_preset_night">Nachtlicht</string>
+    <string name="light_preset_dim">Gedimmt</string>
+    <string name="light_preset_bright">Hell</string>
+    <string name="light_preset_full">Voll</string>
+    <string name="hue_red">Rot</string>
+    <string name="hue_orange">Orange</string>
+    <string name="hue_yellow">Gelb</string>
+    <string name="hue_green">Grün</string>
+    <string name="hue_turquoise">Türkis</string>
+    <string name="hue_blue">Blau</string>
+    <string name="hue_violet">Violett</string>
+    <string name="hue_pink">Pink</string>
+    <string name="light_darker">Dunkler</string>
+    <string name="light_brighter">Heller</string>
+    <string name="light_warmer">Wärmer</string>
+    <string name="light_cooler">Kälter</string>
+    <string name="light_hue_prev">Farbton zurück</string>
+    <string name="light_hue_next">Farbton weiter</string>
+    <string name="light_tab_white">Weißton</string>
+    <string name="light_pastel">Pastell</string>
+    <string name="light_vivid">Kräftig</string>
+    <string name="light_not_dimmable">Nicht dimmbar</string>
+    <string name="detail_hint_brightness">Am Ring ziehen dimmt · Weißton und Farbe bleiben, wie sie sind</string>
+    <string name="detail_hint_white">Am Ring ziehen ändert nur den Weißton · −/+ in 100-K-Schritten</string>
+    <string name="detail_hint_color">Farbe antippen oder am Ring ziehen · −/+ verschiebt den Farbton fein</string>
+    <string name="detail_hint_onoff">Auf der Kachel reicht ein Tippen – dieses Fenster öffnet langes Drücken</string>
+    <string name="detail_hint_cover">Position antippen fährt sofort dorthin · am Ring ziehen für jede Höhe</string>
+    <string name="cover_position">Position</string>
+    <string name="cover_pos_open">Offen</string>
+    <string name="cover_pos_half">Halb</string>
+    <string name="cover_pos_gap">Fast zu</string>
+    <string name="cover_pos_closed">Zu</string>
+    <string name="cover_step_open">10 % weiter auf</string>
+    <string name="cover_step_close">10 % weiter zu</string>
+    <string name="tilt_closed">Zu</string>
+    <string name="tilt_half">Halb</string>
+    <string name="tilt_open">Waagrecht</string>
+    <string name="thermostat_ring_hint">Soll · Punkt am Ring = Ist</string>
+    <string name="settings_tile">Kachel</string>
+    <string name="settings_device">Gerät</string>
 </resources>

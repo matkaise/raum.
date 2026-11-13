@@ -1603,4 +1603,47 @@
     </plurals>
     <string name="hc_all_quiet">All quiet</string>
     <string name="hc_choose_appliance">Choose appliance</string>
+    <string name="history_title">History</string>
+    <string name="quick_select">Quick select</string>
+    <string name="detail_state">State</string>
+    <string name="light_preset_night">Night light</string>
+    <string name="light_preset_dim">Dimmed</string>
+    <string name="light_preset_bright">Bright</string>
+    <string name="light_preset_full">Full</string>
+    <string name="hue_red">Red</string>
+    <string name="hue_orange">Orange</string>
+    <string name="hue_yellow">Yellow</string>
+    <string name="hue_green">Green</string>
+    <string name="hue_turquoise">Turquoise</string>
+    <string name="hue_blue">Blue</string>
+    <string name="hue_violet">Violet</string>
+    <string name="hue_pink">Pink</string>
+    <string name="light_darker">Darker</string>
+    <string name="light_brighter">Brighter</string>
+    <string name="light_warmer">Warmer</string>
+    <string name="light_cooler">Cooler</string>
+    <string name="light_hue_prev">Shift hue back</string>
+    <string name="light_hue_next">Shift hue forward</string>
+    <string name="light_tab_white">White tone</string>
+    <string name="light_pastel">Pastel</string>
+    <string name="light_vivid">Vivid</string>
+    <string name="light_not_dimmable">Not dimmable</string>
+    <string name="detail_hint_brightness">Drag the ring to dim · white tone and colour stay as they are</string>
+    <string name="detail_hint_white">Dragging the ring changes only the white tone · −/+ in 100 K steps</string>
+    <string name="detail_hint_color">Tap a colour or drag the ring · −/+ fine-tunes the hue</string>
+    <string name="detail_hint_onoff">On the tile a tap is enough – a long press opens this window</string>
+    <string name="detail_hint_cover">Tap a position to move there · drag the ring for any height</string>
+    <string name="cover_position">Position</string>
+    <string name="cover_pos_open">Open</string>
+    <string name="cover_pos_half">Half</string>
+    <string name="cover_pos_gap">Almost closed</string>
+    <string name="cover_pos_closed">Closed</string>
+    <string name="cover_step_open">Open 10 % more</string>
+    <string name="cover_step_close">Close 10 % more</string>
+    <string name="tilt_closed">Closed</string>
+    <string name="tilt_half">Half</string>
+    <string name="tilt_open">Horizontal</string>
+    <string name="thermostat_ring_hint">Target · dot on ring = current</string>
+    <string name="settings_tile">Tile</string>
+    <string name="settings_device">Device</string>
 </resources>

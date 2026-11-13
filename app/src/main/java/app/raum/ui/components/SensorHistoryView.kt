@@ -105,12 +105,17 @@ private val HumColorDark = Color(0xFF9FD3FF)
 
 /** Verlauf eines Sensors: Messkurve (Temperatur/Feuchte) oder Zeitleiste (offen/belegt). */
 @Composable
-fun SensorHistoryView(device: Device, modifier: Modifier = Modifier) {
+fun SensorHistoryView(device: Device, modifier: Modifier = Modifier, compact: Boolean = false) {
     val c = device.capabilities
     val lineMetrics = listOfNotNull(
         SensorMetric.TEMPERATURE.takeIf { c.find<TemperatureSensorCapability>() != null || c.find<ThermostatCapability>() != null },
         SensorMetric.HUMIDITY.takeIf { c.find<HumiditySensorCapability>() != null },
     )
+    // Kompakt (Thermostat-Fenster): nur die Temperaturkurve mit Zeitraum, ohne Messwert-Chips und Fußzeile
+    if (compact) {
+        if (lineMetrics.isNotEmpty()) LineHistory(device, lineMetrics.take(1), modifier, compact = true)
+        return
+    }
     Column(modifier) {
         when {
             lineMetrics.isNotEmpty() -> LineHistory(device, lineMetrics, Modifier.weight(1f))
@@ -134,7 +139,7 @@ private fun rememberRefreshTick(): Int {
 private data class Series(val from: Instant, val values: List<Double?>)
 
 @Composable
-private fun LineHistory(device: Device, metrics: List<SensorMetric>, modifier: Modifier) {
+private fun LineHistory(device: Device, metrics: List<SensorMetric>, modifier: Modifier, compact: Boolean = false) {
     val g = LocalGlass.current
     val source = koinInject<SensorHistorySource>()
     var metric by remember(device.id) { mutableStateOf(metrics.first()) }
@@ -151,6 +156,40 @@ private fun LineHistory(device: Device, metrics: List<SensorMetric>, modifier: M
     val isTemp = metric == SensorMetric.TEMPERATURE
     val color = if (isTemp) (if (g.dark) TempColorDark else TempColor) else (if (g.dark) HumColorDark else HumColor)
 
+    if (compact) {
+        Column(modifier) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.history_title).uppercase(), color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.6.sp, modifier = Modifier.weight(1f),
+                )
+                Row(Modifier.clip(RoundedCornerShape(20.dp)).background(g.chip).padding(3.dp)) {
+                    Range.entries.forEach { r ->
+                        val on = r == range
+                        Box(
+                            Modifier.height(34.dp).clip(RoundedCornerShape(17.dp)).background(if (on) g.ink else Color.Transparent)
+                                .clickable { range = r }.padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                stringResource(if (r == Range.DAY) R.string.range_24h else R.string.range_7d),
+                                color = if (on) g.glassSolid.copy(alpha = 1f) else g.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+            val s = series
+            if (s != null && s.values.count { it != null } >= 2) {
+                LineChart(s, range, isTemp, color, Modifier.fillMaxWidth().weight(1f).padding(top = 6.dp))
+            } else {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    if (s != null) Text(stringResource(R.string.history_empty), fontSize = 16.sp, color = g.soft)
+                }
+            }
+        }
+        return
+    }
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(top = 22.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             metrics.forEach { m ->
@@ -275,7 +314,8 @@ private fun LineChart(s: Series, range: Range, isTemp: Boolean, color: Color, mo
     ) {
         val left = 44.dp.toPx()
         val w = size.width - left
-        val h = 220.dp.toPx()
+        // Unten Platz für die Zeitachse; im kompakten Verlauf (Thermostat) entsprechend niedriger
+        val h = (size.height - 32.dp.toPx()).coerceIn(60.dp.toPx(), 220.dp.toPx())
         fun x(i: Int) = left + i / (n - 1f) * w
         fun y(v: Double) = ((1 - (v - lo) / (hi - lo)) * h).toFloat()
 
