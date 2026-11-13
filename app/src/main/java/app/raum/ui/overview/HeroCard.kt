@@ -81,96 +81,87 @@ import kotlin.math.sin
 private val TimeFormat = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
- * Kopf der Übersicht direkt auf dem Himmel: links Begrüßung, große Uhr, Datum und Hinweise,
- * rechts eine Glaskarte mit Außen-/Innenklima und Vorhersage, darunter der Sonnenbogen.
+ * Kopf der Übersicht (Entwurf „raum. Übersicht Redesign“, Variante A): kompakt, damit die Bedienung gleich darunter
+ * beginnt. Links Begrüßung mit Datum, große Uhr und Hinweise (Innenklima als erster Hinweis), rechts eine Glaskarte
+ * mit Außentemperatur, Sonnenbogen und Vorhersage.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeHero(state: HomeUiState, scene: SkyScene, onOpenForecast: ((Int) -> Unit)?) {
     val now = scene.now
     val climate = climateOf(state, scene.outdoorSensorId)
-    Row(Modifier.fillMaxWidth().heightIn(min = 350.dp).height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        Column(Modifier.weight(1f).fillMaxHeight().padding(start = 24.dp, top = 20.dp)) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+        Column(Modifier.weight(1f).fillMaxHeight().padding(start = 20.dp)) {
             Text(
-                listOfNotNull(stringResource(Sky.greetingRes(now.hour)), state.home?.name).joinToString(" · "),
-                style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 22.sp, fontWeight = FontWeight.Medium,
+                listOf(stringResource(Sky.greetingRes(now.hour)), now.format(rememberLongDateFormatter())).joinToString(" · "),
+                style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 18.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            Text(now.format(TimeFormat), style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 148.sp, fontWeight = FontWeight.Light, lineHeight = 150.sp, letterSpacing = (-4).sp)
-            Text(now.format(rememberLongDateFormatter()), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 22.sp)
-            Spacer(Modifier.weight(1f).heightIn(min = 24.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SkyChip(Icons.Outlined.Lightbulb, Accent.Light, lightsStatus(state.lightsOn))
+            Text(now.format(TimeFormat), style = app.raum.ui.theme.SkyTextStyle, color = SkyText, fontSize = 104.sp, fontWeight = FontWeight.Light, lineHeight = 108.sp, letterSpacing = (-3).sp)
+            Spacer(Modifier.weight(1f).heightIn(min = 10.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                climate.celsius?.let { c ->
+                    val text = listOfNotNull(stringResource(R.string.hero_indoor) + " " + formatDegrees(c), climate.humidity?.let { formatPercent(it) }).joinToString(" · ")
+                    SkyChip(Icons.Outlined.Home, SkyText, text, height = 40)
+                }
+                SkyChip(Icons.Outlined.Lightbulb, Accent.Light, lightsStatus(state.lightsOn), height = 40)
                 scene.weather?.outlook?.let { OutlookChip(it) }
                 val notices = state.notices
                 notices.take(2).forEach { NoticeChip(it) }
-                if (notices.size > 2) SkyChip(null, SkyText, pluralStringResource(R.plurals.notices_more, notices.size - 2, notices.size - 2), warning = true)
+                if (notices.size > 2) SkyChip(null, SkyText, pluralStringResource(R.plurals.notices_more, notices.size - 2, notices.size - 2), warning = true, height = 40)
             }
         }
-        Column(Modifier.width(500.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            ClimateCard(scene, climate, onOpenForecast)
-            SunArc(scene)
-        }
+        WeatherCard(scene, onOpenForecast)
     }
 }
 
+/** Glaskarte rechts: Außen links, Sonnenbogen rechts, darunter die nächsten Tage. */
 @Composable
-private fun ClimateCard(scene: SkyScene, climate: Climate, onOpenForecast: ((Int) -> Unit)?) {
+private fun WeatherCard(scene: SkyScene, onOpenForecast: ((Int) -> Unit)?) {
     val g = LocalGlass.current
     val weather = scene.weather
     val hasOutdoor = weather != null || scene.outdoorCelsius != null
-    if (!hasOutdoor && climate.celsius == null) return
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(32.dp), g.glass, g.edge).padding(start = 26.dp, end = 26.dp, top = 22.dp, bottom = 16.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(
+        Modifier.width(if (hasOutdoor) 540.dp else 300.dp).glass(RoundedCornerShape(28.dp), g.glass, g.edge)
+            .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 12.dp),
+    ) {
+        Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             if (hasOutdoor) {
                 Column(
                     Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
                         .then(if (onOpenForecast != null) Modifier.clickable { onOpenForecast(0) } else Modifier),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (weather != null) WeatherIcon(weather.condition, night = scene.sunProgress == null, modifier = Modifier.size(22.dp))
-                        else Icon(Icons.Outlined.Home, null, Modifier.size(20.dp), tint = g.soft)
-                        Spacer(Modifier.width(8.dp))
+                        if (weather != null) WeatherIcon(weather.condition, night = scene.sunProgress == null, modifier = Modifier.size(20.dp))
+                        else Icon(Icons.Outlined.Home, null, Modifier.size(18.dp), tint = g.soft)
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             listOfNotNull(stringResource(R.string.hero_outdoor), scene.placeName).joinToString(" · "),
-                            color = g.soft, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                     Text(
                         scene.outdoorCelsius?.let { formatDegrees(it) } ?: "–",
-                        color = g.ink, fontSize = 64.sp, fontWeight = FontWeight.Light, lineHeight = 66.sp, letterSpacing = (-2).sp,
-                        modifier = Modifier.padding(top = 8.dp),
+                        color = g.ink, fontSize = 52.sp, fontWeight = FontWeight.Light, lineHeight = 58.sp, letterSpacing = (-1.5).sp, maxLines = 1,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                     weather?.let { w ->
                         val range = if (w.todayMax != null && w.todayMin != null) "↑ ${formatDegrees(w.todayMax)} ↓ ${formatDegrees(w.todayMin)}" else null
                         val stale = scene.staleSince?.let { stringResource(R.string.hero_weather_stale, it.format(TimeFormat)) }
                         Text(
                             listOfNotNull(conditionLabel(w.condition), range, stale).joinToString(" · "),
-                            color = g.ink, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp),
+                            color = g.ink.copy(alpha = 0.85f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+                Box(Modifier.width(1.dp).fillMaxHeight().background(g.track))
             }
-            if (climate.celsius != null) {
-                Row(Modifier.weight(1.1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    climate.humidity?.let { HumidityRing(it) }
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Home, null, Modifier.size(20.dp), tint = g.soft)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.hero_indoor), color = g.soft, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                        }
-                        Text(
-                            formatDegrees(climate.celsius), color = g.ink, fontSize = 48.sp, fontWeight = FontWeight.Light,
-                            lineHeight = 52.sp, letterSpacing = (-1.5).sp, maxLines = 1, softWrap = false, modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
-                }
-            }
+            SunArc(scene, Modifier.width(236.dp))
         }
         val next = scene.days.drop(1).take(6)
         if (next.isNotEmpty()) {
-            HorizontalDivider(Modifier.padding(top = 16.dp), color = g.edge)
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            HorizontalDivider(Modifier.padding(top = 10.dp), color = g.track)
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                 val locale = currentLocale()
                 next.forEachIndexed { i, d ->
                     Row(
@@ -180,8 +171,8 @@ private fun ClimateCard(scene: SkyScene, climate: Climate, onOpenForecast: ((Int
                         horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(d.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).trimEnd('.'), color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        WeatherIcon(d.symbol, Modifier.padding(horizontal = 4.dp).size(22.dp))
-                        Text(d.max?.let { formatDegrees(it, decimals = false) } ?: "–", color = g.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        WeatherIcon(d.symbol, Modifier.padding(horizontal = 4.dp).size(20.dp))
+                        Text(d.max?.let { formatDegrees(it, decimals = false) } ?: "–", color = g.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -189,64 +180,49 @@ private fun ClimateCard(scene: SkyScene, climate: Climate, onOpenForecast: ((Int
     }
 }
 
+/** Sonnenbogen in der Wetterkarte: Aufgang bis Untergang, Sonne an ihrer Position – nachts der Mond. */
 @Composable
-private fun HumidityRing(percent: Double) {
+private fun SunArc(scene: SkyScene, modifier: Modifier) {
     val g = LocalGlass.current
-    Box(Modifier.size(88.dp), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(88.dp)) {
-            val stroke = 9.dp.toPx()
-            val inset = Offset(stroke / 2, stroke / 2)
-            val arc = Size(size.width - stroke, size.height - stroke)
-            drawArc(g.track, 0f, 360f, false, inset, arc, style = Stroke(stroke))
-            drawArc(g.cool, -90f, 360f * (percent / 100.0).toFloat().coerceIn(0f, 1f), false, inset, arc, style = Stroke(stroke))
-        }
-        Column(
-            Modifier.size(70.dp).clip(CircleShape).background(g.glassSolid),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(Icons.Outlined.WaterDrop, null, Modifier.size(18.dp), tint = g.cool)
-            Text(formatPercent(percent), color = g.ink, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
-
-/** Sonnenbogen von Aufgang bis Untergang, Sonne an ihrer aktuellen Position – nachts der Mond. */
-@Composable
-private fun SunArc(scene: SkyScene) {
     val sunrise = scene.sunrise
     val sunset = scene.sunset
     if (sunrise == null || sunset == null) {
-        Text(stringResource(R.string.hero_no_location), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(end = 10.dp))
+        Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.hero_no_location), color = g.soft, fontSize = 14.sp)
+        }
         return
     }
     val progress = scene.sunProgress
-    val sunAlpha = 1f - (scene.visual?.cloudCover ?: 0f).coerceIn(0f, 1f) * 0.6f
-    Column(Modifier.width(300.dp).padding(end = 10.dp)) {
-        Canvas(Modifier.fillMaxWidth().height(130.dp)) {
-            val r = 112.dp.toPx()
-            val center = Offset(size.width / 2f, 126.dp.toPx())
-            val topLeft = Offset(center.x - r, center.y - r)
-            val arcSize = Size(r * 2, r * 2)
-            drawArc(Color.White.copy(alpha = 0.4f), 180f, 180f, false, topLeft, arcSize,
-                style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))))
-            drawLine(Color.White.copy(alpha = 0.4f), Offset(0f, center.y), Offset(size.width, center.y), 1.dp.toPx())
+    val sunAlpha = 1f - (scene.visual?.cloudCover ?: 0f).coerceIn(0f, 1f) * 0.5f
+    val path = if (g.dark) Accent.Light else Color(0xFFE8A13A)
+    Column(modifier) {
+        Canvas(Modifier.fillMaxWidth().height(92.dp)) {
+            val cx = size.width / 2f
+            val base = size.height - 6.dp.toPx()
+            val rx = cx - 18.dp.toPx()
+            val ry = 72.dp.toPx()
+            val topLeft = Offset(cx - rx, base - ry)
+            val arcSize = Size(rx * 2, ry * 2)
+            drawLine(g.track, Offset(4.dp.toPx(), base), Offset(size.width - 4.dp.toPx(), base), 1.dp.toPx())
+            drawArc(g.soft.copy(alpha = 0.45f), 180f, 180f, false, topLeft, arcSize,
+                style = Stroke(2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))))
             if (progress != null) {
-                drawArc(Color.White.copy(alpha = 0.92f), 180f, 180f * progress, false, topLeft, arcSize, style = Stroke(3.dp.toPx()))
+                drawArc(path, 180f, 180f * progress, false, topLeft, arcSize, style = Stroke(3.dp.toPx()))
                 val angle = Math.toRadians(180.0 + 180.0 * progress)
-                val sun = Offset(center.x + r * cos(angle).toFloat(), center.y + r * sin(angle).toFloat())
-                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFE7A8).copy(alpha = 0.5f * sunAlpha), Color.Transparent), sun, 40.dp.toPx()), 40.dp.toPx(), sun)
-                drawCircle(Color(0xFFFFE08A).copy(alpha = sunAlpha), 12.dp.toPx(), sun)
+                val sun = Offset(cx + rx * cos(angle).toFloat(), base + ry * sin(angle).toFloat())
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFC861).copy(alpha = 0.45f * sunAlpha), Color.Transparent), sun, 22.dp.toPx()), 22.dp.toPx(), sun)
+                drawCircle(Color(0xFFFFC44D).copy(alpha = sunAlpha), 9.dp.toPx(), sun)
             } else {
-                val moon = Offset(center.x, center.y - 62.dp.toPx())
-                val full = Path().apply { addOval(Rect(moon, 13.dp.toPx())) }
-                val cut = Path().apply { addOval(Rect(moon + Offset(8.dp.toPx(), -4.dp.toPx()), 12.dp.toPx())) }
-                drawPath(Path.combine(PathOperation.Difference, full, cut), Color(0xFFF4F1E6))
+                val moon = Offset(cx, base - 46.dp.toPx())
+                val full = Path().apply { addOval(Rect(moon, 12.dp.toPx())) }
+                val cut = Path().apply { addOval(Rect(moon + Offset(7.dp.toPx(), -4.dp.toPx()), 11.dp.toPx())) }
+                drawPath(Path.combine(PathOperation.Difference, full, cut), if (g.dark) Color(0xFFF4F1E6) else Color(0xFF8C82A3))
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-            Text(stringResource(R.string.hero_sunrise, sunrise.format(TimeFormat)), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp)
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+            Text(stringResource(R.string.hero_sunrise, sunrise.format(TimeFormat)), color = g.ink.copy(alpha = 0.85f), fontSize = 13.sp)
             Spacer(Modifier.weight(1f))
-            Text(stringResource(R.string.hero_sunset, sunset.format(TimeFormat)), style = app.raum.ui.theme.SkyTextStyle, color = SkyTextSoft, fontSize = 16.sp)
+            Text(stringResource(R.string.hero_sunset, sunset.format(TimeFormat)), color = g.ink.copy(alpha = 0.85f), fontSize = 13.sp)
         }
     }
 }
@@ -259,7 +235,7 @@ private fun NoticeChip(n: HomeNotice) {
         NoticeKind.LOW_BATTERY -> Icons.Outlined.BatteryAlert to stringResource(R.string.notice_low_battery, n.deviceName)
         NoticeKind.BORDER_ROUTER -> Icons.Outlined.Router to stringResource(R.string.notice_border_router)
     }
-    SkyChip(icon, Accent.Warn, text, warning = true)
+    SkyChip(icon, Accent.Warn, text, warning = true, height = 40)
 }
 
 /** Glas-Chip direkt auf dem Himmel. */
@@ -291,7 +267,7 @@ private fun OutlookChip(o: PrecipOutlook) {
         o.startsAt != null -> stringResource(R.string.outlook_from, what, o.startsAt.atZone(zone).format(TimeFormat))
         else -> return
     }
-    SkyChip(if (o.type == PrecipType.SNOW) Icons.Outlined.AcUnit else Icons.Outlined.Umbrella, Color(0xFFBFE3FF), text)
+    SkyChip(if (o.type == PrecipType.SNOW) Icons.Outlined.AcUnit else Icons.Outlined.Umbrella, Color(0xFFBFE3FF), text, height = 40)
 }
 
 @Composable

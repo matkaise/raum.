@@ -128,7 +128,7 @@ fun RoomsScreen(
                 if (selected.devices.isEmpty()) {
                     Text(stringResource(R.string.room_devices_empty_text), color = SkyTextSoft, fontSize = 16.sp, modifier = Modifier.padding(start = 20.dp))
                 } else {
-                    FixedGrid(selected.devices, columns = 4) { d, mod -> GlassDeviceTile(d, cardActions, mod.height(190.dp)) }
+                    FixedGrid(selected.devices, columns = 4) { d, mod -> GlassDeviceTile(d, cardActions, mod.height(230.dp)) }
                 }
             }
         }

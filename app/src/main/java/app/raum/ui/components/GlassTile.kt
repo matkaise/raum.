@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Brightness6
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.OpenInFull
@@ -49,7 +48,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -114,8 +115,9 @@ fun RingBadge(icon: ImageVector, level: Float, accent: Color, lit: Boolean, size
 }
 
 /**
- * Gerätekachel auf Glas (Übersicht, Räume): Tippen schaltet, der Knopf oben rechts öffnet die
- * Detailansicht. Dimmbare Leuchten haben einen Zieh-Regler, Thermostate und Storen +/−-Tasten.
+ * Gerätekachel auf Glas (Übersicht, Räume, Geräte) nach Entwurf „raum. Übersicht Redesign“: oben Name und Raum,
+ * in der Mitte ein Bild des Zustands (Leuchte, Fenster, Steckdose, Thermostat-Ring), unten die Bedienung.
+ * Tippen schaltet, langes Drücken oder der Knopf oben rechts öffnet die Detailansicht.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -133,54 +135,88 @@ fun GlassDeviceTile(
     val cover = caps.find<CoverCapability>()
     val online = device.isOnline
     val togglable = light != null || switch != null
-    val lit = device.isActive
-    val accent = accentOf(device)
-    val bg by animateColorAsState(
-        if (lit && light != null) (if (g.dark) Color(0xFFFFBE64).copy(alpha = 0.22f) else Color(0xFFFFECC8).copy(alpha = 0.72f)) else g.glass,
-        label = "tileBg",
-    )
+    val lit = device.isActive && online
+    val lightColor = light?.rgbColor?.takeIf { light.colorMode == app.raum.domain.models.LightColorMode.COLOR }?.let { Color(it.argb) }
+    // Eingeschaltet färbt sich die Kachel: Licht warm (oder in seiner Farbe), Steckdosen grün
+    val (top, bottom) = when {
+        lit && light != null && g.dark -> (lightColor ?: Color(0xFFFFBE64)).copy(alpha = 0.26f) to (lightColor ?: Color(0xFFFFBE64)).copy(alpha = 0.16f)
+        lit && light != null -> (lightColor?.let { lerp(Color.White, it, 0.18f) } ?: Color(0xFFFFF3DC)).copy(alpha = 0.92f) to
+            (lightColor?.let { lerp(Color.White, it, 0.45f) } ?: Color(0xFFFFD896)).copy(alpha = 0.92f)
+        lit && switch != null && g.dark -> Accent.Power.copy(alpha = 0.22f) to Accent.Power.copy(alpha = 0.12f)
+        lit && switch != null -> Color(0xFFE9FBEF).copy(alpha = 0.9f) to Color(0xFFBFECCD).copy(alpha = 0.9f)
+        else -> g.glass to g.glass
+    }
+    val c0 by animateColorAsState(top, label = "tileTop")
+    val c1 by animateColorAsState(bottom, label = "tileBottom")
+    val warmInk = !g.dark && lit && (light != null || switch != null)
+    val subColor = when {
+        warmInk && light != null -> Color(0xFF7A5A2C)
+        warmInk -> Color(0xFF2F6B45)
+        else -> g.soft
+    }
     val shape = RoundedCornerShape(28.dp)
     Column(
         modifier
             .alpha(if (online) 1f else 0.55f)
-            .clip(shape).background(bg, shape).border(1.dp, g.edge, shape)
+            .clip(shape).background(Brush.verticalGradient(listOf(c0, c1)), shape).border(1.dp, g.edge, shape)
             .combinedClickable(
                 onClick = { if (togglable && online) actions.onToggle(device) else actions.onOpenDetails(device) },
                 onLongClick = { actions.onOpenDetails(device) },
                 onClickLabel = stringResource(if (togglable) (if (lit) R.string.a11y_turn_off else R.string.a11y_turn_on) else R.string.a11y_open_details),
             )
-            .padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+            .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            RingBadge(RaumIcons.device(device), if (online) levelOf(device) else 0f, accent, lit && online,
-                tint = light?.rgbColor?.takeIf { light.isOn && online }?.let { Color(it.argb) })
-            Spacer(Modifier.weight(1f))
+            Column(Modifier.weight(1f).padding(top = 2.dp)) {
+                Text(device.displayName, color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val sub = tileSub(device, roomName)
+                if (sub.isNotEmpty()) {
+                    val thermoActive = online && thermo != null && thermo.mode != ThermostatMode.OFF
+                    Text(
+                        sub, color = if (thermoActive && !g.dark) thermoInk(thermo!!.mode) else subColor,
+                        fontSize = 13.sp, fontWeight = if (thermoActive) FontWeight.Medium else FontWeight.Normal,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(g.chip).clickable { actions.onOpenDetails(device) },
+                Modifier.size(40.dp).clip(CircleShape).background(g.chip).clickable { actions.onOpenDetails(device) },
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Outlined.OpenInFull, stringResource(R.string.a11y_open_details), Modifier.size(20.dp), tint = g.ink) }
+            ) { Icon(Icons.Outlined.OpenInFull, stringResource(R.string.a11y_open_details), Modifier.size(18.dp), tint = g.ink) }
         }
-        Spacer(Modifier.weight(1f))
-        Text(device.displayName, color = g.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
-        val sub = tileSub(device, roomName)
-        if (sub.isNotEmpty()) {
-            Text(sub, color = g.soft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp).padding(top = 2.dp))
-        }
-        Spacer(Modifier.height(10.dp))
+        val art = Modifier.weight(1f).fillMaxWidth().padding(vertical = 6.dp)
         when {
-            online && light?.brightnessPercent != null ->
-                BrightnessBar(light, g) { actions.onCommand(device, DeviceCommand.SetBrightness(it)) }
-            online && thermo != null -> {
+            thermo != null && online -> {
                 val step = Units.stepCelsius(LocalTemperatureUnit.current)
-                Stepper(
-                    g, Icons.Outlined.Remove, Icons.Outlined.Add,
-                    if (thermo.mode == ThermostatMode.OFF) stringResource(R.string.state_off) else formatDegrees(thermo.targetCelsius),
+                val off = thermo.mode == ThermostatMode.OFF
+                ThermoRing(
+                    level = if (off) null else levelOf(device),
+                    accent = thermoAccent(thermo.mode),
+                    text = if (off) stringResource(R.string.state_off) else formatDegrees(thermo.targetCelsius),
+                    textDim = off,
                     decLabel = stringResource(R.string.thermostat_decrease), incLabel = stringResource(R.string.thermostat_increase),
                     onDec = { actions.onCommand(device, DeviceCommand.SetTargetTemperature((thermo.targetCelsius - step).coerceAtLeast(thermo.minTargetCelsius))) },
                     onInc = { actions.onCommand(device, DeviceCommand.SetTargetTemperature((thermo.targetCelsius + step).coerceAtMost(thermo.maxTargetCelsius))) },
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 4.dp),
                 )
+                return@Column
             }
-            online && cover != null -> {
+            light != null -> LampArt(light.isOn, (light.brightnessPercent ?: 100) / 100f, lightColor, online, art)
+            cover != null -> WindowArt(cover.openPercent, cover.movement, online, art)
+            switch != null -> SocketArt(switch.isOn && online, art)
+            else -> {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.BottomStart) {
+                    Text(tileBig(device), color = g.ink, fontSize = 30.sp, lineHeight = 32.sp, fontWeight = FontWeight.Light, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 2.dp, bottom = 4.dp))
+                }
+                return@Column
+            }
+        }
+        when {
+            !online -> Text(stringResource(R.string.state_offline), color = g.soft, fontSize = 14.sp, modifier = Modifier.height(52.dp).padding(start = 4.dp, top = 16.dp))
+            light?.brightnessPercent != null ->
+                BrightnessBar(light, lightColor, g) { actions.onCommand(device, DeviceCommand.SetBrightness(it)) }
+            light != null || switch != null -> OnOffPill(lit, if (light != null) (lightColor ?: Color(0xFFFFC24F)) else Color(0xFF7FD19A), g) { actions.onToggle(device) }
+            cover != null -> {
                 // Während der Fahrt wird der Knopf der laufenden Richtung zum Stopp (wie ein Taster an der Wand)
                 val closing = cover.movement == CoverMovement.CLOSING
                 val opening = cover.movement == CoverMovement.OPENING
@@ -196,8 +232,31 @@ fun GlassDeviceTile(
                     onInc = { actions.onCommand(device, if (opening) DeviceCommand.StopCover else DeviceCommand.OpenCover) },
                 )
             }
-            else -> Text(tileBig(device), color = g.ink, fontSize = 30.sp, lineHeight = 32.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
         }
+    }
+}
+
+private fun thermoAccent(mode: ThermostatMode): Color = when (mode) {
+    ThermostatMode.COOL -> Color(0xFF4FB7E8)
+    ThermostatMode.AUTO -> Color(0xFF7FC89A)
+    else -> Color(0xFFF0894A)
+}
+
+private fun thermoInk(mode: ThermostatMode): Color = when (mode) {
+    ThermostatMode.COOL -> Color(0xFF1D6F99)
+    ThermostatMode.AUTO -> Color(0xFF2F6B45)
+    else -> Color(0xFFB4561F)
+}
+
+/** An/Aus-Fläche für Schalter und nicht dimmbares Licht: an gefüllt. */
+@Composable
+private fun OnOffPill(on: Boolean, fill: Color, g: GlassColors, onClick: () -> Unit) {
+    val bg by animateColorAsState(if (on) (if (g.dark) fill.copy(alpha = 0.55f) else fill) else g.chip, label = "pill")
+    Box(
+        Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(bg).clickable(onClick = onClick).padding(horizontal = 18.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(stringResource(if (on) R.string.state_on else R.string.state_off), color = if (on) g.ink else g.soft, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -224,18 +283,19 @@ private fun tileBig(device: Device): String {
 
 /**
  * Helligkeitsregler: Ziehen ändert nur die Anzeige, gesendet wird beim Loslassen (keine Befehlsflut).
- * Kurzes Tippen setzt die Helligkeit auf die getippte Stelle.
+ * Kurzes Tippen setzt die Helligkeit auf die getippte Stelle. Links „An“/„Aus“, rechts der Wert.
  */
 @Composable
-private fun BrightnessBar(light: LightCapability, g: GlassColors, onCommit: (Int) -> Unit) {
+private fun BrightnessBar(light: LightCapability, color: Color?, g: GlassColors, onCommit: (Int) -> Unit) {
     val actual = if (light.isOn) (light.brightnessPercent ?: 100) else 0
     var dragging by remember { mutableStateOf(false) }
     var local by remember { mutableFloatStateOf(actual.toFloat()) }
     LaunchedEffect(actual) { if (!dragging) local = actual.toFloat() }
     val shown = local.roundToInt()
-    val fill = if (g.dark) Accent.Light.copy(alpha = 0.55f) else Color(0xFFFFD58C)
+    val base = color ?: Color(0xFFFFC24F)
+    val fill = if (g.dark) base.copy(alpha = 0.55f) else base
     BoxWithConstraints(
-        Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(28.dp)).background(g.chip)
+        Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(26.dp)).background(g.chip)
             .pointerInput(Unit) {
                 detectTapGestures { o -> val v = (o.x / size.width * 100f).coerceIn(1f, 100f); local = v; onCommit(v.roundToInt()) }
             }
@@ -248,11 +308,11 @@ private fun BrightnessBar(light: LightCapability, g: GlassColors, onCommit: (Int
             },
     ) {
         if (shown > 0) {
-            Box(Modifier.fillMaxHeight().width((maxWidth * (shown / 100f)).coerceAtLeast(56.dp)).clip(RoundedCornerShape(28.dp)).background(fill))
+            Box(Modifier.fillMaxHeight().width((maxWidth * (shown / 100f)).coerceAtLeast(52.dp)).clip(RoundedCornerShape(26.dp)).background(fill))
         }
         Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (shown > 0) "$shown %" else stringResource(R.string.state_off), color = g.ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Icon(Icons.Outlined.Brightness6, null, Modifier.size(20.dp), tint = g.soft)
+            Text(stringResource(if (shown > 0) R.string.state_on else R.string.state_off), color = if (shown > 0) g.ink else g.soft, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (shown > 0) Text("$shown %", color = if (g.dark) g.ink else Color(0xFF5A3D12), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

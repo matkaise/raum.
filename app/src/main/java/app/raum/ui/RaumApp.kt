@@ -32,10 +32,8 @@ import androidx.compose.material.icons.outlined.MusicNote
 import app.raum.sonos.SonosService
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import app.raum.ui.music.MusicRow
 import app.raum.ui.music.MusicScreen
 import app.raum.homeconnect.HomeConnectService
-import app.raum.ui.household.HouseholdRow
 import app.raum.ui.household.HouseholdScreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -233,15 +231,18 @@ fun RaumApp(
                             cardActions = cardActions,
                             onRunScene = viewModel::runScene,
                             onOpenRoom = { navController.openRoomFromOverview(it) },
-                            householdRow = {
-                                HouseholdRow(household, homeConnect, groheState) { haId ->
-                                    requests.openAppliance.value = haId
-                                    navController.navigateTopLevel(TopLevel.HOUSEHOLD)
-                                }
-                                MusicRow(sonos) { groupId ->
-                                    requests.openMusicGroup.value = groupId
-                                    navController.navigateTopLevel(TopLevel.MUSIC)
-                                }
+                            activeRow = {
+                                app.raum.ui.overview.ActiveRow(
+                                    sonos, household, homeConnect, groheState,
+                                    onOpenMusic = { groupId ->
+                                        requests.openMusicGroup.value = groupId
+                                        navController.navigateTopLevel(TopLevel.MUSIC)
+                                    },
+                                    onOpenAppliance = { haId ->
+                                        requests.openAppliance.value = haId
+                                        navController.navigateTopLevel(TopLevel.HOUSEHOLD)
+                                    },
+                                )
                             },
                         )
                     }

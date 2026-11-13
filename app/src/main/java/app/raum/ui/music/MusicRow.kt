@@ -1,5 +1,6 @@
 package app.raum.ui.music
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,31 +8,39 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material.icons.outlined.Stop
-import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -45,117 +54,107 @@ import app.raum.sonos.PlaySource
 import app.raum.sonos.SonosGroup
 import app.raum.sonos.SonosService
 import app.raum.sonos.TransportState
-import app.raum.ui.components.FixedGrid
 import app.raum.ui.household.rememberNow
-import app.raum.ui.theme.LocalGlass
-import app.raum.ui.theme.SkyText
-import app.raum.ui.theme.SkyTextSoft
-import app.raum.ui.theme.SkyTextStyle
-import app.raum.ui.theme.glass
 import kotlinx.coroutines.launch
 
-/**
- * Übersicht: Reihe „Musik“ (Entwurf „Mini-Player“). Der erste spielende Raum bekommt eine breite Karte mit Fortschritt,
- * Zurück/Pause/Weiter und Lautstärke, weitere Räume kompakte Karten. Gestoppte Räume erscheinen nicht.
- */
+/** Räume, die gerade etwas spielen oder pausiert sind (ohne Fernseher) – für „Gerade aktiv“ auf der Übersicht. */
 @Composable
-fun MusicRow(service: SonosService, onOpen: (String) -> Unit) {
+fun rememberActiveMusic(service: SonosService): List<SonosGroup> {
     val st by service.state.collectAsStateWithLifecycle()
-    if (!st.active) return
+    if (!st.active) return emptyList()
     DisposableEffect(service) {
         val release = service.watch(SonosService.GLANCE_POLL_MS)
         onDispose { release() }
     }
-    val groups = st.groups.filter {
+    return st.groups.filter {
         it.playback.hasContent && it.playback.source != PlaySource.TV && it.playback.state in setOf(TransportState.PLAYING, TransportState.TRANSITIONING, TransportState.PAUSED)
     }.sortedByDescending { it.playback.playing }
-    if (groups.isEmpty()) return
-    val scope = rememberCoroutineScope()
-    Row(Modifier.padding(start = 20.dp, top = 34.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.nav_music).uppercase(), style = SkyTextStyle, color = SkyText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp)
-        Text(stringResource(R.string.sonos_row_hint), style = SkyTextStyle, color = SkyTextSoft, fontSize = 14.sp)
-    }
-    val first = groups.first()
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        WideCard(first, service, Modifier.weight(2f), onOpen) { a -> scope.launch { a() } }
-        groups.getOrNull(1)?.let { CompactCard(it, Modifier.weight(1f), onOpen) { scope.launch { service.playPause(it.id) } } } ?: Spacer(Modifier.weight(1f))
-    }
-    if (groups.size > 2) {
-        FixedGrid(groups.drop(2), columns = 3, modifier = Modifier.padding(top = 14.dp)) { grp, mod ->
-            CompactCard(grp, mod, onOpen) { scope.launch { service.playPause(grp.id) } }
-        }
-    }
 }
 
+private val CardInk = Color(0xFF2A2238)
+
+/**
+ * Übersicht: Musikkarte (Entwurf „raum. Übersicht Redesign“) – dunkel wie die Musikseite, hinter dem Cover dessen
+ * Leuchtfarbe. Titel, Fortschritt, Zurück/Pause/Weiter und Lautstärke −/+; antippen öffnet die Musik.
+ * Spielen mehrere Räume, zeigt die Karte den ersten und „+1“.
+ */
 @Composable
-private fun WideCard(group: SonosGroup, service: SonosService, modifier: Modifier, onOpen: (String) -> Unit, run: (suspend () -> Unit) -> Unit) {
-    val g = LocalGlass.current
+fun MusicGlanceCard(groups: List<SonosGroup>, service: SonosService, modifier: Modifier, onOpen: (String) -> Unit) {
+    val group = groups.first()
     val p = group.playback
     val now = rememberNow()
-    Row(
-        modifier.height(150.dp).glass(RoundedCornerShape(28.dp), g.glass, g.edge).clickable { onOpen(group.id) }.padding(start = 14.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        SonosCover(p.track?.artUrl, 122.dp, RoundedCornerShape(20.dp), icon = sourceIcon(group))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (p.playing) Icon(Icons.Outlined.GraphicEq, null, Modifier.size(16.dp), tint = g.ink)
-                Text(group.name, color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Text(primaryLine(p), color = g.ink, fontSize = 24.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
-            val sub = listOfNotNull(p.track?.artist, p.startedFrom?.let { stringResource(R.string.sonos_from, it) } ?: p.stationName?.takeIf { it != p.track?.title })
-                .joinToString(" · ").ifBlank { null }
-            sub?.let { Text(it, color = g.soft, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            val duration = p.durationS
-            if (duration != null && p.source == PlaySource.QUEUE) {
-                val f = ((livePosition(p, now) ?: 0).toFloat() / duration).coerceIn(0f, 1f)
-                Box(Modifier.padding(top = 14.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(g.track)) {
-                    Box(Modifier.fillMaxWidth(f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(g.ink))
+    val scope = rememberCoroutineScope()
+    val cover = rememberCover(listOfNotNull(p.track?.artUrl))
+    val glow = remember(cover) { glowColor(cover) }
+    Box(modifier.clip(RoundedCornerShape(28.dp)).background(CardInk).clickable { onOpen(group.id) }) {
+        Canvas(Modifier.fillMaxSize()) {
+            val c = Offset(90.dp.toPx(), size.height * 0.45f)
+            val r = 210.dp.toPx()
+            drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.7f), glow.copy(alpha = 0f)), c, r), r, c)
+        }
+        Row(
+            Modifier.fillMaxSize().padding(start = 18.dp, end = 20.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            CoverImage(cover, 156.dp, RoundedCornerShape(18.dp), Modifier.shadow(14.dp, RoundedCornerShape(18.dp)), icon = sourceIcon(group))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (p.playing) Icon(Icons.Outlined.GraphicEq, null, Modifier.size(15.dp), tint = Color.White)
+                    val where = stringResource(if (p.playing) R.string.sonos_playing_in else R.string.sonos_paused_in, group.name).uppercase()
+                    Text(
+                        if (groups.size > 1) "$where  +${groups.size - 1}" else where,
+                        color = Color.White.copy(alpha = 0.72f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.3.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(primaryLine(p), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                secondaryLine(p)?.let { Text(it, color = Color.White.copy(alpha = 0.72f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                val duration = p.durationS
+                if (duration != null && p.source == PlaySource.QUEUE) {
+                    val f = ((livePosition(p, now) ?: 0).toFloat() / duration).coerceIn(0f, 1f)
+                    Box(Modifier.padding(top = 12.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.2f))) {
+                        Box(Modifier.fillMaxWidth(f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val transport = p.hasContent && p.source != PlaySource.LINE_IN
+                    DarkButton(Icons.Outlined.SkipPrevious, stringResource(R.string.sonos_previous), 46.dp, enabled = transport && p.canPrevious) { scope.launch { service.previous(group.id) } }
+                    val icon = when { !p.playing -> Icons.Outlined.PlayArrow; p.canPause -> Icons.Outlined.Pause; else -> Icons.Outlined.Stop }
+                    DarkButton(icon, stringResource(if (p.playing) R.string.sonos_pause else R.string.sonos_play), 58.dp, primary = true, enabled = transport) { scope.launch { service.playPause(group.id) } }
+                    DarkButton(Icons.Outlined.SkipNext, stringResource(R.string.sonos_next), 46.dp, enabled = transport && p.canNext) { scope.launch { service.next(group.id) } }
+                    Spacer(Modifier.weight(1f))
+                    val vol = group.volume
+                    if (vol != null) {
+                        DarkButton(Icons.Outlined.Remove, stringResource(R.string.sonos_volume_down), 40.dp) { scope.launch { service.setGroupVolume(group.id, (vol - 5).coerceAtLeast(0)) } }
+                        VolumeRing(vol)
+                        DarkButton(Icons.Outlined.Add, stringResource(R.string.sonos_volume_up), 40.dp) { scope.launch { service.setGroupVolume(group.id, (vol + 5).coerceAtMost(100)) } }
+                    }
                 }
             }
         }
-        val transport = p.hasContent && p.source != PlaySource.LINE_IN
-        RowButton(Icons.Outlined.SkipPrevious, stringResource(R.string.sonos_previous), 52.dp, enabled = transport && p.canPrevious) { run { service.previous(group.id) } }
-        val icon = when { !p.playing -> Icons.Outlined.PlayArrow; p.canPause -> Icons.Outlined.Pause; else -> Icons.Outlined.Stop }
-        RowButton(icon, stringResource(if (p.playing) R.string.sonos_pause else R.string.sonos_play), 68.dp, primary = true, enabled = transport) { run { service.playPause(group.id) } }
-        RowButton(Icons.Outlined.SkipNext, stringResource(R.string.sonos_next), 52.dp, enabled = transport && p.canNext) { run { service.next(group.id) } }
-        Box(Modifier.width(1.dp).height(44.dp).background(g.track))
-        // Lautstärke: Anzeige; antippen öffnet die Musik-Seite mit dem Drehring
-        Column(
-            Modifier.size(52.dp).clip(CircleShape).background(g.chip).clickable { onOpen(group.id) },
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(Icons.Outlined.VolumeUp, stringResource(R.string.sonos_volume), Modifier.size(20.dp), tint = g.ink)
-            Text((group.volume ?: 0).toString(), color = g.ink, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, lineHeight = 12.sp)
+    }
+}
+
+/** Kleiner Lautstärkering (270°) mit Zahl. */
+@Composable
+private fun VolumeRing(volume: Int) {
+    Box(Modifier.size(50.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = 4.5.dp.toPx()
+            val inset = Offset(stroke / 2, stroke / 2)
+            val arc = Size(size.width - stroke, size.height - stroke)
+            drawArc(Color.White.copy(alpha = 0.2f), 135f, 270f, false, inset, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+            if (volume > 0) drawArc(Color.White, 135f, 270f * volume / 100f, false, inset, arc, style = Stroke(stroke, cap = StrokeCap.Round))
         }
+        Text(volume.toString(), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
-private fun CompactCard(group: SonosGroup, modifier: Modifier, onOpen: (String) -> Unit, onPlayPause: () -> Unit) {
-    val g = LocalGlass.current
-    val p = group.playback
-    Row(
-        modifier.height(150.dp).glass(RoundedCornerShape(28.dp), g.glass, g.edge).clickable { onOpen(group.id) }.padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        SonosCover(p.track?.artUrl, 88.dp, RoundedCornerShape(18.dp), icon = sourceIcon(group))
-        Column(Modifier.weight(1f)) {
-            Text("${group.name} · ${statusLine(group)}", color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(primaryLine(p), color = g.ink, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-            secondaryLine(p)?.let { Text(it, color = g.soft, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        }
-        val icon = when { !p.playing -> Icons.Outlined.PlayArrow; p.canPause -> Icons.Outlined.Pause; else -> Icons.Outlined.Stop }
-        RowButton(icon, stringResource(if (p.playing) R.string.sonos_pause else R.string.sonos_play), 56.dp, primary = true, onClick = onPlayPause)
-    }
-}
-
-@Composable
-private fun RowButton(icon: ImageVector, label: String, size: Dp, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    val g = LocalGlass.current
-    val fg = if (primary) (if (g.dark) Color(0xFF10131F) else Color.White) else g.ink
+private fun DarkButton(icon: ImageVector, label: String, size: Dp, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
-        Modifier.size(size).clip(CircleShape).background(if (primary) g.ink else g.chip).clickable(enabled = enabled, onClick = onClick),
+        Modifier.size(size).clip(CircleShape).background(if (primary) Color.White else Color.White.copy(alpha = 0.14f))
+            .clickable(enabled = enabled, onClickLabel = label, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, Modifier.size(size * 0.5f), tint = fg.copy(alpha = if (enabled) 1f else 0.4f)) }
+    ) { Icon(icon, label, Modifier.size(size * 0.46f), tint = (if (primary) CardInk else Color.White).copy(alpha = if (enabled) 1f else 0.4f)) }
 }

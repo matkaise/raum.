@@ -161,6 +161,8 @@
     <string name="position">Position</string>
 
     <!-- Übersicht und Räume -->
+    <string name="overview_active">Gerade aktiv</string>
+    <string name="room_lights_off_short">Licht aus</string>
     <string name="favorites">Favoriten</string>
     <string name="favorites_empty">Karte gedrückt halten → Stern.</string>
     <string name="notice_all_ok">Alles in Ordnung</string>

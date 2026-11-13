@@ -162,6 +162,8 @@
     <string name="position">Position</string>
 
     <!-- Übersicht und Räume -->
+    <string name="overview_active">Right now</string>
+    <string name="room_lights_off_short">Lights off</string>
     <string name="favorites">Favorites</string>
     <string name="favorites_empty">Long-press a card → star.</string>
     <string name="notice_all_ok">All good</string>

@@ -95,7 +95,7 @@ fun DevicesScreen(
                     Row { SectionHeader(title, Modifier.padding(top = if (i == 0) 8.dp else 22.dp, bottom = 14.dp)) }
                     app.raum.ui.components.FixedGrid(devices, columns = 4) { device, mod ->
                         androidx.compose.runtime.key(device.id) {
-                            app.raum.ui.components.GlassDeviceTile(device, cardActions, mod.height(190.dp))
+                            app.raum.ui.components.GlassDeviceTile(device, cardActions, mod.height(230.dp))
                         }
                     }
                 }
