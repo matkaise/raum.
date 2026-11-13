@@ -396,12 +396,12 @@
 
     <!-- Automationen: Oberfläche -->
     <string name="automations_subtitle">%1$d von %2$d aktiv</string>
-    <string name="automation_new">Neue Automation</string>
-    <string name="automation_edit">Automation bearbeiten</string>
-    <string name="automations_empty">Noch keine Automationen</string>
+    <string name="automation_new">Neuer Ablauf</string>
+    <string name="automation_edit">Ablauf bearbeiten</string>
+    <string name="automations_empty">Noch keine Abläufe</string>
     <string name="automations_empty_text">Nach Uhrzeit, Sonne, Sensoren oder Geräten.</string>
-    <string name="automation_create_first">Erste Automation anlegen</string>
-    <string name="automation_delete_text">Die Automation wird endgültig entfernt.</string>
+    <string name="automation_create_first">Ersten Ablauf anlegen</string>
+    <string name="automation_delete_text">Der Ablauf wird endgültig entfernt.</string>
     <string name="automation_delete_text_log">Wird endgültig entfernt. Protokoll bleibt.</string>
     <string name="automation_test_run">Jetzt testweise ausführen</string>
     <string name="automation_paused_until">Pausiert bis %1$s Uhr (zu häufig ausgelöst)</string>
@@ -411,11 +411,11 @@
     <string name="msg_automation_incomplete">„%1$s“ ist unvollständig – bitte zuerst bearbeiten.</string>
     <string name="msg_automation_running">„%1$s“ wird ausgeführt</string>
     <string name="msg_copy_created_disabled">Kopie angelegt (deaktiviert)</string>
-    <string name="automation_not_found">Automation nicht gefunden</string>
+    <string name="automation_not_found">Ablauf nicht gefunden</string>
     <string name="active">Aktiv</string>
     <string name="summary">Zusammenfassung</string>
     <string name="automation_test_actions">Aktionen jetzt testen</string>
-    <string name="automation_delete">Automation löschen</string>
+    <string name="automation_delete">Ablauf löschen</string>
     <string name="section_when">Wenn</string>
     <string name="section_when_hint">Einer dieser Auslöser tritt ein</string>
     <string name="section_only_if">Nur wenn</string>
@@ -462,9 +462,9 @@
     <string name="trigger_sun_no_location">Kein Standort – dieser Auslöser löst nie aus.</string>
     <string name="sunrise">Sonnenaufgang</string>
     <string name="sunset">Sonnenuntergang</string>
-    <string name="offset_exact">Versatz: genau dann</string>
-    <string name="offset_after">Versatz: %1$d Min. danach</string>
-    <string name="offset_before">Versatz: %1$d Min. davor</string>
+    <string name="offset_exact">genau dann</string>
+    <string name="offset_after">%1$d Min. danach</string>
+    <string name="offset_before">%1$d Min. davor</string>
     <string name="connectivity_lost">wird unerreichbar</string>
     <string name="connectivity_back">ist wieder erreichbar</string>
     <string name="trigger_start_hint">Beim Start von raum., z. B. nach Stromausfall.</string>
@@ -1683,4 +1683,42 @@
     <string name="scene_add_to">zu „%1$s“ · antippen wählt aus</string>
     <string name="scene_try">Ausprobieren</string>
     <string name="scene_light_tone">Lichtfarbe</string>
+    <string name="automation_paused_short">Pausiert bis %1$s</string>
+    <string name="automation_switched_off">Ausgeschaltet</string>
+    <string name="automation_last_triggered">Zuletzt ausgelöst %1$s</string>
+    <string name="automation_never_triggered">Noch nie ausgelöst</string>
+    <string name="automation_new_hint">Wenn … dann … – zum Beispiel Storen zu bei Sonnenuntergang</string>
+    <string name="over_midnight_short">über Mitternacht</string>
+    <string name="automation_add_trigger">Auslöser</string>
+    <string name="automation_add_condition">Bedingung</string>
+    <string name="automation_add_action">Aktion</string>
+    <string name="days_workdays">Werktags</string>
+    <string name="time_earlier">5 Minuten früher</string>
+    <string name="time_later">5 Minuten später</string>
+    <string name="item_kind">Art</string>
+    <string name="item_incomplete">Noch unvollständig – bitte auswählen</string>
+    <string name="trigger_for">Auslöser für „%1$s“</string>
+    <string name="condition_for">Bedingung für „%1$s“</string>
+    <string name="action_for">Aktion für „%1$s“</string>
+    <string name="trigger_hint_time">jeden Tag oder an Wochentagen</string>
+    <string name="trigger_hint_sun">Aufgang oder Untergang ± Minuten</string>
+    <string name="trigger_hint_device">an/aus, offen, Bewegung</string>
+    <string name="trigger_hint_sensor">Temperatur oder Feuchte über/unter</string>
+    <string name="trigger_hint_connectivity">Gerät geht offline / online</string>
+    <string name="trigger_hint_start">nach Neustart oder Stromausfall</string>
+    <string name="condition_hint_time">nur zwischen zwei Uhrzeiten</string>
+    <string name="condition_hint_days">nur an bestimmten Tagen</string>
+    <string name="condition_hint_device">an/aus, offen, belegt</string>
+    <string name="action_hint_device">schalten, dimmen, Storen</string>
+    <string name="action_hint_scene">eine gespeicherte Stimmung</string>
+    <string name="action_hint_delay">Pause vor dem nächsten Schritt</string>
+    <string name="action_hint_notify">Meldung auf dem Panel</string>
+    <string name="sun_offset">Versatz</string>
+    <string name="time_ring_hint">Am Ring ziehen für die Uhrzeit, −/+ in 5-Minuten-Schritten.</string>
+    <string name="time_window_hint">„Von“ oder „Bis“ antippen, dann am Ring ziehen.</string>
+    <plurals name="automations_failing">
+        <item quantity="one">%1$d mit Fehler</item>
+        <item quantity="other">%1$d mit Fehler</item>
+    </plurals>
+    <string name="action_other_device">Anderes Gerät</string>
 </resources>

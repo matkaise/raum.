@@ -397,12 +397,12 @@
 
     <!-- Automationen: Oberfläche -->
     <string name="automations_subtitle">%1$d of %2$d active</string>
-    <string name="automation_new">New automation</string>
-    <string name="automation_edit">Edit automation</string>
-    <string name="automations_empty">No automations yet</string>
+    <string name="automation_new">New routine</string>
+    <string name="automation_edit">Edit routine</string>
+    <string name="automations_empty">No routines yet</string>
     <string name="automations_empty_text">By time, sun, sensors or devices.</string>
-    <string name="automation_create_first">Create first automation</string>
-    <string name="automation_delete_text">The automation will be deleted permanently.</string>
+    <string name="automation_create_first">Create first routine</string>
+    <string name="automation_delete_text">The routine will be deleted permanently.</string>
     <string name="automation_delete_text_log">Deleted permanently. Log is kept.</string>
     <string name="automation_test_run">Test run now</string>
     <string name="automation_paused_until">Paused until %1$s (triggered too often)</string>
@@ -412,11 +412,11 @@
     <string name="msg_automation_incomplete">“%1$s” is incomplete – please edit it first.</string>
     <string name="msg_automation_running">Running “%1$s”</string>
     <string name="msg_copy_created_disabled">Copy created (disabled)</string>
-    <string name="automation_not_found">Automation not found</string>
+    <string name="automation_not_found">Routine not found</string>
     <string name="active">Active</string>
     <string name="summary">Summary</string>
     <string name="automation_test_actions">Test actions now</string>
-    <string name="automation_delete">Delete automation</string>
+    <string name="automation_delete">Delete routine</string>
     <string name="section_when">When</string>
     <string name="section_when_hint">Any of these triggers occurs</string>
     <string name="section_only_if">Only if</string>
@@ -463,9 +463,9 @@
     <string name="trigger_sun_no_location">No location – this trigger never fires.</string>
     <string name="sunrise">Sunrise</string>
     <string name="sunset">Sunset</string>
-    <string name="offset_exact">Offset: exactly then</string>
-    <string name="offset_after">Offset: %1$d min after</string>
-    <string name="offset_before">Offset: %1$d min before</string>
+    <string name="offset_exact">exactly then</string>
+    <string name="offset_after">%1$d min after</string>
+    <string name="offset_before">%1$d min before</string>
     <string name="connectivity_lost">becomes unreachable</string>
     <string name="connectivity_back">is reachable again</string>
     <string name="trigger_start_hint">When raum. starts, e.g. after a power cut.</string>
@@ -1684,4 +1684,42 @@
     <string name="scene_add_to">to “%1$s” · tap to select</string>
     <string name="scene_try">Try it</string>
     <string name="scene_light_tone">Light colour</string>
+    <string name="automation_paused_short">Paused until %1$s</string>
+    <string name="automation_switched_off">Switched off</string>
+    <string name="automation_last_triggered">Last triggered %1$s</string>
+    <string name="automation_never_triggered">Not triggered yet</string>
+    <string name="automation_new_hint">If … then … – e.g. close the blinds at sunset</string>
+    <string name="over_midnight_short">past midnight</string>
+    <string name="automation_add_trigger">Trigger</string>
+    <string name="automation_add_condition">Condition</string>
+    <string name="automation_add_action">Action</string>
+    <string name="days_workdays">Weekdays</string>
+    <string name="time_earlier">5 minutes earlier</string>
+    <string name="time_later">5 minutes later</string>
+    <string name="item_kind">Type</string>
+    <string name="item_incomplete">Not complete yet – please choose</string>
+    <string name="trigger_for">Trigger for “%1$s”</string>
+    <string name="condition_for">Condition for “%1$s”</string>
+    <string name="action_for">Action for “%1$s”</string>
+    <string name="trigger_hint_time">every day or on certain days</string>
+    <string name="trigger_hint_sun">sunrise or sunset ± minutes</string>
+    <string name="trigger_hint_device">on/off, open, motion</string>
+    <string name="trigger_hint_sensor">temperature or humidity above/below</string>
+    <string name="trigger_hint_connectivity">device goes offline / online</string>
+    <string name="trigger_hint_start">after a restart or power cut</string>
+    <string name="condition_hint_time">only between two times</string>
+    <string name="condition_hint_days">only on certain days</string>
+    <string name="condition_hint_device">on/off, open, occupied</string>
+    <string name="action_hint_device">switch, dim, blinds</string>
+    <string name="action_hint_scene">a saved mood</string>
+    <string name="action_hint_delay">pause before the next step</string>
+    <string name="action_hint_notify">message on the panel</string>
+    <string name="sun_offset">Offset</string>
+    <string name="time_ring_hint">Drag the ring to set the time, −/+ in 5-minute steps.</string>
+    <string name="time_window_hint">Tap “From” or “To”, then drag the ring.</string>
+    <plurals name="automations_failing">
+        <item quantity="one">%1$d with an error</item>
+        <item quantity="other">%1$d with errors</item>
+    </plurals>
+    <string name="action_other_device">Other device</string>
 </resources>

@@ -26,6 +26,9 @@ data class AutomationRow(
     val sentence: String,
     val status: AutomationStatus,
     val lastEntry: LogEntry?,
+    val triggers: List<StepLabel> = emptyList(),
+    val conditions: List<StepLabel> = emptyList(),
+    val actions: List<StepLabel> = emptyList(),
 )
 
 class AutomationsViewModel(
@@ -45,8 +48,15 @@ class AutomationsViewModel(
         engine.status,
         eventLog.observeLatestPerAutomation(),
     ) { automations, devices, scenes, status, latest ->
-        val describer = AutomationDescriber(devices.associateBy { it.id }, scenes.associate { it.id to it.name }, strings, settings.temperatureUnit.value)
-        automations.map { a -> AutomationRow(a, describer.sentence(a), status[a.id] ?: AutomationStatus(), latest[a.id]) }
+        val byId = devices.associateBy { it.id }
+        val describer = AutomationDescriber(byId, scenes.associate { it.id to it.name }, strings, settings.temperatureUnit.value)
+        val labels = FlowLabels(byId, describer, strings)
+        automations.map { a ->
+            AutomationRow(
+                a, describer.sentence(a), status[a.id] ?: AutomationStatus(), latest[a.id],
+                a.triggers.map(labels::trigger), a.conditions.map(labels::condition), a.actions.map(labels::action),
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun setEnabled(a: Automation, enabled: Boolean) = viewModelScope.launch {
