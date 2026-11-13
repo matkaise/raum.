@@ -1566,7 +1566,6 @@
     <string name="sonos_volume_up">Louder</string>
     <string name="sonos_favorites_play_in">from the Sonos app · tap to play in %1$s</string>
     <string name="sonos_tile_playing">playing</string>
-    <string name="sonos_rooms_hint">Tap to add a room or remove it again.</string>
     <string name="sonos_room_plays_with">plays along</string>
     <string name="sonos_room_own">playing its own music</string>
     <string name="sonos_room_free">free</string>

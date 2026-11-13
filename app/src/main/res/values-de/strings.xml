@@ -1565,7 +1565,6 @@
     <string name="sonos_volume_up">Lauter</string>
     <string name="sonos_favorites_play_in">aus der Sonos-App · antippen spielt in %1$s</string>
     <string name="sonos_tile_playing">läuft</string>
-    <string name="sonos_rooms_hint">Antippen holt einen Raum dazu oder löst ihn wieder.</string>
     <string name="sonos_room_plays_with">spielt mit</string>
     <string name="sonos_room_own">spielt eigene Musik</string>
     <string name="sonos_room_free">frei</string>

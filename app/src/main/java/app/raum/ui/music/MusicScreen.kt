@@ -1,5 +1,10 @@
 package app.raum.ui.music
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyRow
+import app.raum.ui.components.RingTabSpec
+import app.raum.ui.components.RingTabStrip
+import app.raum.ui.overview.SkyChip
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -140,12 +145,18 @@ fun MusicScreen(
     LaunchedEffect(selected?.id) { if (selected != null && selected.id != selectedId) vm.select(selected.id) }
 
     Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 24.dp, top = 20.dp, bottom = 24.dp)) {
-        Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 18.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Column(Modifier.weight(1f)) {
+        // Kopf wie Räume und Geräte: Titel mit Tag, Lautsprecher als Ring-Leiste
+        Row(
+            Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).heightIn(min = 136.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(stringResource(R.string.nav_music), style = SkyTextStyle, color = SkyText, fontSize = 56.sp, fontWeight = FontWeight.Light, letterSpacing = (-1.5).sp, lineHeight = 58.sp)
-                Text(headline(st), style = SkyTextStyle, color = SkyTextSoft, fontSize = 17.sp, modifier = Modifier.padding(top = 8.dp))
+                SkyChip(Icons.Outlined.Speaker, SkyText, headline(st), height = 40)
             }
-            if (st.groups.size > 1 && selected != null) RoomTabs(st, selected, vm::select)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                if (st.groups.size > 1 && selected != null) SpeakerTabs(st, selected, vm::select)
+            }
         }
         when {
             selected == null -> EmptyMusic(st, onOpenSettings)
@@ -162,12 +173,13 @@ private fun isIdle(p: Playback) = !p.hasContent || p.state == TransportState.STO
 private fun headline(st: SonosState): String {
     val n = st.players.size
     val playing = st.groups.filter { it.playback.playing }
+    // Was gerade spielt, zeigt die Leiste; ohne Leiste (ein Lautsprecher) steht es im Tag
     return listOfNotNull(
         "Sonos",
         if (n > 0) pluralStringResource(R.plurals.sonos_speakers, n, n) else null,
         when {
+            st.groups.size > 1 -> null
             playing.size == 1 -> stringResource(R.string.sonos_headline_playing, playing.first().name)
-            playing.size > 1 -> pluralStringResource(R.plurals.sonos_headline_playing_many, playing.size, playing.size)
             n > 0 -> stringResource(R.string.sonos_headline_quiet)
             else -> null
         },
@@ -194,29 +206,28 @@ private fun EmptyMusic(st: SonosState, onOpenSettings: () -> Unit) {
 
 // --- Raumleiste --------------------------------------------------------------------------------------
 
+/**
+ * Lautsprecher als Ring-Leiste wie Räume und Geräte: Spielt einer, steht sein Cover im Ring, der Ring zeigt die
+ * Lautstärke und ein Schallwellen-Abzeichen sitzt am Rand.
+ */
 @Composable
-private fun RoomTabs(st: SonosState, selected: SonosGroup, onPick: (String) -> Unit) {
-    val desc = stringResource(R.string.sonos_choose_room)
-    Row(
-        Modifier.semantics { contentDescription = desc }.clip(RoundedCornerShape(30.dp)).background(Color.White.copy(alpha = 0.14f))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(30.dp)).padding(5.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        st.groups.forEach { grp ->
-            val on = grp.id == selected.id
-            val bg by animateColorAsState(if (on) Color.White else Color.Transparent, label = "tab")
-            val fg = if (on) Color(0xFF10131F) else Color.White
-            Row(
-                Modifier.height(48.dp).clip(RoundedCornerShape(24.dp)).background(bg).clickable { onPick(grp.id) }.padding(start = 14.dp, end = 18.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(if (grp.members.size > 1) Icons.Outlined.SpeakerGroup else Icons.Outlined.Speaker, null, Modifier.size(20.dp), tint = fg)
-                Text(grp.name, color = fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                // Statisch statt animiert: Dauer-Animationen kosten auf dem Panel bei jedem Bild Rechenzeit
-                if (grp.playback.playing) Icon(Icons.Outlined.GraphicEq, stringResource(R.string.sonos_state_playing), Modifier.size(18.dp), tint = fg)
-            }
-        }
+private fun SpeakerTabs(st: SonosState, selected: SonosGroup, onPick: (String) -> Unit) {
+    val ink = Color(0xFF10131F)
+    val tabs = st.groups.map { grp ->
+        val p = grp.playback
+        val showCover = p.hasContent && p.source != PlaySource.TV && !isIdle(p)
+        // Still (gestoppt) heißt hier wie auf der Seite „frei“, nicht „pausiert“
+        val status = if (isIdle(p)) stringResource(R.string.sonos_state_idle)
+            else statusLine(grp).let { s -> if (p.playing && grp.volume != null) "$s · ${grp.volume}" else s }
+        RingTabSpec(
+            key = grp.id, label = grp.name, status = status,
+            icon = if (grp.members.size > 1) Icons.Outlined.SpeakerGroup else Icons.Outlined.Speaker,
+            ring = if (showCover) (grp.volume ?: 0) / 100f else null, ringColor = Color.White, ringColorSelected = ink,
+            active = p.playing, accentOn = ink, accentOff = Color.White, wave = p.playing,
+            coreContent = if (showCover) ({ CoverImage(rememberCover(listOfNotNull(p.track?.artUrl)), 42.dp, CircleShape, icon = sourceIcon(grp)) }) else null,
+        )
     }
+    RingTabStrip(tabs, selected.id, stringResource(R.string.sonos_choose_room), onPick)
 }
 
 // --- Es läuft etwas ----------------------------------------------------------------------------------
@@ -224,7 +235,7 @@ private fun RoomTabs(st: SonosState, selected: SonosGroup, onPick: (String) -> U
 @Composable
 private fun PlayingBody(st: SonosState, group: SonosGroup, starting: String?, vm: MusicViewModel) {
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().height(384.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(36.dp)) {
+        Row(Modifier.fillMaxWidth().height(350.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(36.dp)) {
             HeroCover(group)
             NowPlaying(group, vm, Modifier.weight(1f))
             VolumeCard(group, vm, Modifier.width(250.dp).fillMaxHeight().padding(vertical = 14.dp))
@@ -469,7 +480,6 @@ private fun RoomsCard(st: SonosState, group: SonosGroup, vm: MusicViewModel, mod
     ) {
         Text(stringResource(R.string.sonos_rooms).uppercase(), color = g.soft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.3.sp)
         st.players.forEach { pl -> RoomRow(st, pl, group, vm) }
-        Text(stringResource(R.string.sonos_rooms_hint), color = g.soft, fontSize = 12.sp, lineHeight = 16.sp, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
@@ -567,34 +577,37 @@ private fun IdleBody(st: SonosState, group: SonosGroup, starting: String?, vm: M
         if (items.isEmpty()) {
             Text(stringResource(R.string.sonos_favorites_empty), style = SkyTextStyle, color = SkyTextSoft, fontSize = 15.sp, modifier = Modifier.padding(start = 12.dp, end = 24.dp))
         } else {
-            LazyVerticalGrid(
-                GridCells.Fixed(4), Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(start = 12.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
+            // Große Cover-Karten wie die Programmkarten im Haushalt; viele wischen waagrecht
+            LazyRow(
+                Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(items, key = { it.kind.name + it.id }) { f -> FavoriteRowTile(f, starting == f.id) { vm.play(group.id, f) } }
+                items(items, key = { it.kind.name + it.id }) { f -> FavoriteCard(f, starting == f.id) { vm.play(group.id, f) } }
             }
         }
     }
 }
 
 @Composable
-private fun FavoriteRowTile(f: SonosFavorite, busy: Boolean, onClick: () -> Unit) {
-    val g = LocalGlass.current
-    Row(
-        Modifier.fillMaxWidth().height(96.dp).glass(RoundedCornerShape(24.dp), g.glass, g.edge).clickable(enabled = !busy, onClick = onClick).padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+private fun FavoriteCard(f: SonosFavorite, busy: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.width(200.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = 0.18f))
+            .clickable(enabled = !busy, onClick = onClick).padding(10.dp),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            SonosCover(f.artUrls, 74.dp, RoundedCornerShape(16.dp), icon = if (f.isStream) Icons.Outlined.Radio else Icons.Outlined.QueueMusic)
-            if (busy) CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 3.dp)
+        Box(Modifier.size(180.dp)) {
+            SonosCover(f.artUrls, 180.dp, RoundedCornerShape(18.dp), icon = if (f.isStream) Icons.Outlined.Radio else Icons.Outlined.QueueMusic)
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(10.dp).size(48.dp).shadow(6.dp, CircleShape).clip(CircleShape).background(Color.White),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (busy) CircularProgressIndicator(Modifier.size(24.dp), color = Color(0xFF10131F), strokeWidth = 3.dp)
+                else Icon(Icons.Outlined.PlayArrow, stringResource(R.string.sonos_play), Modifier.size(26.dp), tint = Color(0xFF10131F))
+            }
         }
-        Column(Modifier.weight(1f)) {
-            Text(f.title, color = g.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val sub = f.subtitle ?: if (f.kind == FavoriteKind.PLAYLIST) stringResource(R.string.sonos_playlist) else null
-            sub?.let { Text(it, color = g.soft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        }
-        Icon(Icons.Outlined.PlayCircle, stringResource(R.string.sonos_play), Modifier.size(28.dp), tint = g.soft)
+        Text(f.title, style = SkyTextStyle, color = SkyText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
+        val sub = f.subtitle ?: if (f.kind == FavoriteKind.PLAYLIST) stringResource(R.string.sonos_playlist) else null
+        Text(sub ?: "", style = SkyTextStyle, color = SkyTextSoft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

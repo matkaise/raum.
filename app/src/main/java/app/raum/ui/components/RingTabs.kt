@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +73,12 @@ data class RingTabSpec(
     val accentOff: Color? = null,
     val badge: Boolean = false,
     val dashed: Boolean = false,
+    /** Ringfarbe, wenn die Taste gewählt ist (weiß hinterlegt) – sonst [ringColor] */
+    val ringColorSelected: Color? = null,
+    /** Eigener Inhalt im Kern statt des Symbols (Cover bei Musik) */
+    val coreContent: (@Composable () -> Unit)? = null,
+    /** Schallwellen-Abzeichen oben rechts (spielt gerade) */
+    val wave: Boolean = false,
 )
 
 @Composable
@@ -144,7 +151,7 @@ private fun RingTab(t: RingTabSpec, on: Boolean, onClick: () -> Unit) {
                 } else {
                     drawArc(if (on) TabInk.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.28f), 0f, 360f, false, inset, arc, style = Stroke(stroke))
                     t.ring?.takeIf { it > 0f }?.let { f ->
-                        drawArc(t.ringColor, -90f, 360f * f.coerceIn(0f, 1f), false, inset, arc, style = Stroke(stroke, cap = StrokeCap.Round))
+                        drawArc(if (on) t.ringColorSelected ?: t.ringColor else t.ringColor, -90f, 360f * f.coerceIn(0f, 1f), false, inset, arc, style = Stroke(stroke, cap = StrokeCap.Round))
                     }
                 }
             }
@@ -153,7 +160,14 @@ private fun RingTab(t: RingTabSpec, on: Boolean, onClick: () -> Unit) {
                 else -> t.core ?: Color.White.copy(alpha = 0.94f)
             }
             Box(Modifier.size(42.dp).clip(CircleShape).background(core), contentAlignment = Alignment.Center) {
-                Icon(t.icon, null, Modifier.size(22.dp), tint = if (t.dashed) (if (on) TabInk else Color.White) else t.iconTint)
+                if (t.coreContent != null) t.coreContent.invoke()
+                else Icon(t.icon, null, Modifier.size(22.dp), tint = if (t.dashed) (if (on) TabInk else Color.White) else t.iconTint)
+            }
+            if (t.wave) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(20.dp).clip(CircleShape).background(if (on) TabInk else Color.White),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.GraphicEq, null, Modifier.size(13.dp), tint = if (on) Color.White else TabInk) }
             }
             if (t.badge) {
                 Box(Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp).size(14.dp).clip(CircleShape).background(Color.White).padding(2.dp).clip(CircleShape).background(Color(0xFFE5484D)))

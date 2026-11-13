@@ -76,10 +76,14 @@ private val CardInk = Color(0xFF2A2238)
 /**
  * Übersicht: Musikkarte (Entwurf „raum. Übersicht Redesign“) – dunkel wie die Musikseite, hinter dem Cover dessen
  * Leuchtfarbe. Titel, Fortschritt, Zurück/Pause/Weiter und Lautstärke −/+; antippen öffnet die Musik.
- * Spielen mehrere Räume, zeigt die Karte den ersten und „+1“.
+ * Spielen mehrere Räume, stehen sie als zwei Zeilen übereinander (mehr als zwei: „+n“ an der zweiten).
  */
 @Composable
 fun MusicGlanceCard(groups: List<SonosGroup>, service: SonosService, modifier: Modifier, onOpen: (String) -> Unit) {
+    if (groups.size > 1) {
+        MultiMusicCard(groups, service, modifier, onOpen)
+        return
+    }
     val group = groups.first()
     val p = group.playback
     val now = rememberNow()
@@ -102,7 +106,7 @@ fun MusicGlanceCard(groups: List<SonosGroup>, service: SonosService, modifier: M
                     if (p.playing) Icon(Icons.Outlined.GraphicEq, null, Modifier.size(15.dp), tint = Color.White)
                     val where = stringResource(if (p.playing) R.string.sonos_playing_in else R.string.sonos_paused_in, group.name).uppercase()
                     Text(
-                        if (groups.size > 1) "$where  +${groups.size - 1}" else where,
+                        where,
                         color = Color.White.copy(alpha = 0.72f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.3.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
@@ -135,10 +139,65 @@ fun MusicGlanceCard(groups: List<SonosGroup>, service: SonosService, modifier: M
     }
 }
 
+/** Mehrere Räume spielen: je Raum eine Zeile mit Cover, Titel, Pause/Weiter und Lautstärke. */
+@Composable
+private fun MultiMusicCard(groups: List<SonosGroup>, service: SonosService, modifier: Modifier, onOpen: (String) -> Unit) {
+    val shown = groups.take(2)
+    Column(modifier.clip(RoundedCornerShape(28.dp)).background(CardInk)) {
+        shown.forEachIndexed { i, group ->
+            if (i > 0) Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+            val more = if (i == shown.lastIndex && groups.size > shown.size) groups.size - shown.size else 0
+            MusicLine(group, service, more, Modifier.weight(1f).fillMaxWidth()) { onOpen(group.id) }
+        }
+    }
+}
+
+@Composable
+private fun MusicLine(group: SonosGroup, service: SonosService, more: Int, modifier: Modifier, onOpen: () -> Unit) {
+    val p = group.playback
+    val scope = rememberCoroutineScope()
+    val cover = rememberCover(listOfNotNull(p.track?.artUrl))
+    val glow = remember(cover) { glowColor(cover) }
+    Box(modifier.clickable(onClick = onOpen)) {
+        Canvas(Modifier.fillMaxSize()) {
+            val c = Offset(54.dp.toPx(), size.height / 2f)
+            val r = 120.dp.toPx()
+            drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = 0.55f), glow.copy(alpha = 0f)), c, r), r, c)
+        }
+        Row(
+            Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            CoverImage(cover, 72.dp, RoundedCornerShape(14.dp), Modifier.shadow(8.dp, RoundedCornerShape(14.dp)), icon = sourceIcon(group))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (p.playing) Icon(Icons.Outlined.GraphicEq, null, Modifier.size(13.dp), tint = Color.White)
+                    Text(
+                        group.name.uppercase() + if (more > 0) "  +$more" else "",
+                        color = Color.White.copy(alpha = 0.72f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(primaryLine(p), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+                secondaryLine(p)?.let { Text(it, color = Color.White.copy(alpha = 0.72f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+            val transport = p.hasContent && p.source != PlaySource.LINE_IN
+            val icon = when { !p.playing -> Icons.Outlined.PlayArrow; p.canPause -> Icons.Outlined.Pause; else -> Icons.Outlined.Stop }
+            DarkButton(icon, stringResource(if (p.playing) R.string.sonos_pause else R.string.sonos_play), 48.dp, primary = true, enabled = transport) { scope.launch { service.playPause(group.id) } }
+            DarkButton(Icons.Outlined.SkipNext, stringResource(R.string.sonos_next), 40.dp, enabled = transport && p.canNext) { scope.launch { service.next(group.id) } }
+            val vol = group.volume
+            if (vol != null) {
+                DarkButton(Icons.Outlined.Remove, stringResource(R.string.sonos_volume_down), 36.dp) { scope.launch { service.setGroupVolume(group.id, (vol - 5).coerceAtLeast(0)) } }
+                VolumeRing(vol, 42.dp)
+                DarkButton(Icons.Outlined.Add, stringResource(R.string.sonos_volume_up), 36.dp) { scope.launch { service.setGroupVolume(group.id, (vol + 5).coerceAtMost(100)) } }
+            }
+        }
+    }
+}
+
 /** Kleiner Lautstärkering (270°) mit Zahl. */
 @Composable
-private fun VolumeRing(volume: Int) {
-    Box(Modifier.size(50.dp), contentAlignment = Alignment.Center) {
+private fun VolumeRing(volume: Int, diameter: Dp = 50.dp) {
+    Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = 4.5.dp.toPx()
             val inset = Offset(stroke / 2, stroke / 2)
