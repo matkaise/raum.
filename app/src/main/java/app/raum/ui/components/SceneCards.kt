@@ -63,6 +63,9 @@ private data class Mood(val sky: List<Color>, val orb: Brush, val moon: Boolean 
 
 private fun orb(vararg stops: Pair<Float, Color>) = Brush.radialGradient(colorStops = stops)
 
+/** Himmelsverlauf einer Stimmung – für die Stimmungswahl im Szeneneditor. */
+fun moodSky(icon: String): List<Color> = moodOf(icon).sky
+
 private fun moodOf(icon: String): Mood = when (icon) {
     "power" -> Mood(listOf(Color(0xFF15161C), Color(0xFF2A2B33)), orb(0f to Color.White.copy(alpha = 0.08f), 1f to Color.White.copy(alpha = 0.08f)))
     "movie", "tv" -> Mood(listOf(Color(0xFF1E1340), Color(0xFF5B2A7A), Color(0xFFB0507A)), orb(0f to Color(0xFFFF9BD0), 0.7f to Color(0xFF8A4DFF), 1f to Color(0x008A4DFF)))
@@ -111,13 +114,17 @@ fun SceneMoodCard(
     tall: Boolean = false,
     subtitle: String? = null,
     onMore: (() -> Unit)? = null,
+    /** Große Karte in mittlerer Höhe (Szenenseite mit zwei Reihen auf dem Bildschirm) */
+    medium: Boolean = false,
     menu: @Composable () -> Unit = {},
 ) {
     val mood = moodOf(scene.icon)
     val state = if (running) SceneRun.RUNNING else if (done) SceneRun.DONE else SceneRun.IDLE
     val t = updateTransition(state, label = "scene")
     val scale by t.animateFloat(label = "scale") { if (it == SceneRun.RUNNING) 0.97f else 1f }
-    val orbY by t.animateDp({ tween(600) }, label = "orbY") { if (it == SceneRun.RUNNING) 40.dp else 70.dp }
+    val orbY by t.animateDp({ tween(600) }, label = "orbY") {
+        if (medium) (if (it == SceneRun.RUNNING) 18.dp else 34.dp) else if (it == SceneRun.RUNNING) 40.dp else 70.dp
+    }
     val pulse = if (running) {
         val inf = rememberInfiniteTransition(label = "pulse")
         inf.animateFloat(0f, 1f, infiniteRepeatable(tween(1000), RepeatMode.Restart), label = "p").value
@@ -135,7 +142,7 @@ fun SceneMoodCard(
     }
     Box(
         modifier
-            .height(if (tall) 430.dp else 150.dp)
+            .height(if (tall) (if (medium) 290.dp else 430.dp) else 150.dp)
             .scale(scale)
             .drawBehind {
                 // Puls um die Karte, solange die Szene läuft
@@ -156,7 +163,7 @@ fun SceneMoodCard(
             .clickable(enabled = enabled, onClick = onRun),
     ) {
         // Kugel: Sonne, Mond oder Licht der Stimmung
-        val orbSize = if (tall) 120.dp else 90.dp
+        val orbSize = if (tall) (if (medium) 96.dp else 120.dp) else 90.dp
         val orbMod = if (tall) Modifier.align(Alignment.TopCenter).offset(y = orbY) else Modifier.align(Alignment.TopEnd).offset(x = 10.dp, y = (-18).dp)
         if (mood.moon) {
             Canvas(orbMod.size(orbSize)) {
@@ -168,15 +175,15 @@ fun SceneMoodCard(
         if (tall) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.35f))))
         }
-        Column(Modifier.align(Alignment.BottomStart).padding(if (tall) 24.dp else 20.dp)) {
-            Icon(RaumIcons.scene(scene.icon), null, Modifier.size(if (tall) 34.dp else 30.dp), tint = Color.White)
+        Column(Modifier.align(Alignment.BottomStart).padding(if (tall && !medium) 24.dp else 18.dp)) {
+            Icon(RaumIcons.scene(scene.icon), null, Modifier.size(if (tall && !medium) 34.dp else 28.dp), tint = Color.White)
             Text(
-                scene.name, color = Color.White, fontSize = if (tall) 30.sp else 22.sp, fontWeight = FontWeight.Medium,
-                lineHeight = if (tall) 33.sp else 26.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp),
+                scene.name, color = Color.White, fontSize = if (tall) (if (medium) 24.sp else 30.sp) else 22.sp, fontWeight = FontWeight.Medium,
+                lineHeight = if (tall) (if (medium) 27.sp else 33.sp) else 26.sp, maxLines = if (medium) 1 else 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp),
             )
             if (tall) {
                 subtitle?.let {
-                    Text(it, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, maxLines = 2, modifier = Modifier.padding(top = 6.dp).heightIn(min = 20.dp))
+                    Text(it, color = Color.White.copy(alpha = 0.85f), fontSize = if (medium) 13.sp else 15.sp, maxLines = if (medium) 1 else 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = if (medium) 4.dp else 6.dp).heightIn(min = 18.dp))
                 }
                 Row(
                     Modifier.padding(top = 14.dp).fillMaxWidth().height(48.dp).clip(RoundedCornerShape(24.dp)).background(Color.White.copy(alpha = 0.2f)),

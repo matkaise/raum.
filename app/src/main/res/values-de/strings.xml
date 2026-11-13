@@ -1658,4 +1658,29 @@
         <item quantity="one">in %1$d Raum</item>
         <item quantity="other">in %1$d Räumen</item>
     </plurals>
+    <plurals name="scene_mix_lights">
+        <item quantity="one">%1$d Licht</item>
+        <item quantity="other">%1$d Lichter</item>
+    </plurals>
+    <plurals name="scene_mix_covers">
+        <item quantity="one">%1$d Store</item>
+        <item quantity="other">%1$d Storen</item>
+    </plurals>
+    <plurals name="scene_mix_climate">
+        <item quantity="one">%1$d Thermostat</item>
+        <item quantity="other">%1$d Thermostate</item>
+    </plurals>
+    <plurals name="scene_mix_switches">
+        <item quantity="one">%1$d Steckdose</item>
+        <item quantity="other">%1$d Steckdosen</item>
+    </plurals>
+    <string name="scene_new_hint">Geräte wählen, Zustand festlegen, ausprobieren</string>
+    <string name="scene_add_hint">Neue Geräte übernehmen ihren aktuellen Zustand – danach hier anpassen.</string>
+    <string name="scene_preview">Vorschau</string>
+    <string name="scene_mood">Stimmung</string>
+    <string name="scene_already_in">schon drin</string>
+    <string name="scene_add_n">%1$d Geräte hinzufügen</string>
+    <string name="scene_add_to">zu „%1$s“ · antippen wählt aus</string>
+    <string name="scene_try">Ausprobieren</string>
+    <string name="scene_light_tone">Lichtfarbe</string>
 </resources>

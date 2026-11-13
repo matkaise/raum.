@@ -1659,4 +1659,29 @@
         <item quantity="one">in %1$d room</item>
         <item quantity="other">in %1$d rooms</item>
     </plurals>
+    <plurals name="scene_mix_lights">
+        <item quantity="one">%1$d light</item>
+        <item quantity="other">%1$d lights</item>
+    </plurals>
+    <plurals name="scene_mix_covers">
+        <item quantity="one">%1$d cover</item>
+        <item quantity="other">%1$d covers</item>
+    </plurals>
+    <plurals name="scene_mix_climate">
+        <item quantity="one">%1$d thermostat</item>
+        <item quantity="other">%1$d thermostats</item>
+    </plurals>
+    <plurals name="scene_mix_switches">
+        <item quantity="one">%1$d socket</item>
+        <item quantity="other">%1$d sockets</item>
+    </plurals>
+    <string name="scene_new_hint">Pick devices, set their state, try it out</string>
+    <string name="scene_add_hint">New devices take on their current state – adjust them here afterwards.</string>
+    <string name="scene_preview">Preview</string>
+    <string name="scene_mood">Mood</string>
+    <string name="scene_already_in">already in</string>
+    <string name="scene_add_n">Add %1$d devices</string>
+    <string name="scene_add_to">to “%1$s” · tap to select</string>
+    <string name="scene_try">Try it</string>
+    <string name="scene_light_tone">Light colour</string>
 </resources>
